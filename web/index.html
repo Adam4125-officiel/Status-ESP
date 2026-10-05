@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Status-ESP</title>
+<style>
+/* Status-ESP web interface: one page, no external resource (the device is often offline). */
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#111;color:#eee;line-height:1.4}
+header{display:flex;align-items:baseline;justify-content:space-between;gap:8px;padding:12px 16px 4px;max-width:640px;margin:auto}
+h1{font-size:20px;margin:0}
+h2{font-size:16px;margin:0 0 8px}
+h3{font-size:14px;margin:14px 0 6px;color:#bbb}
+#ver{color:#888;font-size:12px}
+nav{display:flex;gap:4px;overflow-x:auto;padding:8px 16px;max-width:640px;margin:auto;scrollbar-width:thin}
+nav button{flex:0 0 auto;background:#222;color:#ccc;border:1px solid #333;border-radius:6px;padding:8px 12px;cursor:pointer;font-size:14px}
+nav button.on{background:#2a6;border-color:#2a6;color:#fff}
+main{max-width:640px;margin:auto;padding:0 16px 40px}
+.tab{display:none}
+.tab.on{display:block}
+.card{background:#1b1b1b;border:1px solid #2c2c2c;border-radius:10px;padding:14px;margin:12px 0}
+label{display:block;margin:10px 0 4px;color:#ccc;font-size:14px}
+label.inline{display:flex;align-items:center;gap:8px;margin:8px 0}
+input[type=text],input[type=password],input[type=number],input[type=time],select{width:100%;padding:9px;background:#111;color:#eee;border:1px solid #444;border-radius:6px;font-size:15px}
+input[type=color]{width:56px;height:36px;padding:2px;background:#111;border:1px solid #444;border-radius:6px}
+input[type=range]{width:100%}
+input[type=checkbox],input[type=radio]{width:18px;height:18px;margin:0}
+input:disabled,select:disabled{opacity:.5}
+button,.btn{background:#2a6;color:#fff;border:0;border-radius:6px;padding:9px 14px;font-size:14px;cursor:pointer;text-decoration:none;display:inline-block;margin:8px 8px 0 0}
+button.alt{background:#345}
+button.warn,.btn.warn{background:#a62}
+button.small{padding:5px 9px;margin:0 0 0 6px;font-size:13px}
+button:disabled{opacity:.5;cursor:default}
+.hint{color:#888;font-size:12px;margin:4px 0}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+.row>*{flex:1 1 140px}
+.colors{display:flex;gap:18px;flex-wrap:wrap}
+.colors div{display:flex;flex-direction:column;gap:4px;font-size:13px;color:#ccc}
+.list{margin:8px 0 0;padding:0;list-style:none}
+.list li{display:flex;align-items:center;gap:6px;padding:7px 0;border-top:1px solid #2a2a2a;flex-wrap:wrap}
+.list li .name{flex:1 1 140px;word-break:break-all}
+.list li .meta{color:#888;font-size:12px}
+.list li.pick{cursor:pointer}
+.badge{background:#2a6;color:#fff;border-radius:4px;padding:1px 6px;font-size:12px}
+table{border-collapse:collapse;width:100%}
+td{padding:4px 0;border-top:1px solid #2a2a2a;font-size:14px;vertical-align:top}
+td:first-child{color:#999;width:46%}
+.ok{color:#6d6}.bad{color:#f66}
+.banner{background:#4a3410;border:1px solid #a62;color:#fc9;border-radius:8px;padding:10px;margin:12px 0;font-size:14px}
+progress{width:100%;height:8px}
+#toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:#2a6;color:#fff;padding:10px 16px;border-radius:8px;max-width:92%;font-size:14px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:9}
+#toast.show{opacity:1}
+#toast.err{background:#b33}
+a{color:#8cf}
+</style>
+</head>
+<body>
+<header><h1>Status-ESP</h1><span id="ver"></span></header>
+<nav id="tabs">
+  <button data-tab="portal">Status-Portal</button>
+  <button data-tab="network">Network</button>
+  <button data-tab="weather">Weather</button>
+  <button data-tab="time">Time</button>
+  <button data-tab="pictures">Pictures</button>
+  <button data-tab="settings">Settings</button>
+</nav>
+<main>
+<div id="banner" class="banner" hidden></div>
+
+<!-- 1. Status-Portal ------------------------------------------------------------------>
+<section class="tab" id="t-portal">
+  <div class="card">
+    <h2>Status-Portal</h2>
+    <p>Coming soon.</p>
+    <p class="hint">Showing the status of your services from Status-Portal on this display is planned.</p>
+  </div>
+</section>
+
+<!-- 2. Network ---------------------------------------------------------------------------->
+<section class="tab" id="t-network">
+  <div class="card">
+    <h2>Wi-Fi</h2>
+    <p class="hint" id="wifi-now"></p>
+    <button type="button" class="alt" id="scan">Scan for networks</button>
+    <span class="hint" id="scan-msg"></span>
+    <ul class="list" id="nets"></ul>
+    <form id="f-wifi" autocomplete="off">
+      <label for="ssid">Network name (SSID)</label>
+      <input type="text" id="ssid" name="ssid" maxlength="32" required>
+      <label for="pass">Password</label>
+      <input type="password" id="pass" name="pass" maxlength="63">
+      <button>Save and reboot</button>
+    </form>
+    <p class="hint">2.4 GHz networks only. After it connects, the <b>Status-ESP</b> hotspot disappears and the new IP address is shown on the screen. If the connection fails, the hotspot comes back.</p>
+  </div>
+  <div class="card">
+    <h2>Delay before connecting</h2>
+    <form data-settings>
+      <label for="boot_delay">Seconds to wait after boot before connecting to Wi-Fi (0 - 120)</label>
+      <input type="number" id="boot_delay" name="boot_delay" data-t="n" min="0" max="120" step="1">
+      <p class="hint">Useful when your router boots more slowly than this device. Default 0.</p>
+      <button>Save</button>
+    </form>
+  </div>
+</section>
+
+<!-- 3. Weather ------------------------------------------------------------------------------>
+<section class="tab" id="t-weather">
+  <div class="card">
+    <h2>City</h2>
+    <p>Current: <b id="curcity">none</b></p>
+    <form id="f-city" autocomplete="off">
+      <label for="q">Search a city</label>
+      <div class="row">
+        <input type="text" id="q" maxlength="60" placeholder="Paris, Tokyo, Austin...">
+        <button style="flex:0 0 auto">Search</button>
+      </div>
+    </form>
+    <ul class="list" id="cities"></ul>
+    <button type="button" class="alt" id="city-clear">Clear the city</button>
+    <p class="hint">Weather comes from open-meteo.com (no account or key needed). The device needs an internet connection.</p>
+  </div>
+  <div class="card">
+    <h2>Units and updates</h2>
+    <form data-settings>
+      <div class="row">
+        <div><label for="t_unit">Temperature</label>
+          <select id="t_unit" name="t_unit" data-t="n"><option value="0">Celsius (C)</option><option value="1">Fahrenheit (F)</option></select></div>
+        <div><label for="w_unit">Wind</label>
+          <select id="w_unit" name="w_unit" data-t="n"><option value="0">km/h</option><option value="1">m/s</option><option value="2">mph</option></select></div>
+        <div><label for="p_unit">Pressure</label>
+          <select id="p_unit" name="p_unit" data-t="n"><option value="0">hPa</option><option value="1">kPa</option><option value="2">mmHg</option><option value="3">inHg</option></select></div>
+      </div>
+      <label for="w_interval">Update interval, minutes (10 - 180)</label>
+      <input type="number" id="w_interval" name="w_interval" data-t="n" min="10" max="180" step="1">
+      <button>Save</button>
+    </form>
+  </div>
+  <div class="card">
+    <h2>GIF for the weather screen</h2>
+    <p class="hint">Animated GIF, 80 x 80 px recommended. Stored in /gif.</p>
+    <input type="file" id="gif-file" accept=".gif,image/gif">
+    <button type="button" id="gif-up">Upload</button>
+    <progress id="gif-prog" max="100" value="0" hidden></progress>
+    <ul class="list" id="gif-list"></ul>
+    <p class="hint" id="gif-free"></p>
+    <button type="button" class="alt" id="gif-none">Show no GIF</button>
+  </div>
+</section>
+
+<!-- 4. Time ---------------------------------------------------------------------------------->
+<section class="tab" id="t-time">
+  <div class="card">
+    <form data-settings id="f-time">
+      <h2>Time zone</h2>
+      <label class="inline"><input type="radio" name="tz_auto" value="1" data-t="n"> Automatic: use the offset of the city chosen in Weather (follows daylight saving)</label>
+      <label class="inline"><input type="radio" name="tz_auto" value="0" data-t="n"> Manual offset</label>
+      <select id="tz_offset" name="tz_offset" data-t="n"></select>
+      <p class="hint">With Automatic and no city set, the clock shows UTC.</p>
+
+      <h3>Colours</h3>
+      <div class="colors">
+        <div><span>Hours</span><input type="color" name="hc"></div>
+        <div><span>Minutes</span><input type="color" name="mc"></div>
+        <div><span>Seconds</span><input type="color" name="sc"></div>
+      </div>
+
+      <div class="row">
+        <div><label for="hour12">Hour format</label>
+          <select id="hour12" name="hour12" data-t="n"><option value="0">24-hour</option><option value="1">12-hour (AM/PM)</option></select></div>
+        <div><label for="date_fmt">Date format</label>
+          <select id="date_fmt" name="date_fmt" data-t="n"><option value="0">DD/MM/YYYY</option><option value="1">MM/DD/YYYY</option><option value="2">YYYY-MM-DD</option></select></div>
+        <div><label for="font">Clock font</label>
+          <select id="font" name="font" data-t="n"><option value="0">Digital (7-segment)</option><option value="1">Plain</option></select></div>
+      </div>
+      <label class="inline"><input type="checkbox" name="colon" data-t="b"> Blinking colon</label>
+
+      <label for="ntp">Custom NTP server (optional)</label>
+      <input type="text" id="ntp" name="ntp" maxlength="40" placeholder="pool.ntp.org" autocapitalize="off">
+      <p class="hint">Tried first. pool.ntp.org, time.google.com and time.cloudflare.com are used as fallbacks.</p>
+      <button>Save</button>
+    </form>
+  </div>
+</section>
+
+<!-- 5. Pictures ------------------------------------------------------------------------------>
+<section class="tab" id="t-pictures">
+  <div class="card">
+    <h2>Album</h2>
+    <form data-settings>
+      <label class="inline"><input type="checkbox" name="album_auto" data-t="b"> Auto display: show every picture in turn</label>
+      <label for="album_interval">Seconds per picture (2 - 3600)</label>
+      <input type="number" id="album_interval" name="album_interval" data-t="n" min="2" max="3600" step="1">
+      <p class="hint">With auto display off, only the picture marked "Shown" below stays on screen.</p>
+      <button>Save</button>
+    </form>
+  </div>
+  <div class="card">
+    <h2>Pictures</h2>
+    <p class="hint">JPG or GIF, 240 x 240 px. Baseline JPEG only (not progressive). Stored in /image.</p>
+    <input type="file" id="img-file" accept=".jpg,.jpeg,.gif,image/jpeg,image/gif">
+    <button type="button" id="img-up">Upload</button>
+    <progress id="img-prog" max="100" value="0" hidden></progress>
+    <ul class="list" id="img-list"></ul>
+    <p class="hint" id="img-free"></p>
+  </div>
+</section>
+
+<!-- 6. Settings --------------------------------------------------------------------------------->
+<section class="tab" id="t-settings">
+  <div class="card">
+    <h2>Theme</h2>
+    <form data-settings id="f-theme">
+      <label for="theme">Theme shown on the screen</label>
+      <select id="theme" name="theme">
+        <option value="weather_clock">Weather clock</option>
+        <option value="forecast">Forecast (3 days)</option>
+        <option value="album">Photo album</option>
+        <option value="clock">Clock</option>
+      </select>
+      <p class="hint">To choose a theme manually, turn auto-switch off.</p>
+      <label class="inline"><input type="checkbox" name="auto_switch" data-t="b"> Auto-switch between themes</label>
+      <label for="auto_interval">Seconds per theme (5 - 3600)</label>
+      <input type="number" id="auto_interval" name="auto_interval" data-t="n" min="5" max="3600" step="1">
+      <div>
+        <label class="inline"><input type="checkbox" name="auto_themes" value="weather_clock"> Weather clock</label>
+        <label class="inline"><input type="checkbox" name="auto_themes" value="forecast"> Forecast</label>
+        <label class="inline"><input type="checkbox" name="auto_themes" value="album"> Photo album</label>
+        <label class="inline"><input type="checkbox" name="auto_themes" value="clock"> Clock</label>
+      </div>
+      <p class="hint">A theme without data (no city set, no picture uploaded) is skipped.</p>
+      <button>Save</button>
+    </form>
+  </div>
+
+  <div class="card">
+    <h2>Brightness</h2>
+    <label for="brt">Brightness: <b id="brt-val"></b> %</label>
+    <input type="range" id="brt" min="0" max="100" step="1">
+    <label class="inline"><input type="checkbox" id="blinv"> Invert backlight</label>
+    <p class="hint">Tick "Invert backlight" if the screen stays black, or if brightness works backwards.</p>
+  </div>
+
+  <div class="card">
+    <h2>Night mode</h2>
+    <form data-settings id="f-night">
+      <label class="inline"><input type="checkbox" name="night_en" data-t="b"> Dim the screen at night</label>
+      <div class="row">
+        <div><label for="night_start">From</label><input type="time" id="night_start" name="night_start"></div>
+        <div><label for="night_end">Until</label><input type="time" id="night_end" name="night_end"></div>
+      </div>
+      <label for="night_brt">Night brightness: <b id="night-val"></b> %</label>
+      <input type="range" id="night_brt" name="night_brt" data-t="n" min="0" max="100" step="1">
+      <p class="hint">Uses the time of the clock (see Time). The window may cross midnight.</p>
+      <button>Save</button>
+    </form>
+  </div>
+
+  <div class="card">
+    <h2>Device</h2>
+    <button type="button" class="alt" id="reboot">Reboot</button>
+    <button type="button" class="warn" id="reset">Factory reset</button>
+    <p class="hint">Factory reset puts every setting back to its default. Uploaded pictures and the Wi-Fi network are kept.</p>
+    <h3>Firmware</h3>
+    <a class="btn warn" href="/update">Firmware update</a>
+    <p class="hint">To go back to the stock firmware, upload the official GeekMagic firmware (.bin) on the same page.</p>
+  </div>
+
+  <div class="card">
+    <h2>Status</h2>
+    <table id="status"></table>
+    <button type="button" class="alt" id="refresh">Refresh</button>
+  </div>
+</section>
+</main>
+<div id="toast"></div>
+
+<script>
+"use strict";
+var S = {};      // settings as last returned by the device
+var ST = {};     // status as last returned by the device
+
+function $(s) { return document.querySelector(s); }
+function $$(s) { return Array.prototype.slice.call(document.querySelectorAll(s)); }
+function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+function el(tag, props, kids) {
+  var e = document.createElement(tag);
+  if (props) for (var k in props) { if (k === "text") e.textContent = props[k]; else e.setAttribute(k, props[k]); }
+  (kids || []).forEach(function (c) { e.appendChild(c); });
+  return e;
+}
+
+var toastTimer;
+function toast(msg, ok) {
+  var t = $("#toast");
+  t.textContent = msg;
+  t.className = "show" + (ok === false ? " err" : "");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function () { t.className = ""; }, ok === false ? 6000 : 2500);
+}
+
+function api(path, opt) {
+  opt = opt || {};
+  opt.cache = "no-store";
+  return fetch(path, opt).then(function (r) {
+    return r.text().then(function (txt) {
+      var j = null;
+      try { j = JSON.parse(txt); } catch (e) { /* not JSON */ }
+      if (!r.ok || (j && j.ok === false)) throw new Error((j && j.error) || ("HTTP " + r.status));
+      return j || {};
+    });
+  }, function () { throw new Error("The device did not answer"); });
+}
+function post(path, obj) {
+  return api(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(obj || {}) });
+}
+
+function fmtBytes(n) {
+  n = Number(n) || 0;
+  if (n >= 1048576) return (n / 1048576).toFixed(2) + " MB";
+  if (n >= 1024) return (n / 1024).toFixed(1) + " KB";
+  return n + " B";
+}
+function fmtDuration(s) {
+  s = Number(s) || 0;
+  var d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60);
+  return (d ? d + " d " : "") + (h || d ? h + " h " : "") + m + " min";
+}
+
+/* ---- Settings: fill the forms from S, collect them back ---------------------------------- */
+
+function fill() {
+  $$("form[data-settings]").forEach(function (f) {
+    Array.prototype.forEach.call(f.elements, function (e) {
+      var k = e.name;
+      if (!k || !(k in S)) return;
+      if (k === "auto_themes") e.checked = S.auto_themes.indexOf(e.value) >= 0;
+      else if (e.type === "radio") e.checked = String(Number(S[k])) === e.value;
+      else if (e.type === "checkbox") e.checked = !!Number(S[k]);
+      else e.value = S[k];
+    });
+  });
+  $("#brt").value = S.brt;
+  $("#brt-val").textContent = S.brt;
+  $("#blinv").checked = !!Number(S.blinv);
+  $("#night-val").textContent = S.night_brt;
+  $("#curcity").textContent = S.city ? S.city + " (" + Number(S.lat).toFixed(2) + ", " + Number(S.lon).toFixed(2) + ")" : "none";
+  syncTz();
+}
+
+function collect(form) {
+  var o = {}, themes = null;
+  Array.prototype.forEach.call(form.elements, function (e) {
+    var k = e.name;
+    if (!k) return;
+    if (k === "auto_themes") {
+      if (!themes) themes = [];
+      if (e.checked) themes.push(e.value);
+    } else if (e.type === "radio") {
+      if (e.checked) o[k] = Number(e.value);
+    } else if (e.type === "checkbox") {
+      o[k] = e.checked ? 1 : 0;
+    } else if (e.dataset.t === "n") {
+      o[k] = Number(e.value);
+    } else {
+      o[k] = e.value;
+    }
+  });
+  if (themes) o.auto_themes = themes;
+  return o;
+}
+
+function save(obj, msg) {
+  return post("/api/settings", obj).then(function (j) {
+    S = j;
+    fill();
+    toast(msg || "Saved");
+    return j;
+  }, function (e) { toast(e.message, false); throw e; });
+}
+
+function syncTz() {
+  var auto = $("#f-time input[name=tz_auto]:checked");
+  $("#tz_offset").disabled = !!(auto && auto.value === "1");
+}
+
+/* ---- Tabs ------------------------------------------------------------------------------ */
+
+function showTab(name) {
+  if (!$("#t-" + name)) name = "portal";
+  $$(".tab").forEach(function (t) { t.classList.toggle("on", t.id === "t-" + name); });
+  $$("#tabs button").forEach(function (b) { b.classList.toggle("on", b.dataset.tab === name); });
+  if (location.hash !== "#" + name) history.replaceState(null, "", "#" + name);
+  if (name === "weather") loadFiles("/gif");
+  if (name === "pictures") loadFiles("/image");
+  if (name === "settings") loadStatus();
+  if (name === "network") loadStatus();
+}
+
+/* ---- Status ---------------------------------------------------------------------------- */
+
+function loadStatus() {
+  return api("/api/status").then(function (s) {
+    ST = s;
+    $("#ver").textContent = s.fw;
+    var b = $("#banner");
+    b.hidden = !s.ap;
+    b.textContent = s.ap ? "Rescue mode: the device is not connected to your Wi-Fi (hotspot Status-ESP). Time and weather are unavailable until you set the Wi-Fi in the Network tab." : "";
+    $("#wifi-now").textContent = s.ap ? "Not connected to a Wi-Fi network." : "Connected to " + (s.ssid || "?") + " (" + s.rssi + " dBm), IP " + s.ip + ".";
+    var rows = [
+      ["Version", s.fw],
+      ["IP address", s.ip + (s.ap ? " (access point)" : "")],
+      ["Wi-Fi", s.ap ? "none (rescue hotspot)" : (s.ssid || "?") + ", " + s.rssi + " dBm"],
+      ["Local time", s.time ? s.time + (s.offset_known ? "" : " (UTC)") : "not set yet"],
+      ["Uptime", fmtDuration(s.uptime)],
+      ["Free heap", fmtBytes(s.heap) + " (largest block " + fmtBytes(s.max_block) + ")"],
+      ["Firmware size", fmtBytes(s.sketch)],
+      ["Space for /update", fmtBytes(s.free_ota)],
+      ["Back to stock firmware", s.rollback_ok ? "possible" : "TOO BIG"],
+      ["Storage (LittleFS)", s.fs_mounted ? fmtBytes(s.fs_total - s.fs_used) + " free of " + fmtBytes(s.fs_total) : "not mounted"],
+      ["Weather", s.weather_ok ? "updated " + fmtDuration(s.weather_age) + " ago" : "no data"]
+    ];
+    var t = $("#status");
+    t.textContent = "";
+    rows.forEach(function (r) {
+      var v = el("td", { text: r[1] });
+      if (r[0] === "Back to stock firmware") v.className = s.rollback_ok ? "ok" : "bad";
+      t.appendChild(el("tr", null, [el("td", { text: r[0] }), v]));
+    });
+  }, function (e) { toast(e.message, false); });
+}
+
+/* ---- Wi-Fi ----------------------------------------------------------------------------- */
+
+function scan() {
+  var btn = $("#scan"), msg = $("#scan-msg"), ul = $("#nets");
+  btn.disabled = true;
+  msg.textContent = "Scanning...";
+  ul.textContent = "";
+  var tries = 0;
+  function poll(first) {
+    return api("/api/wifi/scan" + (first ? "?new=1" : "")).then(function (r) {
+      if (r.scanning && ++tries < 20) return sleep(1200).then(function () { return poll(false); });
+      return r;
+    });
+  }
+  poll(true).then(function (r) {
+    var list = r.networks || [];
+    msg.textContent = list.length ? list.length + " network(s), strongest first" : "No network found";
+    list.forEach(function (n) {
+      var li = el("li", { "class": "pick" }, [
+        el("span", { "class": "name", text: n.ssid }),
+        el("span", { "class": "meta", text: n.rssi + " dBm" + (n.secure ? "" : ", open") })
+      ]);
+      li.onclick = function () {
+        $("#ssid").value = n.ssid;
+        $("#pass").focus();
+      };
+      ul.appendChild(li);
+    });
+  }).catch(function (e) { msg.textContent = ""; toast(e.message, false); })
+    .then(function () { btn.disabled = false; });
+}
+
+/* ---- Files (pictures and GIFs) ------------------------------------------------------------ */
+
+function loadFiles(dir) {
+  var isGif = dir === "/gif";
+  return api("/api/files?dir=" + dir).then(function (r) {
+    var ul = $(isGif ? "#gif-list" : "#img-list");
+    ul.textContent = "";
+    var files = (r.files || []).slice().sort(function (a, b) { return a.name.localeCompare(b.name); });
+    if (!files.length) ul.appendChild(el("li", null, [el("span", { "class": "meta", text: "No file yet." })]));
+    files.forEach(function (f) {
+      var chosen = isGif ? S.weather_gif === f.name : S.album_file === f.name;
+      var li = el("li", null, [
+        el("span", { "class": "name", text: f.name }),
+        el("span", { "class": "meta", text: (f.size / 1024).toFixed(1) + " KB" })
+      ]);
+      if (chosen) li.appendChild(el("span", { "class": "badge", text: isGif ? "On weather screen" : "Shown" }));
+      var pick = el("button", { type: "button", "class": "small alt", text: isGif ? "Use on weather screen" : "Show" });
+      pick.disabled = chosen;
+      pick.onclick = function () {
+        save(isGif ? { weather_gif: f.name } : { album_file: f.name }, isGif ? "GIF selected" : "Picture selected")
+          .then(function () { return loadFiles(dir); }, function () {});
+      };
+      var del = el("button", { type: "button", "class": "small warn", text: "Delete" });
+      del.onclick = function () {
+        if (!confirm("Delete " + f.name + "?")) return;
+        post("/api/delete", { path: dir + "/" + f.name }).then(function () {
+          if (chosen) { if (isGif) S.weather_gif = ""; else S.album_file = ""; }
+          toast("Deleted");
+          return loadFiles(dir);
+        }).catch(function (e) { toast(e.message, false); });
+      };
+      li.appendChild(pick);
+      li.appendChild(del);
+      ul.appendChild(li);
+    });
+    $(isGif ? "#gif-free" : "#img-free").textContent =
+      "Free space: " + fmtBytes(Math.max(0, r.total - r.used - (r.reserve || 0))) + " (of " + fmtBytes(r.total) + " in total)";
+  }).catch(function (e) { toast(e.message, false); });
+}
+
+function upload(dir, input, prog, allowed) {
+  var f = input.files[0];
+  if (!f) { toast("Choose a file first", false); return; }
+  var ext = (f.name.split(".").pop() || "").toLowerCase();
+  if (allowed.indexOf(ext) < 0) { toast("Only ." + allowed.join(", .") + " files are accepted here", false); return; }
+  var fd = new FormData();
+  fd.append("file", f, f.name);
+  var x = new XMLHttpRequest();
+  x.open("POST", "/api/upload?dir=" + dir);
+  prog.hidden = false;
+  prog.value = 0;
+  x.upload.onprogress = function (e) { if (e.lengthComputable) prog.value = Math.round(e.loaded * 100 / e.total); };
+  x.onload = function () {
+    var j = {};
+    try { j = JSON.parse(x.responseText); } catch (e) { /* ignore */ }
+    prog.hidden = true;
+    if (x.status === 200 && j.ok) {
+      toast("Uploaded " + j.name);
+      input.value = "";
+      loadFiles(dir);
+    } else {
+      toast(j.error || "Upload failed (HTTP " + x.status + ")", false);
+    }
+  };
+  x.onerror = function () { prog.hidden = true; toast("Upload failed: the connection was lost", false); };
+  x.send(fd);
+}
+
+/* ---- City search --------------------------------------------------------------------------- */
+
+function searchCity(ev) {
+  ev.preventDefault();
+  var q = $("#q").value.trim(), ul = $("#cities");
+  ul.textContent = "";
+  if (q.length < 2) { toast("Type at least 2 characters", false); return; }
+  ul.appendChild(el("li", null, [el("span", { "class": "meta", text: "Searching..." })]));
+  api("/api/geocode?q=" + encodeURIComponent(q)).then(function (r) {
+    ul.textContent = "";
+    var res = r.results || [];
+    if (!res.length) ul.appendChild(el("li", null, [el("span", { "class": "meta", text: "No city found." })]));
+    res.forEach(function (c) {
+      var li = el("li", { "class": "pick" }, [
+        el("span", { "class": "name", text: c.name + (c.admin1 ? ", " + c.admin1 : "") + (c.country ? ", " + c.country : "") }),
+        el("span", { "class": "meta", text: Number(c.lat).toFixed(2) + ", " + Number(c.lon).toFixed(2) })
+      ]);
+      li.onclick = function () {
+        save({ city: c.name, lat: c.lat, lon: c.lon }, "City saved").then(function () { ul.textContent = ""; }, function () {});
+      };
+      ul.appendChild(li);
+    });
+  }).catch(function (e) { ul.textContent = ""; toast(e.message, false); });
+}
+
+/* ---- Wiring ------------------------------------------------------------------------------------- */
+
+function init() {
+  // Time zone offsets, UTC-12:00 ... UTC+14:00 in 15-minute steps.
+  var sel = $("#tz_offset");
+  for (var m = -720; m <= 840; m += 15) {
+    var a = Math.abs(m), label = "UTC" + (m < 0 ? "-" : "+") + String(Math.floor(a / 60)).padStart(2, "0") + ":" + String(a % 60).padStart(2, "0");
+    sel.appendChild(el("option", { value: String(m), text: label }));
+  }
+
+  $$("#tabs button").forEach(function (b) { b.onclick = function () { showTab(b.dataset.tab); }; });
+  window.onhashchange = function () { showTab(location.hash.slice(1)); };
+
+  $$("form[data-settings]").forEach(function (f) {
+    f.onsubmit = function (ev) { ev.preventDefault(); save(collect(f)).catch(function () {}); };
+  });
+  $$("#f-time input[name=tz_auto]").forEach(function (r) { r.onchange = syncTz; });
+
+  $("#f-wifi").onsubmit = function (ev) {
+    ev.preventDefault();
+    var ssid = $("#ssid").value;
+    post("/api/wifi", { ssid: ssid, pass: $("#pass").value }).then(function () {
+      toast("Saved. The device reboots and connects to " + ssid + ". Look at its screen for the new IP address.");
+    }).catch(function (e) { toast(e.message, false); });
+  };
+  $("#scan").onclick = scan;
+
+  $("#f-city").onsubmit = searchCity;
+  $("#city-clear").onclick = function () { save({ city: "", lat: 0, lon: 0 }, "City cleared").catch(function () {}); };
+
+  $("#gif-up").onclick = function () { upload("/gif", $("#gif-file"), $("#gif-prog"), ["gif"]); };
+  $("#gif-none").onclick = function () { save({ weather_gif: "" }, "No GIF on the weather screen").then(function () { loadFiles("/gif"); }, function () {}); };
+  $("#img-up").onclick = function () { upload("/image", $("#img-file"), $("#img-prog"), ["jpg", "jpeg", "gif"]); };
+
+  // Brightness: live while the slider moves (not saved), saved when it is released.
+  var brt = $("#brt"), liveTimer;
+  brt.oninput = function () {
+    $("#brt-val").textContent = brt.value;
+    clearTimeout(liveTimer);
+    liveTimer = setTimeout(function () {
+      api("/api/settings?save=0", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ brt: Number(brt.value) }) }).catch(function () {});
+    }, 120);
+  };
+  brt.onchange = function () { clearTimeout(liveTimer); save({ brt: Number(brt.value) }).catch(function () {}); };
+  $("#blinv").onchange = function () { save({ blinv: this.checked ? 1 : 0 }).catch(function () {}); };
+  $("#night_brt").oninput = function () { $("#night-val").textContent = this.value; };
+
+  $("#reboot").onclick = function () {
+    if (!confirm("Reboot the device?")) return;
+    post("/api/reboot").then(function () { toast("Rebooting... reload this page in about 20 seconds."); }).catch(function (e) { toast(e.message, false); });
+  };
+  $("#reset").onclick = function () {
+    if (!confirm("Reset every setting to its default value?\n\nUploaded pictures and the Wi-Fi network are kept. The device reboots.")) return;
+    post("/api/factory-reset").then(function () { toast("Settings reset. Rebooting... reload this page in about 20 seconds."); }).catch(function (e) { toast(e.message, false); });
+  };
+  $("#refresh").onclick = loadStatus;
+
+  Promise.all([api("/api/settings"), loadStatus()]).then(function (r) {
+    S = r[0];
+    fill();
+    showTab(location.hash.slice(1) || "portal");
+  }).catch(function (e) {
+    toast(e.message, false);
+    showTab(location.hash.slice(1) || "portal");
+  });
+}
+init();
+</script>
+</body>
+</html>
