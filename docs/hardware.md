@@ -1,50 +1,52 @@
-# Matériel — GeekMagic SmallTV-Ultra
+# Hardware: GeekMagic SmallTV-Ultra
 
-Légende : ✅ vérifié sur l'appareil · ❓ inconnu
+Legend: ✅ verified on the device, ❓ unknown
 
-## Composants
-| Élément | Détail | Statut |
+## Components
+| Item | Detail | Status |
 |---|---|---|
-| SoC | ESP8266EX, quartz 26 MHz, module type ESP-12F | ✅ |
-| Flash | 4 Mo, mode DIO 40 MHz | ✅ |
-| Écran | ST7789 240×240, SPI **mode 3**, 40 MHz, couleurs RVB correctes sans inversion | ✅ |
-| Rétroéclairage | GPIO5, PWM **inversé** (duty bas = lumineux) | ✅ |
-| Bouton / tactile | **Aucun** | ✅ |
-| Alimentation | USB-C (alimentation seule, pas de port série USB) | ✅ |
-| Capteurs, son | Aucun connu | ❓ |
+| SoC | ESP8266EX, 26 MHz crystal, ESP-12F-type module | ✅ |
+| Flash | 4 MB, DIO mode, 40 MHz | ✅ |
+| Display | ST7789 240x240, SPI **mode 3**, 40 MHz, correct RGB colours with no inversion | ✅ |
+| Backlight | GPIO5, **inverted** PWM (low duty = bright) | ✅ |
+| Button / touch | **None** | ✅ |
+| Power | USB-C (power only, no USB serial port) | ✅ |
+| Sensors, sound | None known | ❓ |
 
-L'appareil se pilote donc uniquement par le réseau.
+The device can therefore only be controlled over the network.
 
-## Brochage
-| GPIO | Fonction | Remarque |
+## Pinout
+| GPIO | Function | Note |
 |---|---|---|
-| 13 | SPI MOSI (écran) | |
-| 14 | SPI SCLK (écran) | |
-| 0 | DC écran | **Broche de démarrage** : ne pas la forcer à l'état bas au boot |
-| 2 | RST écran | **Broche de démarrage** : doit être haute au boot |
-| 5 | Rétroéclairage (PWM inversé) | |
-| — | CS écran | Non câblé (relié à la masse) |
-| 4, 12, 15, 16 | Libres ? | ❓ non vérifié, ne pas supposer |
+| 13 | SPI MOSI (display) | |
+| 14 | SPI SCLK (display) | |
+| 0 | Display DC | **Boot pin**: never drive it low at boot |
+| 2 | Display RST | **Boot pin**: must be high at boot |
+| 5 | Backlight (inverted PWM) | |
+| - | Display CS | Not wired (tied to ground) |
+| 4, 12, 15, 16 | Free? | ❓ not verified, do not assume anything |
 
-## Découpage de la flash (identique au firmware d'origine, « 4M3M »)
-| Adresse | Taille | Contenu |
+## Flash layout (same as the stock firmware, "4M3M")
+| Address | Size | Content |
 |---|---|---|
-| `0x000000` | 4 Ko | Bootloader Arduino `eboot` |
-| `0x001000` | ~1 Mo | Application (firmware actif) + espace pour la mise à jour suivante |
-| `0x100000` | `0x2FA000` (3 121 152 o) | LittleFS : fichiers (images, réglages `.json`, Wi-Fi d'origine…) |
-| `0x3FA000` | 24 Ko | Zone système : EEPROM, calibration RF, config Wi-Fi du SDK |
+| `0x000000` | 4 KB | Arduino bootloader `eboot` |
+| `0x001000` | ~1 MB | Application (running firmware) plus room for the next update |
+| `0x100000` | `0x2FA000` (3,121,152 bytes) | LittleFS: files (images, `.json` settings, the stock Wi-Fi credentials...) |
+| `0x3FA000` | 24 KB | System area: EEPROM, RF calibration, the SDK's Wi-Fi configuration |
 
-`/space.json` du firmware d'origine renvoie `total: 3121152`, ce qui confirme ce découpage.
+The stock firmware's `/space.json` returns `total: 3121152`, which confirms this layout.
 
-## Mise à jour par le Wi-Fi : contrainte de taille
-La mise à jour Arduino écrit la nouvelle image **dans l'espace libre derrière
-l'image actuelle**, avant la zone LittleFS, puis le bootloader la recopie.
+## Updating over Wi-Fi: the size constraint
+An Arduino over-the-air update writes the new image **into the free space behind the
+current image**, before the LittleFS area, and the bootloader then copies it into place.
 
-| Firmware installé | Taille | Espace libre pour la mise à jour |
+| Installed firmware | Size | Free space for the next update |
 |---|---|---|
-| GeekMagic 9.0.50 / 9.0.51 | 505 200 o | 540 672 o |
-| Custom 0.2.0 | ~376 000 o | ~671 000 o |
+| GeekMagic 9.0.50 / 9.0.51 | 505,200 bytes | 540,672 bytes |
+| Status-ESP 0.3.0-rc.1 | 375,504 bytes | ~671,000 bytes |
 
-D'où les deux règles du projet :
-1. notre firmware doit rester **< ~520 Ko** pour pouvoir être installé depuis le firmware d'origine ;
-2. il doit laisser **≥ 505 200 o** libres pour permettre le retour au firmware d'origine.
+Hence the two rules of the project:
+1. our firmware must stay **below ~520 KB** so it can be installed from the stock firmware;
+2. it must leave **at least 505,200 bytes** free so you can go back to the stock firmware.
+
+The enforced limit is `firmware.bin` < 520,000 bytes.

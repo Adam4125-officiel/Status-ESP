@@ -1,51 +1,58 @@
-# Firmware d'origine GeekMagic (Ultra-V9.0.50 / 9.0.51) — notes d'analyse
+# GeekMagic stock firmware (Ultra-V9.0.50 / 9.0.51): analysis notes
 
-Analyse statique avec `tools/analyze_firmware.py`. Le code source n'est pas public :
-on n'a que le binaire compilé. Le firmware lui-même **n'est pas redistribué ici**
-(propriétaire) ; la 9.0.50 est sur le [dépôt officiel](https://github.com/GeekMagicClock/smalltv-ultra).
+Static analysis done with `tools/analyze_firmware.py`. The source code is not public: only
+the compiled binary is available. The firmware itself is **not redistributed here**
+(proprietary); version 9.0.50 is available from the
+[official repository](https://github.com/GeekMagicClock/smalltv-ultra).
 
-## Généralités
-- Arduino ESP8266 (SDK NONOS compilé en 2019), LittleFS, image de 505 200 octets.
-- Identification : `GET /v.json` → `{"m": "SmallTV-Ultra","v":"Ultra-V9.0.51"}`.
-- La 9.0.51 (version d'usine) n'est publiée nulle part ; elle diffère réellement de la
-  9.0.50 (~351 000 octets différents) malgré une taille identique.
-- Interface web : 4 pages HTML/JS stockées compressées (gzip) dans le firmware :
+## General
+- Arduino ESP8266 (NONOS SDK built in 2019), LittleFS, 505,200-byte image.
+- Identification: `GET /v.json` returns `{"m": "SmallTV-Ultra","v":"Ultra-V9.0.51"}`.
+  Status-ESP answers with the same shape, for example
+  `{"m":"SmallTV-Ultra","v":"Status-ESP-<version>"}`.
+- Version 9.0.51 (the factory version) is not published anywhere. It really does differ
+  from 9.0.50 (about 351,000 bytes differ) despite the identical size.
+- Web interface: 4 HTML/JS pages stored gzip-compressed inside the firmware:
   `time.html`, `weather.html`, `settings.html`, `image.html`.
 
-## API HTTP (port 80, sans authentification)
-| Route | Rôle |
+## HTTP API (port 80, no authentication)
+| Route | Purpose |
 |---|---|
-| `GET /set?<param>=<valeur>` | Modifie un réglage (voir liste ci-dessous) |
-| `GET /<nom>.json` | Lit un réglage |
-| `POST /doUpload?dir=<dossier>` | Envoie un fichier (image/GIF) dans LittleFS |
-| `GET /delete?file=<chemin>` | Supprime un fichier |
-| `GET /filelist?dir=<dossier>` | Liste un dossier (HTML) |
-| `GET /space.json` | `{"total":…,"free":…}` de LittleFS |
-| `GET/POST /update` | Mise à jour firmware (`ESP8266HTTPUpdateServer`, champ `firmware`) ; formulaire « filesystem » masqué en commentaire HTML |
-| `/wifisave`, `/generate_204`, `/hotspot-detect.html`, `/fwlink` | Portail captif de configuration Wi-Fi |
+| `GET /set?<param>=<value>` | Changes a setting (see the list below) |
+| `GET /<name>.json` | Reads a setting |
+| `POST /doUpload?dir=<folder>` | Uploads a file (image/GIF) into LittleFS |
+| `GET /delete?file=<path>` | Deletes a file |
+| `GET /filelist?dir=<folder>` | Lists a folder (HTML) |
+| `GET /space.json` | `{"total":...,"free":...}` for LittleFS |
+| `GET/POST /update` | Firmware update (`ESP8266HTTPUpdateServer`, `firmware` field); the "filesystem" form is hidden in an HTML comment |
+| `/wifisave`, `/generate_204`, `/hotspot-detect.html`, `/fwlink` | Wi-Fi configuration captive portal |
 
-Paramètres `/set` repérés : `brt`, `theme`, `theme_list`, `sw_en`, `theme_interval`,
-`tz_auto`, `tz_offset`, `hour`, `font`, `colon`, `ntp`, `day`, `hc`/`mc`/`sc` (couleurs
-heure/minute/seconde), `time_interval`, `yr`/`mth`/`day`, `key`, `fkey`,
-`w_u`/`t_u`/`p_u` (unités), `cd1`/`cd2`, `w_i`, `gif`, `img`, `i_i`, `autoplay`,
-`clear=gif|image`, `t1`/`t2`/`b1`/`b2`/`en` (mode nuit), `reboot=1`, `reset=1`.
+`/set` parameters found: `brt`, `theme`, `theme_list`, `sw_en`, `theme_interval`,
+`tz_auto`, `tz_offset`, `hour`, `font`, `colon`, `ntp`, `day`, `hc`/`mc`/`sc` (hour/minute/
+second colours), `time_interval`, `yr`/`mth`/`day`, `key`, `fkey`,
+`w_u`/`t_u`/`p_u` (units), `cd1`/`cd2`, `w_i`, `gif`, `img`, `i_i`, `autoplay`,
+`clear=gif|image`, `t1`/`t2`/`b1`/`b2`/`en` (night mode), `reboot=1`, `reset=1`.
 
-Fichiers JSON de réglages (dans LittleFS) : `/config.json` (Wi-Fi : `{"a":"<ssid>","p":"<mdp>"}`,
-mot de passe masqué par l'API), `/city.json`, `/key.json`, `/fkey.json`, `/unit.json`,
+Settings JSON files (in LittleFS): `/config.json` (Wi-Fi: `{"a":"<ssid>","p":"<password>"}`,
+password masked by the API), `/city.json`, `/key.json`, `/fkey.json`, `/unit.json`,
 `/ntp.json`, `/tz.json`, `/dst.json`, `/brt.json`, `/timebrt.json`, `/delay.json`,
 `/font.json`, `/gif.json`, `/img.json`, `/album.json`, `/app.json`, `/theme_list.json`,
 `/hour12.json`, `/rotation.json`, `/colon.json`, `/day.json`, `/timecolor.json`,
 `/lon.json`, `/w_i.json`, `/space.json`, `/v.json`, `/wifi.json`.
 
-Autres fichiers utilisés : `/image/…` (photos), `/gif/…` (animations),
-`/image/boot.jpg|gif`, `/Alibaba20.vlw` (police lissée).
+Other files in use: `/image/...` (photos), `/gif/...` (animations),
+`/image/boot.jpg|gif`, `/Alibaba20.vlw` (smooth font).
 
-## Services externes contactés
-- Météo : `api.openweathermap.org` (clé API utilisateur via `/set?key=`) et `api.open-meteo.com`.
-- Heure : NTP, par défaut `ntp.aliyun.com`.
-- Le binaire contient aussi 9 chaînes hexadécimales de 32 caractères, peut-être des clés API
-  par défaut ou des empreintes. Volontairement **non reproduites** ici.
+Status-ESP keeps its own settings in `/custom.json`, a name that does not collide with
+any of the stock files above.
 
-## Points notables
-- `/update` sans mot de passe : toute machine du réseau local peut reflasher l'appareil.
-- Notre firmware relit `/config.json` pour réutiliser les identifiants Wi-Fi d'origine.
+## External services contacted
+- Weather: `api.openweathermap.org` (user API key through `/set?key=`) and `api.open-meteo.com`.
+- Time: NTP, `ntp.aliyun.com` by default.
+- The binary also contains 9 hexadecimal strings of 32 characters, possibly default API keys
+  or fingerprints. They are deliberately **not reproduced** here, and should not be added
+  to this repository: anything that looks like an API key stays out.
+
+## Notable points
+- `/update` has no password: any machine on the local network can reflash the device.
+- Status-ESP re-reads `/config.json` to reuse the stock Wi-Fi credentials.

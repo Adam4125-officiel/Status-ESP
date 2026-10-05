@@ -1,29 +1,31 @@
-# Retour au firmware d'origine et dépannage
+# Going back to stock, and troubleshooting
 
-Tout se fait par le Wi-Fi, depuis un navigateur.
+Everything is done over Wi-Fi, from a web browser.
 
-## Revenir au firmware GeekMagic
-1. Télécharger le firmware officiel sur le
-   [dépôt GeekMagic](https://github.com/GeekMagicClock/smalltv-ultra) (dossier `Ultra-V…`),
-   décompresser le zip et vérifier le MD5 fourni.
-2. Ouvrir `http://<ip-de-l-ecran>/update` (l'IP s'affiche sur l'écran au démarrage).
-3. Envoyer le `.bin` GeekMagic. L'écran redémarre sur le firmware d'origine.
+## Going back to the GeekMagic firmware
+1. Download the official firmware from the
+   [GeekMagic repository](https://github.com/GeekMagicClock/smalltv-ultra) (`Ultra-V...`
+   folder), unzip it and check the MD5 that comes with it.
+2. Open `http://<device-ip>/update` (the IP is shown on the screen at start-up).
+3. Upload the GeekMagic `.bin`. The device restarts on the stock firmware.
 
-Les images, réglages et identifiants Wi-Fi d'origine sont intacts : ce firmware ne
-formate jamais la zone de fichiers.
+The stock images, settings and Wi-Fi credentials are intact: this firmware never formats
+the file area.
 
-Pour contrôler un `.bin` avant envoi : `python tools/check_firmware.py <fichier.bin>`.
+To check a `.bin` before uploading it: `python tools/check_firmware.py <file.bin>`.
 
-## L'écran affiche « Pas de Wi-Fi »
-Le firmware ouvre alors le réseau **SmallTV-Custom** (sans mot de passe) :
-- `http://192.168.4.1/wifi` : choisir un nouveau réseau Wi-Fi ;
-- `http://192.168.4.1/update` : installer un autre firmware ou revenir à l'origine.
+## The screen shows "No Wi-Fi"
+The device could not join a network, so the firmware has opened the **Status-ESP** access
+point (no password). Connect to it, then:
+- `http://192.168.4.1/wifi`: choose a new Wi-Fi network;
+- `http://192.168.4.1/update`: install another firmware or go back to stock.
 
-Sans personne connecté dessus pendant 5 minutes, l'écran redémarre et réessaie le Wi-Fi
-(utile après une coupure de courant, quand la box redémarre plus lentement).
+If nobody is connected to it for 5 minutes, the device restarts and tries the Wi-Fi again
+(useful after a power cut, when the router takes longer to come back than the device).
 
-## La mise à jour est refusée
-- « Not Enough Space » : le `.bin` est trop gros pour l'espace libre (voir
-  [hardware.md](hardware.md#mise-à-jour-par-le-wi-fi--contrainte-de-taille)).
-- « Magic Byte » : le fichier n'est pas un firmware ESP8266 (zip non décompressé,
-  fichier corrompu ou modifié par un antivirus) : vérifier le MD5.
+## The update is refused
+- "Not Enough Space": the `.bin` is too big for the free space (see
+  [hardware.md](hardware.md#updating-over-wi-fi-the-size-constraint)).
+- "Magic Byte": the file is not an ESP8266 firmware (a zip that was not unzipped, a
+  corrupted file, or one modified by an antivirus). Verify the checksum against
+  `checksums.txt` (see the [README](../README.md#installation)).
