@@ -1,0 +1,61 @@
+# Continuous integration: build the firmware and validate the release image on every
+# push and pull request. This workflow only builds and uploads a workflow artifact;
+# it never publishes a release (that is done by tools/release.sh).
+name: Build
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # The toolchain and platform live in .pio-core (see tools/build.sh); the key
+      # changes with platformio.ini, which pins the platform and library versions.
+      - name: Cache the PlatformIO core directory
+        uses: actions/cache@v4
+        with:
+          path: .pio-core
+          key: pio-core-${{ runner.os }}-${{ hashFiles('platformio.ini') }}
+          restore-keys: |
+            pio-core-${{ runner.os }}-
+
+      - name: Install PlatformIO
+        run: bash tools/setup.sh
+
+      # Also enforces the size limit (the image must stay below 520000 bytes).
+      - name: Build the firmware
+        run: bash tools/build.sh
+
+      # Validates the image (Arduino CRC, no trailing data, size limit, version
+      # string embedded) and writes dist/v<version>/ (bin, version.json, checksums.txt).
+      - name: Validate the image and prepare the release assets
+        run: python3 tools/make_release.py
+
+      - name: Read the version
+        id: version
+        run: echo "version=$(tr -d '[:space:]' < VERSION)" >> "$GITHUB_OUTPUT"
+
+      - name: Upload the assets as a workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Status-ESP-${{ steps.version.outputs.version }}
+          path: dist/
+          if-no-files-found: error
