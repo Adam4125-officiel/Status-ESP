@@ -1,0 +1,12 @@
+* text=auto
+
+# Shell scripts must keep LF line endings, or bash fails on "\r".
+*.sh text eol=lf
+*.py text eol=lf
+
+# PowerShell 5.1 reads LF scripts fine, but reads a BOM-less file as ANSI:
+# keep .ps1 files pure ASCII.
+*.ps1 text
+
+*.bin binary
+*.gz binary
