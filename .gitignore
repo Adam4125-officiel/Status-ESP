@@ -24,3 +24,6 @@ __pycache__/
 *.swp
 .DS_Store
 Thumbs.db
+
+# Generated at build time from web/index.html (tools/embed_web.py)
+src/generated/
