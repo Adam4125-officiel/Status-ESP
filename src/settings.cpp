@@ -251,7 +251,7 @@ uint32_t apply(JsonObjectConst obj) {
   if (readBool(obj["hour12"], b)) S.hour12 = b;
   if (readInt(obj["date_fmt"], 0, 2, n)) S.dateFormat = (uint8_t)n;
   if (readBool(obj["colon"], b)) S.colonBlink = b;
-  if (readInt(obj["font"], 0, 1, n)) S.clockFont = (uint8_t)n;
+  if (readInt(obj["font"], 0, 2, n)) S.clockFont = (uint8_t)n;
   if (obj["ntp"].is<const char *>()) {
     str = obj["ntp"].as<const char *>();
     if (str[0] == '\0') S.ntpServer[0] = '\0';

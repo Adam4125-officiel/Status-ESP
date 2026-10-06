@@ -17,7 +17,7 @@
 //   p_unit 0 hPa|1 kPa|2 mmHg|3 inHg      w_interval 10..180 (min)     weather_gif "" or file in /gif
 //   tz_auto 0|1           tz_offset minutes -720..840 (multiple of 15)
 //   hc mc sc "#RRGGBB"    hour12 0|1    date_fmt 0 DD/MM/YYYY|1 MM/DD/YYYY|2 YYYY-MM-DD
-//   colon 0|1             font 0 digital (Font 7)|1 plain (Font 6)     ntp "" or host name
+//   colon 0|1             font 0 digital (Font 7)|1 plain (Font 6)|2 large (Font 8, clock theme only)     ntp "" or host name
 //   album_auto 0|1        album_interval 2..3600 (s)    album_file "" or file in /image
 //   theme "weather_clock"|"forecast"|"album"|"clock"|"analog"|"digital2"|"simple_weather"|"countdown"
 //   auto_switch 0|1       auto_interval 5..3600 (s)     auto_themes ["clock", ...]
@@ -49,7 +49,8 @@ enum WindUnit : uint8_t { WIND_KMH = 0, WIND_MS = 1, WIND_MPH = 2 };
 enum TempUnit : uint8_t { TEMP_C = 0, TEMP_F = 1 };
 enum PressUnit : uint8_t { PRESS_HPA = 0, PRESS_KPA = 1, PRESS_MMHG = 2, PRESS_INHG = 3 };
 enum DateFormat : uint8_t { DATE_DMY = 0, DATE_MDY = 1, DATE_YMD = 2 };
-enum ClockFont : uint8_t { FONT_DIGITAL = 0, FONT_PLAIN = 1 };
+// FONT_LARGE (Font 8, 75 px digits) only exists in the clock theme; the other themes draw it as FONT_DIGITAL.
+enum ClockFont : uint8_t { FONT_DIGITAL = 0, FONT_PLAIN = 1, FONT_LARGE = 2 };
 
 struct Settings {
   // Display

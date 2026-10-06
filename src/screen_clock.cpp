@@ -5,6 +5,12 @@
 // Every text uses an opaque background and a fixed-width field, so nothing is erased
 // first and nothing flickers. Font 7 (7-segment, "Digital") and Font 6 ("Plain") are
 // both 48 px high; "HH:MM:SS" is 216 / 192 px wide, so one layout serves both.
+//
+// The "Large" font (Font 8, 75 px digits) cannot fit "HH:MM:SS" on a 240 px screen (it is
+// 236 px for HH:MM alone), so that layout is different: the weekday, HH:MM in Font 8, the
+// seconds in Font 7 below it with AM/PM beside them, and the date. It is selected by
+// `large` and every drawing step below has a branch for it; the shared state is the same.
+#include "bigfont.h"
 #include "config.h"
 #include "display.h"
 #include "net.h"
@@ -19,6 +25,18 @@ const int16_t TIME_H = 48;
 const int16_t Y_AMPM = 134;
 const int16_t Y_DATE = 160;
 const int16_t Y_HINT = 214;
+
+// Layout of the Large font.
+const int16_t L_Y_WEEKDAY = 6;
+const int16_t L_Y_TIME = 40;
+const int16_t L_Y_SEC = 124;
+const int16_t L_Y_AMPM = 140;
+const int16_t L_Y_DATE = 184;
+const int16_t L_X_HOUR = (config::SCREEN_W - bigfont::HM_W) / 2;
+const int16_t L_X_COLON = L_X_HOUR + bigfont::PAIR_W;
+const int16_t L_X_MIN = L_X_COLON + bigfont::COLON_W;
+
+bool large = false;
 
 uint8_t fontId = 7;
 int16_t digitW = 32, colonW = 12;
@@ -42,6 +60,15 @@ void drawField(int16_t x, const char *text, uint16_t color) {
   tft.setTextDatum(TR_DATUM);
   tft.setTextPadding(2 * digitW);
   tft.drawString(text, x + 2 * digitW, Y_TIME, fontId);
+  tft.setTextPadding(0);
+}
+
+// Large layout: seconds in Font 7, centred.
+void drawLargeSeconds(const char *text, uint16_t color) {
+  tft.setTextColor(color, TFT_BLACK);
+  tft.setTextDatum(TC_DATUM);
+  tft.setTextPadding(72);
+  tft.drawString(text, 120, L_Y_SEC, 7);
   tft.setTextPadding(0);
 }
 
@@ -74,9 +101,15 @@ void drawHint(int8_t kind) {
 
 void drawUnsynced() {
   tft.fillRect(0, 0, 240, 240, TFT_BLACK);
-  tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
-  tft.setTextDatum(TC_DATUM);
-  tft.drawString("--:--:--", 120, Y_TIME, fontId);
+  if (large) {
+    bigfont::drawPair(L_X_HOUR, L_Y_TIME, "--", TFT_DARKGREY);
+    bigfont::drawColon(L_X_COLON, L_Y_TIME, true, TFT_DARKGREY);
+    bigfont::drawPair(L_X_MIN, L_Y_TIME, "--", TFT_DARKGREY);
+  } else {
+    tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
+    tft.setTextDatum(TC_DATUM);
+    tft.drawString("--:--:--", 120, Y_TIME, fontId);
+  }
   shownSync = 0;
   shownHint = -1;
 }
@@ -85,6 +118,7 @@ void drawUnsynced() {
 
 void screenClockEnter() {
   const settings::Settings &s = settings::get();
+  large = s.clockFont == settings::FONT_LARGE;
   fontId = s.clockFont == settings::FONT_PLAIN ? 6 : 7;
   digitW = tft.textWidth("0", fontId);
   colonW = tft.textWidth(":", fontId);
@@ -127,24 +161,31 @@ void screenClockUpdate(bool full) {
 
   if (hour != shownHour) {
     snprintf(buf, sizeof(buf), s.hour12 ? "%d" : "%02d", hour);
-    drawField(xHour, buf, settings::color565(s.hourRgb));
+    if (large) bigfont::drawPair(L_X_HOUR, L_Y_TIME, buf, settings::color565(s.hourRgb));
+    else drawField(xHour, buf, settings::color565(s.hourRgb));
     shownHour = (int8_t)hour;
   }
   if (t.tm_min != shownMin) {
     snprintf(buf, sizeof(buf), "%02d", t.tm_min);
-    drawField(xMin, buf, settings::color565(s.minRgb));
+    if (large) bigfont::drawPair(L_X_MIN, L_Y_TIME, buf, settings::color565(s.minRgb));
+    else drawField(xMin, buf, settings::color565(s.minRgb));
     shownMin = (int8_t)t.tm_min;
   }
   if (t.tm_sec != shownSec) {
     snprintf(buf, sizeof(buf), "%02d", t.tm_sec);
-    drawField(xSec, buf, settings::color565(s.secRgb));
+    if (large) drawLargeSeconds(buf, settings::color565(s.secRgb));
+    else drawField(xSec, buf, settings::color565(s.secRgb));
     shownSec = (int8_t)t.tm_sec;
   }
 
   int8_t colon = (!s.colonBlink || (t.tm_sec % 2) == 0) ? 1 : 0;
   if (colon != shownColon) {
-    drawColon(xColon1, colon, settings::color565(s.hourRgb));
-    drawColon(xColon2, colon, settings::color565(s.minRgb));
+    if (large) {
+      bigfont::drawColon(L_X_COLON, L_Y_TIME, colon, settings::color565(s.hourRgb));
+    } else {
+      drawColon(xColon1, colon, settings::color565(s.hourRgb));
+      drawColon(xColon2, colon, settings::color565(s.minRgb));
+    }
     shownColon = colon;
   }
 
@@ -153,16 +194,16 @@ void screenClockUpdate(bool full) {
     tft.setTextDatum(TR_DATUM);
     tft.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
     tft.setTextPadding(40);
-    tft.drawString(ampm == 2 ? "" : (ampm ? "PM" : "AM"), xSec + 2 * digitW, Y_AMPM, 4);
+    tft.drawString(ampm == 2 ? "" : (ampm ? "PM" : "AM"), large ? 236 : xSec + 2 * digitW, large ? L_Y_AMPM : Y_AMPM, 4);
     tft.setTextPadding(0);
     shownAmPm = ampm;
   }
 
   int32_t day = (int32_t)t.tm_year * 400 + t.tm_yday;
   if (day != shownDay) {
-    drawLine(timekeeping::weekdayName(t.tm_wday, true), Y_WEEKDAY, 4, TFT_WHITE);
+    drawLine(timekeeping::weekdayName(t.tm_wday, true), large ? L_Y_WEEKDAY : Y_WEEKDAY, 4, TFT_WHITE);
     timekeeping::formatDate(buf, sizeof(buf), t);
-    drawLine(buf, Y_DATE, 4, TFT_LIGHTGREY);
+    drawLine(buf, large ? L_Y_DATE : Y_DATE, 4, TFT_LIGHTGREY);
     shownDay = day;
   }
 

@@ -22,6 +22,9 @@ changes the first, second and third number, and what a `-rc.N` pre-release is) i
   like the clock), from the same Open-Meteo request. A polar day or night, where Open-Meteo
   reports no time, simply shows no line. The "feels like" line and the three statistics moved
   a few pixels to make room.
+- **A "Large" clock font** (Time tab, next to Digital and Plain): TFT_eSPI's Font 8, 75 px digits.
+  The Clock theme then shows HH:MM in it with the seconds below and AM/PM beside them
+  (HH:MM:SS cannot fit in 240 px at that size). The other themes show it as Digital.
 - **`status-esp.local`**: once connected to Wi-Fi the device answers to that name over mDNS, so
   the IP address is not needed. It is shown on the "Connected" screen, in the Network tab and
   in the status block. It is a small responder of our own (about 4.7 KB; the ESP8266mDNS
