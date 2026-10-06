@@ -2,6 +2,7 @@
 
 #include "config.h"
 #include "media.h"
+#include "portal.h"
 #include "timekeeping.h"
 
 TFT_eSPI tft;
@@ -27,6 +28,8 @@ static const Screen SCREENS[settings::THEME_COUNT] = {
     {screenWordsEnter, screenWordsUpdate, screenWordsLeave},            // THEME_WORDS
     {screenRingsEnter, screenRingsUpdate, screenRingsLeave},            // THEME_RINGS
     {screenBinaryEnter, screenBinaryUpdate, screenBinaryLeave},         // THEME_BINARY
+    {screenPortalEnter, screenPortalUpdate, screenPortalLeave},         // THEME_PORTAL
+    {screenResourcesEnter, screenResourcesUpdate, screenResourcesLeave},   // THEME_RESOURCES
 };
 
 static const uint8_t NO_THEME = 255;
@@ -130,6 +133,10 @@ static bool available(uint8_t theme) {
       return settings::hasCity();
     case settings::THEME_COUNTDOWN:
       return settings::get().cdYear != 0;
+    case settings::THEME_PORTAL:   // without an answer it says why (not set up, unreachable...), so only "set up" counts
+      return portal::configured();
+    case settings::THEME_RESOURCES:
+      return portal::configured() && (settings::get().portalSections & portal::SEC_RESOURCES);
     case settings::THEME_ALBUM:
       hasPicture = false;
       media::listDir(config::DIR_IMAGE, noteFile, nullptr);
@@ -185,6 +192,69 @@ void showThemesAfter(uint32_t ms) {
 
 void requestRedraw() { needFull = true; }
 
+// --- Status-Portal alert ---------------------------------------------------------------------------
+// portal_alert = switch: while the portal reports a problem the Status-Portal screen (with its red or orange
+// banner) takes over whatever was playing, and what was playing comes back when the problem clears.
+// portal_alert = indicator: a small red or orange dot in the top-right corner of every other screen.
+
+static bool alertActive = false;        // the Status-Portal screen has taken over
+static uint8_t alertPrev = NO_THEME;    // what to go back to (never the Status-Portal screen itself)
+
+static const int16_t DOT_X = 229, DOT_Y = 11, DOT_R = 5;
+static const uint32_t DOT_REFRESH_MS = 250;
+static uint16_t dotShown = 0;           // the colour on the screen, 0 = none
+static uint32_t dotAt = 0;
+
+// Called on every pass while a theme is active. Returns true when it switched to another theme.
+static bool updateAlertSwitch() {
+  const bool takeOver = settings::get().portalAlert == settings::PORTAL_ALERT_SWITCH &&
+                        portal::alertLevel() != portal::LEVEL_NONE;
+  if (takeOver) {
+    if (current != settings::THEME_PORTAL) {
+      alertPrev = current;   // remembered every time: a theme chosen meanwhile is the one to go back to
+      switchTo(settings::THEME_PORTAL);
+      alertActive = true;
+      return true;
+    }
+    alertActive = true;
+    return false;
+  }
+  if (!alertActive) return false;
+  alertActive = false;
+  uint8_t back = alertPrev;
+  alertPrev = NO_THEME;
+  if (current == settings::THEME_PORTAL && back != NO_THEME && back != settings::THEME_PORTAL) {
+    switchTo(back);
+    return true;
+  }
+  return false;
+}
+
+// The corner dot. A theme that repaints the corner (a GIF frame, a full repaint) takes it away, so it is
+// painted again after every full repaint, after every GIF frame, and every DOT_REFRESH_MS otherwise. It
+// is drawn without any clearing (a ring around a disc), so putting it back over itself changes nothing.
+static void updateAlertDot(bool repainted) {
+  uint16_t want = 0;
+  if (settings::get().portalAlert == settings::PORTAL_ALERT_INDICATOR && current != settings::THEME_PORTAL) {
+    portal::AlertLevel level = portal::alertLevel();
+    want = level == portal::LEVEL_DOWN ? (uint16_t)TFT_RED : (level == portal::LEVEL_DEGRADED ? (uint16_t)TFT_ORANGE : (uint16_t)0);
+  }
+  if (want == 0) {
+    if (dotShown) {   // the alert is over: the theme repaints what was under the dot
+      dotShown = 0;
+      needFull = true;
+    }
+    return;
+  }
+  uint32_t now = millis();
+  bool gif = media::gifIsOpen();
+  if (want == dotShown && !repainted && !gif && now - dotAt < DOT_REFRESH_MS) return;
+  tft.drawCircle(DOT_X, DOT_Y, DOT_R + 1, TFT_BLACK);
+  tft.fillCircle(DOT_X, DOT_Y, DOT_R, want);
+  dotShown = want;
+  dotAt = now;
+}
+
 uint8_t currentTheme() { return current; }
 
 void settingsChanged(uint32_t changed) {
@@ -218,12 +288,14 @@ void loop() {
   if (current == NO_THEME) return;
 
   const settings::Settings &s = settings::get();
-  if (s.autoSwitch && now - themeSince >= (uint32_t)s.autoInterval * 1000UL) {
+  updateAlertSwitch();
+  if (s.autoSwitch && !alertActive && now - themeSince >= (uint32_t)s.autoInterval * 1000UL) {
     uint8_t next = nextInRotation(current);
     themeSince = now;
     if (next != current) switchTo(next);
   }
 
+  bool repainted = needFull;
   if (needFull) {
     needFull = false;
     tft.fillScreen(TFT_BLACK);
@@ -231,6 +303,7 @@ void loop() {
   } else {
     SCREENS[current].update(false);
   }
+  updateAlertDot(repainted);
 }
 
 }  // namespace display

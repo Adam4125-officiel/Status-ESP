@@ -23,7 +23,7 @@
 //
 // Names: screenClock*, screenWeather* (theme weather_clock), screenForecast*,
 // screenAlbum*, screenAnalog*, screenDigital2*, screenSimpleWeather*, screenCountdown*, screenWords*,
-// screenRings*, screenBinary*. All sets are
+// screenRings*, screenBinary*, screenPortal*, screenResources*. All sets are
 // declared below; the manager calls them through its own table, so a screen file only has
 // to define its three functions.
 //
@@ -84,6 +84,14 @@ void screenRingsLeave();
 void screenBinaryEnter();
 void screenBinaryUpdate(bool full);
 void screenBinaryLeave();
+
+void screenPortalEnter();
+void screenPortalUpdate(bool full);
+void screenPortalLeave();
+
+void screenResourcesEnter();
+void screenResourcesUpdate(bool full);
+void screenResourcesLeave();
 
 namespace display {
 
