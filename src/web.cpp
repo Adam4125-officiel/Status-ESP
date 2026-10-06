@@ -9,6 +9,8 @@
 //   POST /api/delete           only directly inside /image/ or /gif/ (403 otherwise)
 //   GET  /api/geocode?q=       city search (Open-Meteo)
 //   POST /api/weather/refresh  fetch the weather again now
+//   GET  /api/backup           every stored file as one tar (Wi-Fi password included; not in rescue mode)
+//   POST /api/backup/restore   put such a tar back (multipart), then reboot
 //   POST /api/reboot           POST /api/factory-reset   (deletes only /custom.json)
 //   GET  /update POST /update  firmware update (our page + the library's handler)
 //   GET  /v.json  /reboot  /set?brt=&blinv=  /wifi   kept for backward compatibility
@@ -20,6 +22,7 @@
 #include <ESP8266WiFi.h>
 #include <LittleFS.h>
 
+#include "backup.h"
 #include "config.h"
 #include "display.h"
 #include "generated/web_index.h"
@@ -565,6 +568,100 @@ static void handleDelete() {
   sendOk();
 }
 
+// --- API: full backup and restore ---------------------------------------------------------------------
+
+// Sends one piece of the archive; false once the browser has gone away.
+static bool backupSink(void *ctx, const uint8_t *data, size_t len) {
+  WiFiClient *client = static_cast<WiFiClient *>(ctx);
+  while (len) {
+    if (!client->connected()) return false;
+    size_t n = client->write(data, len);   // waits for room in the send buffer (a few seconds at most)
+    if (n == 0) return false;
+    data += n;
+    len -= n;
+  }
+  return true;
+}
+
+// The archive holds the Wi-Fi password (and the web password, if one is set), and in rescue mode
+// the hotspot is open, so nobody on it may download it.
+static void handleBackup() {
+  if (net::isAp()) {
+    sendError(403, F("Backups are not available in rescue mode (the hotspot is open). Connect the device to your Wi-Fi first."));
+    return;
+  }
+  if (!settings::fsMounted()) {
+    sendError(500, F("Storage is not available"));
+    return;
+  }
+  if (ESP.getMaxFreeBlockSize() < 4096) {
+    sendError(503, F("Not enough memory right now, try again in a moment"));
+    return;
+  }
+  // Known beforehand, so the browser can show a progress bar. The display and the web server
+  // wait while the file goes out (a few seconds for a couple of megabytes).
+  server.setContentLength(backup::tarSize());
+  server.sendHeader(F("Cache-Control"), F("no-store"));
+  server.sendHeader(F("Content-Disposition"), F("attachment; filename=\"status-esp-backup.tar\""));
+  server.send(200, F("application/x-tar"), emptyString);   // the headers; the body follows
+  WiFiClient &client = server.client();
+  backup::writeTar(backupSink, &client);
+  client.stop();
+}
+
+static bool rsFailed = false;
+static int rsCode = 200;
+static String rsMessage;
+
+static void rsFail(int code, const char *message) {
+  if (rsFailed) return;
+  rsFailed = true;
+  rsCode = code;
+  rsMessage = message;
+}
+
+static void handleRestoreChunk() {
+  HTTPUpload &up = server.upload();
+  if (up.status == UPLOAD_FILE_START) {
+    rsFailed = false;
+    rsCode = 200;
+    rsMessage = "";
+    if (!authorized()) return rsFail(401, "Password required");
+    if (!settings::fsMounted()) return rsFail(500, "Storage is not available");
+    media::gifClose();   // the decoder holds a file open, and its memory is needed
+    if (!backup::restoreBegin()) return rsFail(503, "Not enough memory right now, try again in a moment");
+  } else if (up.status == UPLOAD_FILE_WRITE) {
+    if (!rsFailed && !backup::restoreFeed(up.buf, up.currentSize)) rsFail(400, "");   // the reason is in the result
+  } else if (up.status == UPLOAD_FILE_ABORTED) {
+    rsFail(400, "Upload interrupted");
+  }
+}
+
+static void handleRestoreDone() {
+  if (rsFailed && rsCode == 401) {   // refused at the start: nothing was touched
+    rsFailed = false;
+    backup::restoreFinish();
+    guard();
+    return;
+  }
+  backup::Result r = backup::restoreFinish();   // always: frees the state and removes the temporary file
+  bool failed = rsFailed || !r.ok;
+  JsonDocument doc;
+  doc["ok"] = !failed;
+  doc["restored"] = r.restored;
+  doc["skipped"] = r.skipped;
+  doc["wifi"] = r.haveWifi;
+  if (failed) doc["error"] = rsMessage.length() ? rsMessage : String(r.error[0] ? r.error : "The restore failed");
+  bool reboot = r.restored > 0 || r.haveWifi;   // the settings in RAM are older than the files now
+  doc["reboot"] = reboot;
+  rsFailed = false;
+  sendJson(failed && !reboot ? (rsCode == 200 ? 400 : rsCode) : 200, doc);
+  if (!reboot) return;
+  delay(300);
+  if (r.haveWifi) net::saveCredentialsAndReboot(r.ssid, r.pass);
+  ESP.restart();
+}
+
 // --- API: geocoding and system actions ----------------------------------------------------------------
 
 static void handleGeocode() {
@@ -701,6 +798,8 @@ void begin() {
   route("/api/files", HTTP_GET, handleFiles);
   server.on("/api/upload", HTTP_POST, handleUploadDone, handleUploadChunk);   // checks the password itself
   route("/api/delete", HTTP_POST, handleDelete);
+  route("/api/backup", HTTP_GET, handleBackup);
+  server.on("/api/backup/restore", HTTP_POST, handleRestoreDone, handleRestoreChunk);   // checks the password itself
   route("/api/geocode", HTTP_GET, handleGeocode);
   route("/api/weather/refresh", HTTP_POST, handleWeatherRefresh);
   route("/api/reboot", HTTP_POST, handleReboot);

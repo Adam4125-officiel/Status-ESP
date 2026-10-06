@@ -309,6 +309,19 @@ a{color:#8cf}
   </div>
 
   <div class="card">
+    <h2>Full backup</h2>
+    <div class="banner">The backup file contains your <b>Wi-Fi password</b> (and the <b>web password</b> if you set one), in clear text. Keep it private and never share it.</div>
+    <a class="btn alt" id="bk-dl" href="/api/backup" download="status-esp-backup.tar">Download backup</a>
+    <p class="hint" id="bk-ap" style="display:none">Not available in rescue mode: the hotspot is open. Connect the device to your Wi-Fi first.</p>
+    <p class="hint">One .tar file with every file stored on the device (settings, pictures, GIFs and the stock firmware's own files) and the Wi-Fi network. Plain tar: any archive tool opens it. The download takes a few seconds, during which the screen and the page wait.</p>
+    <label for="bk-file">Restore a backup</label>
+    <input type="file" id="bk-file" accept=".tar,application/x-tar">
+    <button type="button" class="warn" id="bk-btn">Restore backup</button>
+    <progress id="bk-prog" max="100" value="0" hidden></progress>
+    <p class="hint">Only a backup made by this page is accepted. Every file in it is written back over the current one (the stock firmware's files included), the Wi-Fi network is replaced, and the device reboots. A file that does not fit is skipped. Nothing is deleted: files that are not in the backup stay.</p>
+  </div>
+
+  <div class="card">
     <h2>Device</h2>
     <button type="button" class="alt" id="reboot">Reboot</button>
     <button type="button" class="warn" id="reset">Factory reset</button>
@@ -472,6 +485,8 @@ function loadStatus() {
     ST = s;
     pwState();
     $("#ver").textContent = s.fw;
+    $("#bk-dl").style.display = s.ap ? "none" : "";
+    $("#bk-ap").style.display = s.ap ? "" : "none";
     var b = $("#banner");
     b.hidden = !s.ap;
     b.textContent = s.ap ? "Rescue mode: the device is not connected to your Wi-Fi (hotspot Status-ESP). Time and weather are unavailable until you set the Wi-Fi in the Network tab." : "";
@@ -711,6 +726,35 @@ function init() {
     };
     rd.onerror = function () { toast("Could not read that file", false); };
     rd.readAsText(f);
+  };
+
+  $("#bk-btn").onclick = function () {
+    var f = $("#bk-file").files[0], prog = $("#bk-prog");
+    if (!f) { toast("Choose a backup file first", false); return; }
+    if (!confirm("Restore this backup?\n\nIt replaces the Wi-Fi network and every file it contains, then reboots the device.")) return;
+    var fd = new FormData();
+    fd.append("file", f, "backup.tar");
+    var x = new XMLHttpRequest();
+    x.open("POST", "/api/backup/restore");
+    prog.hidden = false;
+    prog.value = 0;
+    $("#bk-btn").disabled = true;
+    x.upload.onprogress = function (e) { if (e.lengthComputable) prog.value = Math.round(e.loaded * 100 / e.total); };
+    x.onload = function () {
+      var j = {};
+      try { j = JSON.parse(x.responseText); } catch (e) { /* ignore */ }
+      prog.hidden = true;
+      $("#bk-btn").disabled = false;
+      var n = (j.restored || 0) + " file(s) restored" + (j.skipped ? ", " + j.skipped + " skipped" : "") + (j.wifi ? ", Wi-Fi network restored" : "");
+      if (x.status === 200 && j.ok) {
+        $("#bk-file").value = "";
+        toast(n + ". Rebooting... reload this page in about 25 seconds.");
+      } else {
+        toast((j.error || "Restore failed (HTTP " + x.status + ")") + (j.reboot ? " (" + n + "; rebooting)" : ""), false);
+      }
+    };
+    x.onerror = function () { prog.hidden = true; $("#bk-btn").disabled = false; toast("Restore failed: the connection was lost", false); };
+    x.send(fd);
   };
 
   $("#reboot").onclick = function () {

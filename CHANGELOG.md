@@ -20,6 +20,17 @@ changes the first, second and third number, and what a `-rc.N` pre-release is) i
   device: the weather and the automatic time-zone offset arrive about 8 seconds after boot.
 
 ### Added
+- **Full backup and restore** (Settings tab). *Download backup* streams one uncompressed `.tar`
+  of every file on the device (settings, pictures, GIFs, the stock firmware's own files) plus the
+  Wi-Fi network stored in the SDK's flash area (`status-esp-wifi.json`), generated on the fly:
+  no buffer is as big as a file and nothing is written to flash. The file holds the Wi-Fi password
+  (and the web password if one is set) in clear text, which the page says; the download is
+  refused in rescue mode, where the hotspot is open. *Restore backup* takes such a file back:
+  it must start with the marker entry `status-esp-backup.json` (any other file is refused before
+  anything is written), each file goes to a temporary name and is renamed over its destination
+  when complete, names are sanitised (no `..`, no absolute escape), a file that does not fit is
+  skipped, nothing is deleted and the file system is never formatted. The Wi-Fi network is stored
+  and the device reboots.
 - **Weather diagnostics.** The last failure (HTTP code, network error, "bad JSON: ...",
   "unexpected answer", "heap too low (N B)", "no city", "no Wi-Fi"), the number of failures in a
   row and the age of the last attempt are kept, returned by `/api/status`
