@@ -12,6 +12,14 @@ Version numbers follow [docs/releasing.md](docs/releasing.md): new features bump
 - **Richer weather**: hourly forecast and more forecast days.
 
 
+## Status-Portal resources screen
+- **Page through the resources** like the Status-Portal screen does (every `portal_page` seconds): with
+  CPU, RAM, network, GPU and every disk there are more blocks than the screen holds (today: CPU, RAM and
+  4 disks, the rest is cut). Needs Status-Portal's device API to send all disks (today `DISK_ITEMS = 4`)
+  and the GPUs (`monitoring.get_resource_snapshot()["gpus"]`: name, util_percent, mem, temp_c), with
+  the size ceiling re-checked; then on the device: more disks in `portal_data.h`, a GPU block, and the
+  same paging as `screen_portal.cpp` in `screen_resources.cpp`.
+
 ## Memory
 - **"Not enough memory" on some pictures** (reported on the device with 0.4.0-rc.1). The GIF decoder
   needs about 24.5 KB in one block and the idle heap's largest block is about 25 KB, so GIFs are at the
