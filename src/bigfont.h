@@ -1,5 +1,5 @@
 // TFT_eSPI Font 8 (the "8N" build: Arial digits, 75 px high, 53 px wide) helpers shared by
-// the themes that show big digits: clock ("Large" font), digital2, simple_weather and
+// the themes that show big digits: clock ("Large" font) and
 // countdown. Font 8 only contains " 0123456789:-." (anything else prints as a space) and a
 // 2-digit field is 106 px, so "HH:MM" would be 241 px with the font's own colon: it is
 // drawn by hand instead (a narrower, blinkable colon), which makes the row 236 px.

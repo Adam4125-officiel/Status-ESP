@@ -16,9 +16,8 @@ static_assert(sizeof(Settings::portalUrl) == portal::MAX_URL + 1, "portalUrl mus
 static_assert(sizeof(Settings::portalKey) == portal::MAX_KEY + 1, "portalKey must hold exactly what portal::validKey accepts");
 
 static const char *const THEME_NAMES[THEME_COUNT] = {"weather_clock", "forecast", "album",          "clock",
-                                                     "analog",        "digital2", "simple_weather", "countdown",
-                                                     "words",         "rings",    "binary",         "portal",
-                                                     "resources"};
+                                                     "analog",        "countdown", "words",       "binary",
+                                                     "portal",        "resources"};
 
 const char *themeName(uint8_t theme) {
   return theme < THEME_COUNT ? THEME_NAMES[theme] : THEME_NAMES[THEME_CLOCK];

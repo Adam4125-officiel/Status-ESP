@@ -19,8 +19,8 @@
 //   hc mc sc "#RRGGBB"    hour12 0|1    date_fmt 0 DD/MM/YYYY|1 MM/DD/YYYY|2 YYYY-MM-DD
 //   colon 0|1             font 0 digital (Font 7)|1 plain (Font 6)|2 large (Font 8, clock theme only)     ntp "" or host name
 //   album_auto 0|1        album_interval 2..3600 (s)    album_file "" or file in /image
-//   theme "weather_clock"|"forecast"|"album"|"clock"|"analog"|"digital2"|"simple_weather"|"countdown"|
-//         "words"|"rings"|"binary"|"portal"|"resources"
+//   theme "weather_clock"|"forecast"|"album"|"clock"|"analog"|"countdown"|
+//         "words"|"binary"|"portal"|"resources"
 //   auto_switch 0|1       auto_interval 5..3600 (s)     auto_themes ["clock", ...]
 //   night_en 0|1          night_start "HH:MM"           night_end "HH:MM"     night_brt 0..100
 //   cd_date "" (no countdown) or "YYYY-MM-DD" (2000..2099)   cd_time "HH:MM" (default 00:00)
@@ -47,15 +47,12 @@ enum Theme : uint8_t {
   THEME_ALBUM = 2,
   THEME_CLOCK = 3,
   THEME_ANALOG = 4,
-  THEME_DIGITAL2 = 5,
-  THEME_SIMPLE_WEATHER = 6,
-  THEME_COUNTDOWN = 7,
-  THEME_WORDS = 8,
-  THEME_RINGS = 9,
-  THEME_BINARY = 10,
-  THEME_PORTAL = 11,     // Status-Portal: overall status, services, incidents, maintenance, announcements
-  THEME_RESOURCES = 12,  // Status-Portal: the CPU, memory and disks of the machine the portal runs on
-  THEME_COUNT = 13       // autoMask is a uint16_t: at most 16 themes, this is the limit
+  THEME_COUNTDOWN = 5,
+  THEME_WORDS = 6,
+  THEME_BINARY = 7,
+  THEME_PORTAL = 8,     // Status-Portal: overall status, services, incidents, maintenance, announcements
+  THEME_RESOURCES = 9,  // Status-Portal: the CPU, memory and disks of the machine the portal runs on
+  THEME_COUNT = 10       // autoMask is a uint16_t: at most 16 themes, this is the limit
 };
 // What Status-Portal's alert does to the display (portal_alert).
 enum PortalAlert : uint8_t { PORTAL_ALERT_OFF = 0, PORTAL_ALERT_INDICATOR = 1, PORTAL_ALERT_SWITCH = 2 };
