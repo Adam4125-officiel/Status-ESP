@@ -182,6 +182,19 @@ a{color:#8cf}
       <button>Save</button>
     </form>
   </div>
+  <div class="card">
+    <h2>Countdown</h2>
+    <form data-settings id="f-countdown">
+      <label for="cd_label">Label (up to 20 letters, digits and symbols, no accents)</label>
+      <input type="text" id="cd_label" name="cd_label" maxlength="20" placeholder="Holidays">
+      <div class="row">
+        <div><label for="cd_date">Date</label><input type="date" id="cd_date" name="cd_date" min="2000-01-01" max="2099-12-31"></div>
+        <div><label for="cd_time">Time (optional)</label><input type="time" id="cd_time" name="cd_time"></div>
+      </div>
+      <p class="hint">Shown by the Countdown theme (pick it in Settings). Whole days left; during the last 24 hours it shows hours, minutes and seconds, and once the moment has come it says so. The time is the one of the clock on the device (see Time zone above). Clear the date to switch the countdown off.</p>
+      <button>Save</button>
+    </form>
+  </div>
 </section>
 
 <!-- 5. Pictures ------------------------------------------------------------------------------>
@@ -221,6 +234,7 @@ a{color:#8cf}
         <option value="analog">Analog clock</option>
         <option value="digital2">Big digits (stacked)</option>
         <option value="simple_weather">Simple weather clock</option>
+        <option value="countdown">Countdown</option>
       </select>
       <p class="hint">To choose a theme manually, turn auto-switch off.</p>
       <label class="inline"><input type="checkbox" name="auto_switch" data-t="b"> Auto-switch between themes</label>
@@ -234,8 +248,9 @@ a{color:#8cf}
         <label class="inline"><input type="checkbox" name="auto_themes" value="analog"> Analog clock</label>
         <label class="inline"><input type="checkbox" name="auto_themes" value="digital2"> Big digits (stacked)</label>
         <label class="inline"><input type="checkbox" name="auto_themes" value="simple_weather"> Simple weather clock</label>
+        <label class="inline"><input type="checkbox" name="auto_themes" value="countdown"> Countdown</label>
       </div>
-      <p class="hint">A theme without data (no city set, no picture uploaded) is skipped.</p>
+      <p class="hint">A theme without data (no city set, no picture uploaded, no countdown date) is skipped.</p>
       <button>Save</button>
     </form>
   </div>

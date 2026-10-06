@@ -14,6 +14,10 @@ changes the first, second and third number, and what a `-rc.N` pre-release is) i
   seconds pass, and the date) and *Simple weather clock* (a big time, the weather icon and
   the current temperature). They are in the theme list and in the auto-switch checkboxes.
   TFT_eSPI's Font 8 (narrow build) is now compiled in for the big digits.
+- **Countdown theme**: pick a date (and optionally a time) and a short label in the Time tab; the
+  screen shows the whole days left, switches to HH:MM:SS during the last 24 hours and says
+  "Reached!" (and how long ago) afterwards. The target is local time as the device's clock shows
+  it. A countdown without a date is skipped by the auto-switch.
 - **`status-esp.local`**: once connected to Wi-Fi the device answers to that name over mDNS, so
   the IP address is not needed. It is shown on the "Connected" screen, in the Network tab and
   in the status block. It is a small responder of our own (about 4.7 KB; the ESP8266mDNS

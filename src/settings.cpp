@@ -10,8 +10,8 @@ namespace settings {
 static Settings S;
 static bool mounted = false;
 
-static const char *const THEME_NAMES[THEME_COUNT] = {"weather_clock", "forecast", "album",   "clock",
-                                                     "analog",        "digital2", "simple_weather"};
+static const char *const THEME_NAMES[THEME_COUNT] = {"weather_clock", "forecast", "album",          "clock",
+                                                     "analog",        "digital2", "simple_weather", "countdown"};
 
 const char *themeName(uint8_t theme) {
   return theme < THEME_COUNT ? THEME_NAMES[theme] : THEME_NAMES[THEME_CLOCK];
@@ -171,6 +171,25 @@ static bool parseClock(const char *s, uint16_t &out) {
   return true;
 }
 
+// "YYYY-MM-DD", a real calendar date in 2000..2099.
+static bool parseDate(const char *s, uint16_t &year, uint8_t &month, uint8_t &day) {
+  if (strlen(s) != 10 || s[4] != '-' || s[7] != '-') return false;
+  for (int i : {0, 1, 2, 3, 5, 6, 8, 9}) {
+    if (s[i] < '0' || s[i] > '9') return false;
+  }
+  int y = (s[0] - '0') * 1000 + (s[1] - '0') * 100 + (s[2] - '0') * 10 + (s[3] - '0');
+  int m = (s[5] - '0') * 10 + (s[6] - '0');
+  int d = (s[8] - '0') * 10 + (s[9] - '0');
+  if (y < 2000 || y > 2099 || m < 1 || m > 12 || d < 1) return false;
+  static const uint8_t DAYS[12] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+  int last = DAYS[m - 1] + ((m == 2 && y % 4 == 0) ? 1 : 0);   // 2000..2099: every 4th year is a leap year
+  if (d > last) return false;
+  year = (uint16_t)y;
+  month = (uint8_t)m;
+  day = (uint8_t)d;
+  return true;
+}
+
 static uint32_t diff(const Settings &a, const Settings &b) {
   uint32_t ch = 0;
   if (a.brightness != b.brightness || a.blInverted != b.blInverted) ch |= CH_BRIGHTNESS;
@@ -188,6 +207,8 @@ static uint32_t diff(const Settings &a, const Settings &b) {
   if (a.albumAuto != b.albumAuto || a.albumInterval != b.albumInterval || strcmp(a.albumFile, b.albumFile) != 0) ch |= CH_ALBUM;
   if (a.bootDelay != b.bootDelay) ch |= CH_BOOT_DELAY;
   if (strcmp(a.password, b.password) != 0) ch |= CH_AUTH;
+  if (a.cdYear != b.cdYear || a.cdMonth != b.cdMonth || a.cdDay != b.cdDay || a.cdMinutes != b.cdMinutes ||
+      strcmp(a.cdLabel, b.cdLabel) != 0) ch |= CH_COUNTDOWN;
   return ch;
 }
 
@@ -263,6 +284,22 @@ uint32_t apply(JsonObjectConst obj) {
   if (obj["night_end"].is<const char *>() && parseClock(obj["night_end"].as<const char *>(), minutes)) S.nightEnd = minutes;
   if (readInt(obj["night_brt"], 0, 100, n)) S.nightBrightness = (uint8_t)n;
 
+  uint16_t year;
+  uint8_t month, day;
+  if (obj["cd_date"].is<const char *>()) {
+    str = obj["cd_date"].as<const char *>();
+    if (str[0] == '\0') {
+      S.cdYear = 0;
+      S.cdMonth = S.cdDay = 0;
+    } else if (parseDate(str, year, month, day)) {
+      S.cdYear = year;
+      S.cdMonth = month;
+      S.cdDay = day;
+    }
+  }
+  if (obj["cd_time"].is<const char *>() && parseClock(obj["cd_time"].as<const char *>(), minutes)) S.cdMinutes = minutes;
+  if (obj["cd_label"].is<const char *>()) copyText(S.cdLabel, sizeof(S.cdLabel), obj["cd_label"].as<const char *>());
+
   if (obj["pw"].is<const char *>()) {
     str = obj["pw"].as<const char *>();
     if (str[0] == '\0') S.password[0] = '\0';
@@ -273,7 +310,7 @@ uint32_t apply(JsonObjectConst obj) {
 }
 
 void toJson(JsonDocument &doc, bool secrets) {
-  char buf[8];
+  char buf[16];
   doc["brt"] = S.brightness;
   doc["blinv"] = S.blInverted ? 1 : 0;
   doc["boot_delay"] = S.bootDelay;
@@ -319,6 +356,16 @@ void toJson(JsonDocument &doc, bool secrets) {
   snprintf(buf, sizeof(buf), "%02u:%02u", S.nightEnd / 60, S.nightEnd % 60);
   doc["night_end"] = String(buf);
   doc["night_brt"] = S.nightBrightness;
+
+  if (S.cdYear) {
+    snprintf(buf, sizeof(buf), "%04u-%02u-%02u", S.cdYear, S.cdMonth, S.cdDay);
+    doc["cd_date"] = String(buf);
+  } else {
+    doc["cd_date"] = "";
+  }
+  snprintf(buf, sizeof(buf), "%02u:%02u", S.cdMinutes / 60, S.cdMinutes % 60);
+  doc["cd_time"] = String(buf);
+  doc["cd_label"] = String(S.cdLabel);
 
   if (secrets && S.password[0]) doc["pw"] = String(S.password);
 }
