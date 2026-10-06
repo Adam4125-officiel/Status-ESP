@@ -23,7 +23,8 @@ void currentIp(uint8_t ip[4]) {
 }
 
 void sendMulticast(const uint8_t *data, size_t length) {
-  if (!udp.beginPacketMulticast(IPAddress(224, 0, 0, 251), MDNS_PORT, WiFi.localIP())) return;
+  // TTL 255 as RFC 6762 asks (and as the ESP8266mDNS library does): some resolvers drop anything else.
+  if (!udp.beginPacketMulticast(IPAddress(224, 0, 0, 251), MDNS_PORT, WiFi.localIP(), 255)) return;
   udp.write(data, length);
   udp.endPacket();
 }
