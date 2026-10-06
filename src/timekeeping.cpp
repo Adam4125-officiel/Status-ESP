@@ -16,13 +16,13 @@ static uint32_t lastServerChange = 0;
 static const uint32_t SERVER_RETRY_MS = 45000;
 
 // lwIP SNTP has 3 server slots: the custom server (when set) goes first, followed by
-// the two best built-in ones; if the clock is still unset after a while the lists are
-// swapped so that all three built-in servers get a turn.
+// the two first built-in ones (time.cloudflare.com is the default); if the clock is still
+// unset after a while the lists are swapped so that all three built-in servers get a turn.
 static void configure() {
   if (useCustom && customHost[0]) {
-    configTime(0, 0, customHost, "pool.ntp.org", "time.google.com");
+    configTime(0, 0, customHost, "time.cloudflare.com", "pool.ntp.org");
   } else {
-    configTime(0, 0, "pool.ntp.org", "time.google.com", "time.cloudflare.com");
+    configTime(0, 0, "time.cloudflare.com", "pool.ntp.org", "time.google.com");
   }
   lastServerChange = millis();
 }

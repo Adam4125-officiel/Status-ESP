@@ -23,6 +23,10 @@ changes the first, second and third number, and what a `-rc.N` pre-release is) i
   (`weather_err`, `weather_fails`, `weather_http`, `weather_try_age`), shown in the Weather tab
   (with a "Check now" button, `POST /api/weather/refresh`) and on the "No weather data" screen.
 
+### Changed
+- **The default NTP server is `time.cloudflare.com`** (then `pool.ntp.org` and `time.google.com`).
+  A custom server is still tried first, followed by `time.cloudflare.com` and `pool.ntp.org`.
+
 ## [0.3.0-rc.2] - 2026-10-06
 
 ### Added
