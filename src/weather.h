@@ -8,9 +8,9 @@
 // so weather::loop() returns immediately unless a fetch is due. When one is due it
 // may block for at most ~5 s (HTTP timeout <= 5 s, set both on the client and on the
 // connect), at most once per settings::get().weatherInterval minutes, with a 60 s
-// back-off after a failure. The body must be parsed as a stream through
-// an ArduinoJson filter (never loaded into a String), after http.useHTTP10(true) so
-// that the server does not answer with chunked encoding (getStream() is raw).
+// back-off after a failure. The ~1.1 KB body is read whole by HTTPClient (capped at 4 KB, so a
+// wrong answer cannot eat the heap) and parsed from memory through an ArduinoJson filter, after
+// http.useHTTP10(true) so that the server does not answer with chunked encoding.
 // Check ESP.getMaxFreeBlockSize() first and skip the fetch (retry later) if it is
 // too low: a GIF decoder may be alive on the screen.
 //
@@ -58,7 +58,7 @@ struct Data {
 // Why the weather is (not) arriving, for the web interface and the "No weather data" screen.
 // Cleared when the city changes; `error` is empty once an attempt has worked.
 struct Diag {
-  char error[40];        // last failure ("HTTP 404", "bad JSON: ...", "heap too low (...)", "no city"...)
+  char error[64];        // last failure ("HTTP 404", "bad JSON: ...", "heap too low (...)", "no city"...)
   int16_t httpCode;      // HTTP status of the last attempt, or a negative HTTPClient error; 0 = none
   uint16_t failures;     // consecutive failed attempts
   uint32_t attemptMs;    // millis() of the last attempt (0 = none since boot / since the city changed)

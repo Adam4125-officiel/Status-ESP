@@ -9,12 +9,15 @@ changes the first, second and third number, and what a `-rc.N` pre-release is) i
 
 ### Fixed
 - **The weather never arrived** ("No weather data" for ever, with a city set and the network fine).
-  `HTTPClient::begin(client, url)` keeps a *clone* of the `WiFiClient` it is given and connects
-  that clone; `weather.cpp` then read the body from its own, never-connected `client`, got zero
-  bytes, and every fetch ended in `EmptyInput` (which was only printed on the serial port).
-  The body is now read through `http.getStreamPtr()`. Reproduced on a PC with the real
-  `weather.cpp`, the real ArduinoJson and a client that clones like the library does, against
-  the real Open-Meteo, before and after the change.
+  Two bugs, one behind the other. First, `HTTPClient::begin(client, url)` keeps a *clone* of the
+  `WiFiClient` it is given and connects that clone; `weather.cpp` read the body from its own,
+  never-connected `client`, got zero bytes, and every fetch ended in `EmptyInput` (which was only
+  printed on the serial port). Reading through `http.getStreamPtr()` fixed that on a PC, but on
+  the real device the second bug showed up at once, thanks to the new diagnostics: a
+  hand-written `available()` / `read()` loop saw the transfer end after one or two TCP segments
+  (414 or 950 body bytes of about 1,120), so the JSON ended in `IncompleteInput`. The answer is now
+  read whole by `HTTPClient` itself (capped at 4 KB) and parsed from memory. Confirmed on the
+  device: the weather and the automatic time-zone offset arrive about 8 seconds after boot.
 
 ### Added
 - **Weather diagnostics.** The last failure (HTTP code, network error, "bad JSON: ...",

@@ -19,9 +19,9 @@ namespace weather {
 namespace {
 
 const uint32_t HTTP_TIMEOUT_MS = 5000;     // connect, headers and each stalled read
-const uint32_t BODY_DEADLINE_MS = 8000;    // whole body, however slowly it trickles in
 const uint32_t FAILURE_BACKOFF_MS = 60000; // after a failed fetch
 const uint32_t NO_MEMORY_RETRY_MS = 15000; // heap too fragmented right now: look again soon
+const size_t MAX_BODY = 4096;              // the real answer is ~1.1 KB
 const uint32_t MIN_FREE_BLOCK = 9000;      // HTTP client + filtered document, with margin
 
 Data cache;
@@ -65,38 +65,22 @@ void notice(PGM_P msg) {
   dg.error[sizeof(dg.error) - 1] = '\0';
 }
 
-// Reads from the client with a deadline for the WHOLE body: ArduinoJson's own stream reader
-// would wait up to the stream timeout for every single byte of a stalled transfer.
-class DeadlineStream : public Stream {
+// Collects the answer (a ~1.1 KB document) in a String, refusing more than MAX_BODY bytes: the
+// request is plain HTTP, so whatever answers is not necessarily Open-Meteo.
+class BodySink : public Print {
  public:
-  DeadlineStream(WiFiClient &client, uint32_t budgetMs) : client_(client), deadline_(millis() + budgetMs) {}
-
-  int available() override { return client_.available(); }
-  int peek() override { return client_.peek(); }
-  size_t write(uint8_t) override { return 0; }
-  int read() override {
-    char c;
-    return readBytes(&c, 1) == 1 ? (uint8_t)c : -1;
-  }
-  size_t readBytes(char *buffer, size_t length) override {
-    size_t got = 0;
-    while (got < length) {
-      int ready = client_.available();
-      if (ready > 0) {
-        if ((size_t)ready > length - got) ready = (int)(length - got);
-        int n = client_.read((uint8_t *)buffer + got, ready);
-        if (n > 0) got += n;
-        continue;
-      }
-      if (!client_.connected() || (int32_t)(millis() - deadline_) >= 0) break;
-      delay(1);
+  String text;
+  bool overflow = false;
+  size_t write(uint8_t c) override { return write(&c, 1); }
+  size_t write(const uint8_t *data, size_t n) override {
+    if (text.length() + n > MAX_BODY) {
+      overflow = true;
+      return 0;
     }
-    return got;
+    text.concat((const char *)data, (unsigned int)n);
+    return n;
   }
-
- private:
-  WiFiClient &client_;
-  uint32_t deadline_;
+  int availableForWrite() override { return (int)(MAX_BODY - text.length()); }
 };
 
 // Day of the week (0 = Sunday) of an ISO date "YYYY-MM-DD", -1 if it is not one.
@@ -222,6 +206,7 @@ Outcome fetchOnce() {
   HTTPClient http;
   http.setTimeout(HTTP_TIMEOUT_MS);
   http.useHTTP10(true);  // no chunked encoding: the stream is the raw body
+  http.setReuse(false);  // one request, then the connection is closed ("Connection: close")
   if (!http.begin(client, url)) {
     fail(PSTR("could not start the request"));
     return FAILED;
@@ -236,25 +221,36 @@ Outcome fetchOnce() {
     else fail(PSTR("network error %d"), code);
     return FAILED;
   }
-  WiFiClient *stream = http.getStreamPtr();
-  if (!stream) {
-    http.end();
-    fail(PSTR("connection lost"));
+
+  // The answer is read whole through HTTPClient's own loop (it ends when the server closes the
+  // connection) and parsed from memory. Do NOT replace this with a hand-written available()/read()
+  // loop over getStreamPtr(): on the real device that one saw the transfer end after one or two
+  // TCP segments (414 or 950 body bytes of ~1120, "IncompleteInput"), while this call gets it all.
+  // The cause was never pinned down (see "Known pitfalls" in CLAUDE.md).
+  BodySink sink;
+  sink.text.reserve(1280);
+  http.writeToPrint(&sink);
+  http.end();
+  const String &body = sink.text;
+  if (sink.overflow) {
+    fail(PSTR("answer too large"));
     return FAILED;
   }
 
   Data fresh;
-  bool good;
+  bool good = false;
   {
     JsonDocument filter;
     buildFilter(filter);
     JsonDocument doc;
-    DeadlineStream body(*stream, BODY_DEADLINE_MS);
     DeserializationError err = deserializeJson(doc, body, DeserializationOption::Filter(filter));
-    http.end();
     good = !err && extract(doc, fresh);
-    if (err) fail(PSTR("bad JSON: %s"), err.c_str());
-    else if (!good) fail(doc.isNull() ? PSTR("answer is not JSON") : PSTR("unexpected answer"));
+    if (err) {
+      // The length tells a truncated answer from a malformed one (the whole answer is ~1.1 KB).
+      fail(PSTR("bad JSON: %s (%u B)"), err.c_str(), (unsigned)body.length());
+    } else if (!good) {
+      fail(doc.isNull() ? PSTR("answer is not JSON") : PSTR("unexpected answer"));
+    }
   }
   if (!good) return FAILED;
 
