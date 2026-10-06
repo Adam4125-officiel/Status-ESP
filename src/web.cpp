@@ -36,6 +36,39 @@ static ESP8266WebServer server(80);
 static ESP8266HTTPUpdateServer updater;
 static bool listening = false;
 
+// --- Password (HTTP Basic, user "admin") ------------------------------------------------
+// Off unless a password is set. NEVER enforced in rescue access-point mode: /update (and the
+// rest of the interface) must stay reachable there, it is the only way back from a device
+// that has lost its Wi-Fi, a forgotten password included. /v.json and the 404 / captive
+// portal answers are always open.
+
+static const char *const AUTH_USER = "admin";
+
+static bool authEnforced() { return settings::get().password[0] != '\0' && !net::isAp(); }
+
+static bool authorized() { return !authEnforced() || server.authenticate(AUTH_USER, settings::get().password); }
+
+// True when the request may go on; otherwise has already sent the 401 (the browser then asks).
+static bool guard() {
+  if (authorized()) return true;
+  server.requestAuthentication(BASIC_AUTH, "Status-ESP", F("Password required"));
+  return false;
+}
+
+// POST /update is the library's handler: it has its own credentials, which follow the same rule.
+static void applyUpdaterCredentials() {
+  updater.updateCredentials(authEnforced() ? String(AUTH_USER) : String(),
+                            authEnforced() ? String(settings::get().password) : String());
+}
+
+// Registers a route behind guard().
+typedef void (*Handler)();
+static void route(const char *uri, HTTPMethod method, Handler fn) {
+  server.on(uri, method, [fn]() {
+    if (guard()) fn();
+  });
+}
+
 // --- Helpers ------------------------------------------------------------------------
 
 static void sendJson(int code, const JsonDocument &doc) {
@@ -135,6 +168,8 @@ static void handleStatus() {
   doc["fw"] = FW_FULL_NAME;
   doc["ap"] = net::isAp();
   doc["ip"] = net::ip();
+  doc["auth"] = settings::get().password[0] != '\0';
+  doc["auth_enforced"] = authEnforced();
   if (mdns::active()) doc["mdns"] = mdns::name();
   if (net::isConnected()) {
     doc["ssid"] = WiFi.SSID();
@@ -169,9 +204,15 @@ static void handleStatus() {
   sendJson(200, doc);
 }
 
+// The settings as the API returns them: never the password itself, only whether one is set.
+static void settingsToJson(JsonDocument &doc) {
+  settings::toJson(doc);
+  doc["pw_set"] = settings::get().password[0] != '\0';
+}
+
 static void handleSettingsGet() {
   JsonDocument doc;
-  settings::toJson(doc);
+  settingsToJson(doc);
   sendJson(200, doc);
 }
 
@@ -186,9 +227,10 @@ static void applySettingsAndReply(JsonDocument &body, bool persist) {
   display::settingsChanged(changed);
   if (changed & settings::CH_NTP) timekeeping::applySettings();
   if (changed & settings::CH_LOCATION) weather::requestRefresh();
+  if (changed & settings::CH_AUTH) applyUpdaterCredentials();
 
   JsonDocument doc;
-  settings::toJson(doc);
+  settingsToJson(doc);
   doc["ok"] = true;
   sendJson(200, doc);
 }
@@ -196,6 +238,13 @@ static void applySettingsAndReply(JsonDocument &body, bool persist) {
 static void handleSettingsPost() {
   JsonDocument body;
   if (!readJsonBody(body)) return;
+  if (body["pw"].is<const char *>()) {
+    const char *pw = body["pw"].as<const char *>();
+    if (pw[0] != '\0' && !settings::validPassword(pw)) {
+      sendError(400, F("The password must be 4 to 32 printable characters"));
+      return;
+    }
+  }
   // ?save=0 applies without writing flash: used by the live brightness slider, which
   // fires on every movement; the final value is saved when the slider is released.
   bool persist = !(server.hasArg("save") && server.arg("save") == "0");
@@ -220,6 +269,8 @@ static void handleSettingsExport() {
 static void handleSettingsImport() {
   JsonDocument body;
   if (!readJsonBody(body)) return;
+  body.remove("pw");        // an import never touches the password, in either direction
+  body.remove("pw_set");
   JsonDocument known;
   settings::toJson(known);
   size_t recognised = 0;
@@ -395,6 +446,7 @@ static void handleUploadChunk() {
     upWritten = 0;
     if (upFile) upFile.close();
 
+    if (!authorized()) return upFail(401, "Password required");
     const char *folder = folderFromArg(server.arg("dir"));
     if (!folder) return upFail(400, "dir must be /image or /gif");
     if (!settings::fsMounted()) return upFail(500, "Storage is not available");
@@ -430,6 +482,11 @@ static void handleUploadChunk() {
 
 static void handleUploadDone() {
   if (upFile) upFile.close();
+  if (upFailed && upCode == 401) {   // refused at the start: nothing was written
+    upFailed = false;
+    guard();
+    return;
+  }
   if (upFailed) {
     sendError(upCode, upMessage);
   } else if (upName.isEmpty()) {
@@ -615,30 +672,30 @@ static void handleNotFound() {
 
 void begin() {
   // Must stay before updater.setup(): see handleUpdatePage().
-  server.on("/update", HTTP_GET, handleUpdatePage);
+  route("/update", HTTP_GET, handleUpdatePage);
   updater.setup(&server, "/update");
 
-  server.on("/", HTTP_GET, handleIndex);
+  route("/", HTTP_GET, handleIndex);
 
-  server.on("/api/status", HTTP_GET, handleStatus);
-  server.on("/api/settings", HTTP_GET, handleSettingsGet);
-  server.on("/api/settings", HTTP_POST, handleSettingsPost);
-  server.on("/api/settings/export", HTTP_GET, handleSettingsExport);
-  server.on("/api/settings/import", HTTP_POST, handleSettingsImport);
-  server.on("/api/wifi/scan", HTTP_GET, handleWifiScan);
-  server.on("/api/wifi", HTTP_POST, handleWifiSave);
-  server.on("/api/files", HTTP_GET, handleFiles);
-  server.on("/api/upload", HTTP_POST, handleUploadDone, handleUploadChunk);
-  server.on("/api/delete", HTTP_POST, handleDelete);
-  server.on("/api/geocode", HTTP_GET, handleGeocode);
-  server.on("/api/reboot", HTTP_POST, handleReboot);
-  server.on("/api/factory-reset", HTTP_POST, handleFactoryReset);
+  route("/api/status", HTTP_GET, handleStatus);
+  route("/api/settings", HTTP_GET, handleSettingsGet);
+  route("/api/settings", HTTP_POST, handleSettingsPost);
+  route("/api/settings/export", HTTP_GET, handleSettingsExport);
+  route("/api/settings/import", HTTP_POST, handleSettingsImport);
+  route("/api/wifi/scan", HTTP_GET, handleWifiScan);
+  route("/api/wifi", HTTP_POST, handleWifiSave);
+  route("/api/files", HTTP_GET, handleFiles);
+  server.on("/api/upload", HTTP_POST, handleUploadDone, handleUploadChunk);   // checks the password itself
+  route("/api/delete", HTTP_POST, handleDelete);
+  route("/api/geocode", HTTP_GET, handleGeocode);
+  route("/api/reboot", HTTP_POST, handleReboot);
+  route("/api/factory-reset", HTTP_POST, handleFactoryReset);
 
-  server.on("/set", handleLegacySet);
-  server.on("/wifi", HTTP_GET, handleLegacyWifiPage);
-  server.on("/wifi", HTTP_POST, handleLegacyWifiSave);
-  server.on("/reboot", handleLegacyReboot);
-  server.on("/v.json", handleVersion);
+  route("/set", HTTP_ANY, handleLegacySet);
+  route("/wifi", HTTP_GET, handleLegacyWifiPage);
+  route("/wifi", HTTP_POST, handleLegacyWifiSave);
+  route("/reboot", HTTP_ANY, handleLegacyReboot);
+  server.on("/v.json", handleVersion);   // always open: the upload tools read it
   server.onNotFound(handleNotFound);
 }
 
@@ -646,6 +703,7 @@ void loop() {
   if (!listening) {
     // The same moment the 0.1.0 firmware chose: once the Wi-Fi mode is settled.
     if (!net::isConnected() && !net::isAp()) return;
+    applyUpdaterCredentials();   // the Wi-Fi mode is settled: password on, or rescue mode and off
     server.begin();
     listening = true;
   }

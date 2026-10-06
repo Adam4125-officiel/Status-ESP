@@ -10,6 +10,8 @@
 #   bash tools/upload.sh 192.168.4.1               -> device in rescue access-point mode
 #   bash tools/upload.sh <ip> <geekmagic-firmware.bin>   (back to stock)
 # The IP is shown on the device's screen at boot.
+# If a password is set in the web interface (never needed in rescue mode), put it in the
+# STATUS_ESP_PASSWORD environment variable; the user name is admin.
 #
 # Guards: the file must start with 0xE9 (ESP8266 image; a .gz file is exempt) and
 # be at most 530000 bytes. /v.json is read before the upload (the device must
@@ -45,7 +47,12 @@ before=$(curl --silent --show-error --fail --max-time 5 "http://$ip/v.json") \
 echo "Before: $before"
 echo "Sending $(basename "$file") ($size bytes) to http://$ip/update ..."
 
-curl --fail --silent --show-error -F "firmware=@$file" "http://$ip/update" \
+# HTTP Basic credentials, only when a password was given (it shows in this machine's process list
+# for the duration of the upload).
+auth=()
+if [ -n "${STATUS_ESP_PASSWORD:-}" ]; then auth=(--user "admin:$STATUS_ESP_PASSWORD"); fi
+
+curl --fail --silent --show-error ${auth[@]+"${auth[@]}"} -F "firmware=@$file" "http://$ip/update" \
     || die "upload failed (curl exit code $?)."
 
 echo

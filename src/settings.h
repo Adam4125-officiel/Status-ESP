@@ -22,6 +22,9 @@
 //   theme "weather_clock"|"forecast"|"album"|"clock"|"analog"|"digital2"|"simple_weather"
 //   auto_switch 0|1       auto_interval 5..3600 (s)     auto_themes ["clock", ...]
 //   night_en 0|1          night_start "HH:MM"           night_end "HH:MM"     night_brt 0..100
+//   pw "" or 4..32 printable ASCII characters: the web password (user "admin"), "" = none.
+//       Write-only: it is stored in /custom.json but never returned by toJson() unless the
+//       caller asks for secrets (only save() does), so no API response and no export has it.
 #pragma once
 
 #include <Arduino.h>
@@ -79,6 +82,8 @@ struct Settings {
   bool nightEnabled;
   uint16_t nightStart, nightEnd;      // minutes since local midnight
   uint8_t nightBrightness;
+  // Security
+  char password[33];         // pw, "" = the web interface and the API are open
 };
 
 // Bits returned by apply(): which groups of settings changed.
@@ -93,6 +98,7 @@ enum : uint32_t {
   CH_WEATHER = 1u << 7,      // units, w_interval, weather_gif
   CH_ALBUM = 1u << 8,
   CH_BOOT_DELAY = 1u << 9,
+  CH_AUTH = 1u << 10,        // pw
   CH_VISUAL = CH_THEME | CH_CLOCK | CH_TIMEZONE | CH_LOCATION | CH_WEATHER | CH_ALBUM
 };
 
@@ -105,8 +111,9 @@ Settings &get();
 
 // Validates and applies a (possibly partial) JSON object. Returns the CH_* bits that changed.
 uint32_t apply(JsonObjectConst obj);
-// Writes every setting into doc (the same shape the file uses).
-void toJson(JsonDocument &doc);
+// Writes every setting into doc (the same shape the file uses). The password is only written
+// when `secrets` is true, which is for the file on the device and nothing else.
+void toJson(JsonDocument &doc, bool secrets = false);
 // Writes /custom.json (temp file + rename). Returns false if it could not be written.
 bool save();
 // Deletes /custom.json (only that file) and resets the RAM copy to the defaults.
@@ -118,6 +125,8 @@ inline bool hasCity() { return get().city[0] != '\0'; }
 inline uint16_t color565(uint32_t rgb) {
   return (uint16_t)(((rgb >> 8) & 0xF800) | ((rgb >> 5) & 0x07E0) | ((rgb >> 3) & 0x001F));
 }
+// 4..32 printable ASCII characters (what the web interface accepts as a password).
+bool validPassword(const char *pw);
 // Validates a file name coming from outside (settings, API): [A-Za-z0-9._ -], no "..", no
 // leading dot or edge space, at most config::MAX_FILE_NAME characters.
 bool validFileName(const char *name);

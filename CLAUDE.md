@@ -87,6 +87,14 @@ Founding constraints:
     closes it before it opens a connection and the weather screen reopens it afterwards. Do
     not allocate it statically, do not keep it open off screen, and do not add another network
     call that can run while a GIF plays without closing it first.
+11. **The web password (setting `pw`, HTTP Basic, user `admin`) is never enforced in rescue
+    access-point mode** (`web.cpp`: `authEnforced()` is `password set && !net::isAp()`), and it
+    must keep covering **every** route except `/v.json`, the 404 / captive-portal answers and
+    the library's own CORS preflight: a new route goes through `route()` (or calls `guard()` /
+    `authorized()` itself, as `/api/upload` does), and `POST /update` follows the same rule through
+    `updater.updateCredentials()`. The password is never returned by any GET or by the export
+    (`settings::toJson()` only writes it for the file on the device), and an import never
+    touches it. Otherwise a forgotten password would brick the device without opening it.
 
 ## 4. Privacy (public repository)
 - **Commit nothing personal**: name, e-mail, user name, user-profile or home-directory paths,

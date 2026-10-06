@@ -23,6 +23,26 @@ point (no password). Connect to it, then:
 If nobody is connected to it for 5 minutes, the device restarts and tries the Wi-Fi again
 (useful after a power cut, when the router takes longer to come back than the device).
 
+## I forgot the web interface password
+The password (Settings tab, off by default; user name `admin`) protects the web interface, the
+API and firmware updates, but **never the rescue access point**, so there is always a way in:
+1. Switch your router off, or take the device out of its range. After its Wi-Fi attempts fail
+   (about 40 seconds after power-up) the device opens the open **Status-ESP** access point.
+2. Connect to it and open `http://192.168.4.1`: no password is asked there. In the Settings
+   tab choose "Remove the password" (or do a factory reset, which also clears it).
+3. Switch the router back on. The device retries the Wi-Fi by itself 5 minutes after nobody
+   is connected to its access point (or reboot it from the Settings tab).
+
+A firmware update from `/update` on the rescue access point never needs the password either.
+The password is stored in clear text in `/custom.json` on the device and is never returned by
+the API or included in a settings export. It travels in clear text over plain HTTP like
+everything else here (Basic authentication), so it keeps casual visitors out, not someone who
+can listen to your network; there is no limit on wrong guesses.
+
+If a password is set and you upload with `tools/upload.sh` or `tools/upload.ps1`, put it in the
+`STATUS_ESP_PASSWORD` environment variable (`curl -u admin:<password> -F firmware=@file.bin
+http://<device-ip>/update` does the same by hand).
+
 ## The update is refused
 - "Not Enough Space": the `.bin` is too big for the free space (see
   [hardware.md](hardware.md#updating-over-wi-fi-the-size-constraint)).

@@ -264,6 +264,19 @@ a{color:#8cf}
   </div>
 
   <div class="card">
+    <h2>Password</h2>
+    <p class="hint" id="pw-state"></p>
+    <form id="f-pw" autocomplete="off">
+      <label for="pw">New password (4 - 32 characters)</label>
+      <input type="password" id="pw" maxlength="32" autocomplete="new-password">
+      <button>Set password</button>
+      <button type="button" class="alt" id="pw-off">Remove the password</button>
+    </form>
+    <p class="hint">Asked by the browser for this page, the API and firmware updates (user name: <b>admin</b>). It is sent in clear text over plain HTTP, so it keeps casual visitors out of your settings; it is not protection against someone who can listen to your network.</p>
+    <p class="hint"><b>Rescue mode is never password-protected</b>, so a firmware update stays possible whatever happens. If you forget the password: switch your router off (or take the device out of its range) until the <b>Status-ESP</b> hotspot appears on the device, connect to it, open <b>http://192.168.4.1</b> and remove the password here (or do a factory reset). The device opens the hotspot by itself after its Wi-Fi attempts fail.</p>
+  </div>
+
+  <div class="card">
     <h2>Back up the settings</h2>
     <a class="btn alt" href="/api/settings/export" download="status-esp-settings.json">Export settings</a>
     <p class="hint">Downloads every setting on this page as a file. The Wi-Fi network and the uploaded pictures are not part of it.</p>
@@ -361,8 +374,14 @@ function fill() {
   $("#brt-val").textContent = S.brt;
   $("#blinv").checked = !!Number(S.blinv);
   $("#night-val").textContent = S.night_brt;
+  pwState();
   $("#curcity").textContent = S.city ? S.city + " (" + Number(S.lat).toFixed(2) + ", " + Number(S.lon).toFixed(2) + ")" : "none";
   syncTz();
+}
+
+function pwState() {
+  $("#pw-state").textContent = S.pw_set ? "A password is set." + (ST.ap ? " It is not asked for in rescue mode." : "") : "No password is set: anyone on your network can use this page.";
+  $("#pw-off").disabled = !S.pw_set;
 }
 
 function collect(form) {
@@ -419,6 +438,7 @@ function showTab(name) {
 function loadStatus() {
   return api("/api/status").then(function (s) {
     ST = s;
+    pwState();
     $("#ver").textContent = s.fw;
     var b = $("#banner");
     b.hidden = !s.ap;
@@ -619,6 +639,21 @@ function init() {
   brt.onchange = function () { clearTimeout(liveTimer); save({ brt: Number(brt.value) }).catch(function () {}); };
   $("#blinv").onchange = function () { save({ blinv: this.checked ? 1 : 0 }).catch(function () {}); };
   $("#night_brt").oninput = function () { $("#night-val").textContent = this.value; };
+
+  $("#f-pw").onsubmit = function (ev) {
+    ev.preventDefault();
+    var v = $("#pw").value;
+    if (v.length < 4 || v.length > 32) { toast("The password must be 4 to 32 characters", false); return; }
+    if (!confirm("Protect this page, the API and firmware updates with this password?\n\nThe user name is admin. Your browser will ask for it next.")) return;
+    save({ pw: v }, "Password set").then(function () {
+      $("#pw").value = "";
+      setTimeout(loadStatus, 400);
+    }, function () {});
+  };
+  $("#pw-off").onclick = function () {
+    if (!confirm("Remove the password? Anyone on your network will be able to use this page and update the firmware.")) return;
+    save({ pw: "" }, "Password removed").then(function () { setTimeout(loadStatus, 400); }, function () {});
+  };
 
   $("#imp-btn").onclick = function () {
     var f = $("#imp-file").files[0];

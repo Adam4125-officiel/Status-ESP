@@ -4,6 +4,8 @@
 #   .\tools\upload.ps1 -Ip 192.168.4.1        -> device in rescue access-point mode
 #   .\tools\upload.ps1 -Ip <ip> -File <geekmagic-firmware.bin>   (back to stock)
 # The IP is shown on the device's screen at boot.
+# If a password is set in the web interface (never needed in rescue mode), put it in the
+# STATUS_ESP_PASSWORD environment variable; the user name is admin.
 
 param(
     [Parameter(Mandatory = $true)][string]$Ip,
@@ -27,7 +29,9 @@ $before = (Invoke-WebRequest "http://$Ip/v.json" -UseBasicParsing -TimeoutSec 5 
 Write-Host "Before: $before"
 Write-Host "Sending $($bin.Name) ($($bin.Length) bytes) to http://$Ip/update ..."
 
-curl.exe --fail --silent --show-error -F "firmware=@$($bin.FullName)" "http://$Ip/update"
+$auth = @()
+if ($env:STATUS_ESP_PASSWORD) { $auth = @("--user", "admin:$($env:STATUS_ESP_PASSWORD)") }
+curl.exe --fail --silent --show-error @auth -F "firmware=@$($bin.FullName)" "http://$Ip/update"
 if ($LASTEXITCODE -ne 0) { throw "Upload failed (curl exit code $LASTEXITCODE)." }
 
 Write-Host "`nThe device is restarting..."

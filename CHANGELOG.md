@@ -24,6 +24,14 @@ changes the first, second and third number, and what a `-rc.N` pre-release is) i
   same JSON that `/custom.json` holds, and `POST /api/settings/import` restores such a file
   with exactly the validation `POST /api/settings` applies (a file with no recognisable
   setting is refused). The Wi-Fi network and the uploaded pictures are not part of it.
+- **Optional password** (Settings tab, off by default): HTTP Basic authentication, user `admin`,
+  for the web interface, the API and `POST /update`. The password is stored in
+  `/custom.json` and never returned by any GET or by the export (the API only says whether one
+  is set). **It is never enforced in rescue access-point mode**, so `/update` always stays
+  reachable: if you forget it, switch the router off until the `Status-ESP` hotspot appears,
+  connect to it and remove the password (or factory-reset). A factory reset clears it.
+  `/v.json` stays open. `tools/upload.sh` and `upload.ps1` read it from
+  `STATUS_ESP_PASSWORD`. See `docs/recovery.md`.
 
 ## [0.3.0-rc.1] - 2026-10-05
 

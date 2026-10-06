@@ -121,6 +121,15 @@ bool validFileName(const char *name) {
   return name[0] != '.' && name[0] != ' ' && name[n - 1] != ' ';
 }
 
+bool validPassword(const char *pw) {
+  size_t n = pw ? strlen(pw) : 0;
+  if (n < 4 || n > sizeof(Settings::password) - 1) return false;
+  for (size_t i = 0; i < n; i++) {
+    if ((uint8_t)pw[i] < 32 || (uint8_t)pw[i] > 126) return false;
+  }
+  return true;
+}
+
 static bool validHostName(const char *s) {
   size_t n = strlen(s);
   if (n == 0 || n > 40) return false;
@@ -178,6 +187,7 @@ static uint32_t diff(const Settings &a, const Settings &b) {
       a.weatherInterval != b.weatherInterval || strcmp(a.weatherGif, b.weatherGif) != 0) ch |= CH_WEATHER;
   if (a.albumAuto != b.albumAuto || a.albumInterval != b.albumInterval || strcmp(a.albumFile, b.albumFile) != 0) ch |= CH_ALBUM;
   if (a.bootDelay != b.bootDelay) ch |= CH_BOOT_DELAY;
+  if (strcmp(a.password, b.password) != 0) ch |= CH_AUTH;
   return ch;
 }
 
@@ -253,10 +263,16 @@ uint32_t apply(JsonObjectConst obj) {
   if (obj["night_end"].is<const char *>() && parseClock(obj["night_end"].as<const char *>(), minutes)) S.nightEnd = minutes;
   if (readInt(obj["night_brt"], 0, 100, n)) S.nightBrightness = (uint8_t)n;
 
+  if (obj["pw"].is<const char *>()) {
+    str = obj["pw"].as<const char *>();
+    if (str[0] == '\0') S.password[0] = '\0';
+    else if (validPassword(str)) strlcpy(S.password, str, sizeof(S.password));
+  }
+
   return diff(old, S);
 }
 
-void toJson(JsonDocument &doc) {
+void toJson(JsonDocument &doc, bool secrets) {
   char buf[8];
   doc["brt"] = S.brightness;
   doc["blinv"] = S.blInverted ? 1 : 0;
@@ -303,6 +319,8 @@ void toJson(JsonDocument &doc) {
   snprintf(buf, sizeof(buf), "%02u:%02u", S.nightEnd / 60, S.nightEnd % 60);
   doc["night_end"] = String(buf);
   doc["night_brt"] = S.nightBrightness;
+
+  if (secrets && S.password[0]) doc["pw"] = String(S.password);
 }
 
 // --- Persistence ----------------------------------------------------------------
@@ -336,7 +354,7 @@ Settings &get() { return S; }
 bool save() {
   if (!mounted) return false;
   JsonDocument doc;
-  toJson(doc);
+  toJson(doc, true);   // the file is the one place the password is kept
   File f = LittleFS.open(config::SETTINGS_TMP, "w");
   if (!f) return false;
   size_t written = serializeJson(doc, f);
