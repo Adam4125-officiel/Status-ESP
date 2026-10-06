@@ -3,6 +3,7 @@
 //   GET  /                     the whole web interface (gzip from PROGMEM, web/index.html)
 //   GET  /api/status           version, network, memory, flash, time, weather state
 //   GET  /api/settings         every setting          POST /api/settings  partial update
+//   GET  /api/settings/export  the settings as a file POST /api/settings/import  restore one
 //   GET  /api/wifi/scan        async scan             POST /api/wifi      save Wi-Fi, reboot
 //   GET  /api/files?dir=       list /image or /gif    POST /api/upload?dir=   multipart
 //   POST /api/delete           only directly inside /image/ or /gif/ (403 otherwise)
@@ -174,13 +175,10 @@ static void handleSettingsGet() {
   sendJson(200, doc);
 }
 
-static void handleSettingsPost() {
-  JsonDocument body;
-  if (!readJsonBody(body)) return;
+// Applies a settings object (already validated by settings::apply()), optionally writes it
+// to /custom.json, applies it live and answers with the resulting settings.
+static void applySettingsAndReply(JsonDocument &body, bool persist) {
   uint32_t changed = settings::apply(body.as<JsonObjectConst>());
-  // ?save=0 applies without writing flash: used by the live brightness slider, which
-  // fires on every movement; the final value is saved when the slider is released.
-  bool persist = !(server.hasArg("save") && server.arg("save") == "0");
   if (persist && !settings::save()) {
     sendError(500, F("Could not write the settings file"));
     return;
@@ -193,6 +191,46 @@ static void handleSettingsPost() {
   settings::toJson(doc);
   doc["ok"] = true;
   sendJson(200, doc);
+}
+
+static void handleSettingsPost() {
+  JsonDocument body;
+  if (!readJsonBody(body)) return;
+  // ?save=0 applies without writing flash: used by the live brightness slider, which
+  // fires on every movement; the final value is saved when the slider is released.
+  bool persist = !(server.hasArg("save") && server.arg("save") == "0");
+  applySettingsAndReply(body, persist);
+}
+
+// The settings as a downloadable file: the same JSON /custom.json holds.
+static void handleSettingsExport() {
+  JsonDocument doc;
+  settings::toJson(doc);
+  String out;
+  out.reserve(1024);
+  serializeJson(doc, out);
+  server.sendHeader(F("Cache-Control"), F("no-store"));
+  server.sendHeader(F("Content-Disposition"), F("attachment; filename=\"status-esp-settings.json\""));
+  server.send(200, F("application/json"), out);
+}
+
+// Restores a file made by the export. Same validation as POST /api/settings (it is the same
+// settings::apply()), and refused when the file has no setting in it at all, so that picking
+// the wrong file does not look like a successful import.
+static void handleSettingsImport() {
+  JsonDocument body;
+  if (!readJsonBody(body)) return;
+  JsonDocument known;
+  settings::toJson(known);
+  size_t recognised = 0;
+  for (JsonPair kv : body.as<JsonObject>()) {
+    if (!known[kv.key()].isNull()) recognised++;
+  }
+  if (recognised == 0) {
+    sendError(400, F("This does not look like a Status-ESP settings file"));
+    return;
+  }
+  applySettingsAndReply(body, true);
 }
 
 // --- API: Wi-Fi -----------------------------------------------------------------------------------
@@ -585,6 +623,8 @@ void begin() {
   server.on("/api/status", HTTP_GET, handleStatus);
   server.on("/api/settings", HTTP_GET, handleSettingsGet);
   server.on("/api/settings", HTTP_POST, handleSettingsPost);
+  server.on("/api/settings/export", HTTP_GET, handleSettingsExport);
+  server.on("/api/settings/import", HTTP_POST, handleSettingsImport);
   server.on("/api/wifi/scan", HTTP_GET, handleWifiScan);
   server.on("/api/wifi", HTTP_POST, handleWifiSave);
   server.on("/api/files", HTTP_GET, handleFiles);

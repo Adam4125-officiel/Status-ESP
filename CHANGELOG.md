@@ -20,6 +20,10 @@ changes the first, second and third number, and what a `-rc.N` pre-release is) i
   library costs about 21 KB, which the size limit cannot afford): it answers address
   questions only, so the device does not show up in a network browser and two devices with the
   same name are not detected. It does not run in rescue mode.
+- **Export and import of the settings** (Settings tab): `GET /api/settings/export` downloads the
+  same JSON that `/custom.json` holds, and `POST /api/settings/import` restores such a file
+  with exactly the validation `POST /api/settings` applies (a file with no recognisable
+  setting is refused). The Wi-Fi network and the uploaded pictures are not part of it.
 
 ## [0.3.0-rc.1] - 2026-10-05
 

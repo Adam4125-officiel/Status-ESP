@@ -28,7 +28,7 @@ input[type=range]{width:100%}
 input[type=checkbox],input[type=radio]{width:18px;height:18px;margin:0}
 input:disabled,select:disabled{opacity:.5}
 button,.btn{background:#2a6;color:#fff;border:0;border-radius:6px;padding:9px 14px;font-size:14px;cursor:pointer;text-decoration:none;display:inline-block;margin:8px 8px 0 0}
-button.alt{background:#345}
+button.alt,.btn.alt{background:#345}
 button.warn,.btn.warn{background:#a62}
 button.small{padding:5px 9px;margin:0 0 0 6px;font-size:13px}
 button:disabled{opacity:.5;cursor:default}
@@ -261,6 +261,16 @@ a{color:#8cf}
       <p class="hint">Uses the time of the clock (see Time). The window may cross midnight.</p>
       <button>Save</button>
     </form>
+  </div>
+
+  <div class="card">
+    <h2>Back up the settings</h2>
+    <a class="btn alt" href="/api/settings/export" download="status-esp-settings.json">Export settings</a>
+    <p class="hint">Downloads every setting on this page as a file. The Wi-Fi network and the uploaded pictures are not part of it.</p>
+    <label for="imp-file">Restore a settings file</label>
+    <input type="file" id="imp-file" accept=".json,application/json">
+    <button type="button" id="imp-btn">Import settings</button>
+    <p class="hint">The file is checked like any other change: values that do not make sense are ignored.</p>
   </div>
 
   <div class="card">
@@ -609,6 +619,27 @@ function init() {
   brt.onchange = function () { clearTimeout(liveTimer); save({ brt: Number(brt.value) }).catch(function () {}); };
   $("#blinv").onchange = function () { save({ blinv: this.checked ? 1 : 0 }).catch(function () {}); };
   $("#night_brt").oninput = function () { $("#night-val").textContent = this.value; };
+
+  $("#imp-btn").onclick = function () {
+    var f = $("#imp-file").files[0];
+    if (!f) { toast("Choose a settings file first", false); return; }
+    if (f.size > 2000) { toast("That file is too large to be a settings file", false); return; }
+    var rd = new FileReader();
+    rd.onload = function () {
+      var o;
+      try { o = JSON.parse(rd.result); } catch (e) { toast("That file is not valid JSON", false); return; }
+      if (!o || typeof o !== "object" || Array.isArray(o)) { toast("That file is not a settings file", false); return; }
+      if (!confirm("Replace the current settings with the ones in this file?")) return;
+      post("/api/settings/import", o).then(function (j) {
+        S = j;
+        fill();
+        $("#imp-file").value = "";
+        toast("Settings imported");
+      }).catch(function (e) { toast(e.message, false); });
+    };
+    rd.onerror = function () { toast("Could not read that file", false); };
+    rd.readAsText(f);
+  };
 
   $("#reboot").onclick = function () {
     if (!confirm("Reboot the device?")) return;
