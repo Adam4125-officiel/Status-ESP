@@ -30,6 +30,12 @@ changes the first, second and third number, and what a `-rc.N` pre-release is) i
   has it and an import never touches it.
 - `POST /api/portal/refresh` asks Status-Portal again at the next loop pass (for the "Test
   connection" button).
+- **The Status-Portal tab** replaces the "Coming soon" placeholder: portal address, API key
+  (a password field that is never filled in again, with a "Remove the key" button), refresh
+  interval, the five switches for what to show, what to do when something is wrong (switch to the
+  screen, a dot in the corner, or nothing), a **Test connection** button that saves the form, asks
+  the portal at once and shows the answer within seconds, and a status line (also in the Status
+  table at the bottom of Settings) saying what the portal reports or why it does not answer.
 - **Host tests** (`tools/test_host.sh`, run by CI): the answer parser, the address checker and the
   UTF-8 fold are built with the PC's g++ and the address and undefined-behaviour sanitizers, and
   checked against the contract's example, a worst-case 2.7 KB answer made of quotes, backslashes,
