@@ -11,7 +11,8 @@ static Settings S;
 static bool mounted = false;
 
 static const char *const THEME_NAMES[THEME_COUNT] = {"weather_clock", "forecast", "album",          "clock",
-                                                     "analog",        "digital2", "simple_weather", "countdown"};
+                                                     "analog",        "digital2", "simple_weather", "countdown",
+                                                     "words",         "rings",    "binary"};
 
 const char *themeName(uint8_t theme) {
   return theme < THEME_COUNT ? THEME_NAMES[theme] : THEME_NAMES[THEME_CLOCK];
@@ -271,7 +272,7 @@ uint32_t apply(JsonObjectConst obj) {
   if (readBool(obj["auto_switch"], b)) S.autoSwitch = b;
   if (readInt(obj["auto_interval"], 5, 3600, n)) S.autoInterval = (uint16_t)n;
   if (obj["auto_themes"].is<JsonArrayConst>()) {
-    uint8_t mask = 0;
+    uint16_t mask = 0;
     for (JsonVariantConst v : obj["auto_themes"].as<JsonArrayConst>()) {
       if (v.is<const char *>() && themeFromName(v.as<const char *>(), t)) mask |= (1u << t);
     }

@@ -19,7 +19,8 @@
 //   hc mc sc "#RRGGBB"    hour12 0|1    date_fmt 0 DD/MM/YYYY|1 MM/DD/YYYY|2 YYYY-MM-DD
 //   colon 0|1             font 0 digital (Font 7)|1 plain (Font 6)|2 large (Font 8, clock theme only)     ntp "" or host name
 //   album_auto 0|1        album_interval 2..3600 (s)    album_file "" or file in /image
-//   theme "weather_clock"|"forecast"|"album"|"clock"|"analog"|"digital2"|"simple_weather"|"countdown"
+//   theme "weather_clock"|"forecast"|"album"|"clock"|"analog"|"digital2"|"simple_weather"|"countdown"|
+//         "words"|"rings"|"binary"|"words"|"rings"|"binary"
 //   auto_switch 0|1       auto_interval 5..3600 (s)     auto_themes ["clock", ...]
 //   night_en 0|1          night_start "HH:MM"           night_end "HH:MM"     night_brt 0..100
 //   cd_date "" (no countdown) or "YYYY-MM-DD" (2000..2099)   cd_time "HH:MM" (default 00:00)
@@ -43,7 +44,10 @@ enum Theme : uint8_t {
   THEME_DIGITAL2 = 5,
   THEME_SIMPLE_WEATHER = 6,
   THEME_COUNTDOWN = 7,
-  THEME_COUNT = 8        // autoMask is a uint8_t: at most 8 themes, this is the limit
+  THEME_WORDS = 8,
+  THEME_RINGS = 9,
+  THEME_BINARY = 10,
+  THEME_COUNT = 11       // autoMask is a uint16_t: at most 16 themes, this is the limit
 };
 enum WindUnit : uint8_t { WIND_KMH = 0, WIND_MS = 1, WIND_MPH = 2 };
 enum TempUnit : uint8_t { TEMP_C = 0, TEMP_F = 1 };
@@ -81,7 +85,7 @@ struct Settings {
   uint8_t theme;             // manual choice (a Theme)
   bool autoSwitch;
   uint16_t autoInterval;     // seconds per theme
-  uint8_t autoMask;          // bit n set = Theme n takes part in the rotation
+  uint16_t autoMask;         // bit n set = Theme n takes part in the rotation
   // Night mode
   bool nightEnabled;
   uint16_t nightStart, nightEnd;      // minutes since local midnight

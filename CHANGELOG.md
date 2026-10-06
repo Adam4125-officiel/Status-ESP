@@ -31,6 +31,15 @@ changes the first, second and third number, and what a `-rc.N` pre-release is) i
   when complete, names are sanitised (no `..`, no absolute escape), a file that does not fit is
   skipped, nothing is deleted and the file system is never formatted. The Wi-Fi network is stored
   and the device reboots.
+- **Three more display themes**, drawn from scratch like the others: *Word clock* (`words`: the
+  time spelled out by lighting words in a grid of letters, to the nearest five minutes, with
+  four dots for the minutes in between), *Rings* (`rings`: three concentric rings, seconds
+  outside, minutes, then hours, filling clockwise in the hour, minute and second colours around
+  the digital time, the date and the weekday) and *Binary clock* (`binary`: six columns of dots
+  showing HH MM SS in binary-coded decimal, with the plain time and date below). All three
+  repaint only what changed (no full-screen clear, no flicker), follow the Time settings
+  (colours, 12/24 hour) and can be chosen manually or taken into the automatic rotation
+  (`theme`, `auto_themes`). `auto_themes` is stored as a 16-bit mask now, so up to 16 themes fit.
 - **Weather diagnostics.** The last failure (HTTP code, network error, "bad JSON: ...",
   "unexpected answer", "heap too low (N B)", "no city", "no Wi-Fi"), the number of failures in a
   row and the age of the last attempt are kept, returned by `/api/status`

@@ -24,6 +24,9 @@ static const Screen SCREENS[settings::THEME_COUNT] = {
     {screenDigital2Enter, screenDigital2Update, screenDigital2Leave},   // THEME_DIGITAL2
     {screenSimpleWeatherEnter, screenSimpleWeatherUpdate, screenSimpleWeatherLeave},   // THEME_SIMPLE_WEATHER
     {screenCountdownEnter, screenCountdownUpdate, screenCountdownLeave},   // THEME_COUNTDOWN
+    {screenWordsEnter, screenWordsUpdate, screenWordsLeave},            // THEME_WORDS
+    {screenRingsEnter, screenRingsUpdate, screenRingsLeave},            // THEME_RINGS
+    {screenBinaryEnter, screenBinaryUpdate, screenBinaryLeave},         // THEME_BINARY
 };
 
 static const uint8_t NO_THEME = 255;

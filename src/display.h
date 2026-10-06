@@ -22,7 +22,8 @@
 // Leave  : release resources (GIF decoder, files). May draw nothing. Idempotent.
 //
 // Names: screenClock*, screenWeather* (theme weather_clock), screenForecast*,
-// screenAlbum*, screenAnalog*, screenDigital2*, screenSimpleWeather*, screenCountdown*. All sets are
+// screenAlbum*, screenAnalog*, screenDigital2*, screenSimpleWeather*, screenCountdown*, screenWords*,
+// screenRings*, screenBinary*. All sets are
 // declared below; the manager calls them through its own table, so a screen file only has
 // to define its three functions.
 //
@@ -71,6 +72,18 @@ void screenSimpleWeatherLeave();
 void screenCountdownEnter();
 void screenCountdownUpdate(bool full);
 void screenCountdownLeave();
+
+void screenWordsEnter();
+void screenWordsUpdate(bool full);
+void screenWordsLeave();
+
+void screenRingsEnter();
+void screenRingsUpdate(bool full);
+void screenRingsLeave();
+
+void screenBinaryEnter();
+void screenBinaryUpdate(bool full);
+void screenBinaryLeave();
 
 namespace display {
 
