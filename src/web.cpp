@@ -8,6 +8,7 @@
 //   GET  /api/files?dir=       list /image or /gif    POST /api/upload?dir=   multipart
 //   POST /api/delete           only directly inside /image/ or /gif/ (403 otherwise)
 //   GET  /api/geocode?q=       city search (Open-Meteo)
+//   POST /api/weather/refresh  fetch the weather again now
 //   POST /api/reboot           POST /api/factory-reset   (deletes only /custom.json)
 //   GET  /update POST /update  firmware update (our page + the library's handler)
 //   GET  /v.json  /reboot  /set?brt=&blinv=  /wifi   kept for backward compatibility
@@ -201,6 +202,13 @@ static void handleStatus() {
   const weather::Data &w = weather::data();
   doc["weather_ok"] = w.valid;
   if (w.valid) doc["weather_age"] = (millis() - w.updatedAtMs) / 1000;
+  const weather::Diag &wd = weather::diag();   // why the weather is not arriving (empty when it is)
+  if (wd.error[0]) doc["weather_err"] = wd.error;
+  if (wd.attemptMs) {
+    doc["weather_try_age"] = (millis() - wd.attemptMs) / 1000;
+    doc["weather_fails"] = wd.failures;
+    doc["weather_http"] = wd.httpCode;
+  }
   sendJson(200, doc);
 }
 
@@ -575,6 +583,12 @@ static void handleGeocode() {
   sendJson(200, doc);
 }
 
+// Asks for a weather fetch at the next loop pass (the "Check now" button of the Weather tab).
+static void handleWeatherRefresh() {
+  weather::requestRefresh();
+  sendOk();
+}
+
 static void handleReboot() {
   sendOk();
   delay(300);
@@ -688,6 +702,7 @@ void begin() {
   server.on("/api/upload", HTTP_POST, handleUploadDone, handleUploadChunk);   // checks the password itself
   route("/api/delete", HTTP_POST, handleDelete);
   route("/api/geocode", HTTP_GET, handleGeocode);
+  route("/api/weather/refresh", HTTP_POST, handleWeatherRefresh);
   route("/api/reboot", HTTP_POST, handleReboot);
   route("/api/factory-reset", HTTP_POST, handleFactoryReset);
 

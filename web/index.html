@@ -122,6 +122,12 @@ a{color:#8cf}
     <p class="hint">Weather comes from open-meteo.com (no account or key needed). The device needs an internet connection.</p>
   </div>
   <div class="card">
+    <h2>Status</h2>
+    <p id="w-status">Loading...</p>
+    <button type="button" class="alt" id="w-check">Check now</button>
+    <p class="hint">If the weather does not arrive, the reason is shown here (and on the device screen). Checking blocks the device for up to 13 seconds.</p>
+  </div>
+  <div class="card">
     <h2>Units and updates</h2>
     <form data-settings>
       <div class="row">
@@ -367,6 +373,16 @@ function fmtBytes(n) {
   if (n >= 1024) return (n / 1024).toFixed(1) + " KB";
   return n + " B";
 }
+function ago(s) { s = Number(s) || 0; return s < 90 ? s + " s" : fmtDuration(s); }
+function weatherLine(s) {
+  var t = s.weather_ok ? "Updated " + ago(s.weather_age) + " ago." : "No weather data yet.";
+  if (s.weather_err) {
+    t += " " + (s.weather_try_age === undefined ? "Not fetched: " : "Last attempt " + ago(s.weather_try_age) + " ago failed: ") + s.weather_err;
+    if (s.weather_fails > 1) t += " (" + s.weather_fails + " failures in a row)";
+    t += ".";
+  }
+  return t;
+}
 function fmtDuration(s) {
   s = Number(s) || 0;
   var d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60);
@@ -443,7 +459,7 @@ function showTab(name) {
   $$(".tab").forEach(function (t) { t.classList.toggle("on", t.id === "t-" + name); });
   $$("#tabs button").forEach(function (b) { b.classList.toggle("on", b.dataset.tab === name); });
   if (location.hash !== "#" + name) history.replaceState(null, "", "#" + name);
-  if (name === "weather") loadFiles("/gif");
+  if (name === "weather") { loadFiles("/gif"); loadStatus(); }
   if (name === "pictures") loadFiles("/image");
   if (name === "settings") loadStatus();
   if (name === "network") loadStatus();
@@ -472,8 +488,9 @@ function loadStatus() {
       ["Space for /update", fmtBytes(s.free_ota)],
       ["Back to stock firmware", s.rollback_ok ? "possible" : "TOO BIG"],
       ["Storage (LittleFS)", s.fs_mounted ? fmtBytes(s.fs_total - s.fs_used) + " free of " + fmtBytes(s.fs_total) : "not mounted"],
-      ["Weather", s.weather_ok ? "updated " + fmtDuration(s.weather_age) + " ago" : "no data"]
+      ["Weather", weatherLine(s)]
     ];
+    $("#w-status").textContent = weatherLine(s);
     var t = $("#status");
     t.textContent = "";
     rows.forEach(function (r) {
@@ -637,6 +654,10 @@ function init() {
   $("#scan").onclick = scan;
 
   $("#f-city").onsubmit = searchCity;
+  $("#w-check").onclick = function () {
+    $("#w-status").textContent = "Checking...";
+    post("/api/weather/refresh").then(function () { return sleep(9000); }).then(loadStatus).catch(function (e) { toast(e.message, false); });
+  };
   $("#city-clear").onclick = function () { save({ city: "", lat: 0, lon: 0 }, "City cleared").catch(function () {}); };
 
   $("#gif-up").onclick = function () { upload("/gif", $("#gif-file"), $("#gif-prog"), ["gif"]); };

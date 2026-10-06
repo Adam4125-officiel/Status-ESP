@@ -5,6 +5,24 @@ All notable changes to this project are documented in this file. The format foll
 changes the first, second and third number, and what a `-rc.N` pre-release is) is in
 [docs/releasing.md](docs/releasing.md).
 
+## [0.3.0-rc.3] - 2026-10-06
+
+### Fixed
+- **The weather never arrived** ("No weather data" for ever, with a city set and the network fine).
+  `HTTPClient::begin(client, url)` keeps a *clone* of the `WiFiClient` it is given and connects
+  that clone; `weather.cpp` then read the body from its own, never-connected `client`, got zero
+  bytes, and every fetch ended in `EmptyInput` (which was only printed on the serial port).
+  The body is now read through `http.getStreamPtr()`. Reproduced on a PC with the real
+  `weather.cpp`, the real ArduinoJson and a client that clones like the library does, against
+  the real Open-Meteo, before and after the change.
+
+### Added
+- **Weather diagnostics.** The last failure (HTTP code, network error, "bad JSON: ...",
+  "unexpected answer", "heap too low (N B)", "no city", "no Wi-Fi"), the number of failures in a
+  row and the age of the last attempt are kept, returned by `/api/status`
+  (`weather_err`, `weather_fails`, `weather_http`, `weather_try_age`), shown in the Weather tab
+  (with a "Check now" button, `POST /api/weather/refresh`) and on the "No weather data" screen.
+
 ## [0.3.0-rc.2] - 2026-10-06
 
 ### Added

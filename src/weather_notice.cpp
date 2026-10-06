@@ -40,9 +40,12 @@ void draw(Kind kind) {
     case LOADING:
       display::drawMessage("Loading weather", "Please wait...");
       break;
-    case UNAVAILABLE:
-      display::drawMessage("No weather data", "Retrying every minute", TFT_YELLOW);
+    case UNAVAILABLE: {
+      // The reason (HTTP code, parse error...) is what the owner needs to see; fall back to the generic line.
+      const char *why = weather::diag().error;
+      display::drawMessage("No weather data", why[0] ? why : "Retrying every minute", TFT_YELLOW);
       break;
+    }
     default:
       break;
   }

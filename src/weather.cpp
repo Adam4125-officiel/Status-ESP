@@ -2,6 +2,8 @@
 // See weather.h for the contract (when it may block, what it caches, the back-off).
 #include "weather.h"
 
+#include <stdarg.h>
+
 #include <ArduinoJson.h>
 #include <ESP8266HTTPClient.h>
 #include <ESP8266WiFi.h>
@@ -22,6 +24,7 @@ const uint32_t NO_MEMORY_RETRY_MS = 15000; // heap too fragmented right now: loo
 const uint32_t MIN_FREE_BLOCK = 9000;      // HTTP client + filtered document, with margin
 
 Data cache;
+Diag dg;
 bool forceNow = false;        // fetch at the next pass, even inside the back-off
 bool attempted = false;       // at least one attempt since boot / since the location changed
 bool lastOk = false;
@@ -39,8 +42,26 @@ bool sameLocation() {
 
 void forgetData() {
   memset(&cache, 0, sizeof(cache));
+  memset(&dg, 0, sizeof(dg));
   haveLocation = false;
   attempted = false;
+}
+
+// Records why the weather is not coming (shown in the web interface and on the empty weather
+// screens) and prints it. `fmt` is a PSTR() printf format.
+void fail(PGM_P fmt, ...) {
+  va_list args;
+  va_start(args, fmt);
+  vsnprintf_P(dg.error, sizeof(dg.error), fmt, args);
+  va_end(args);
+  Serial.printf_P(PSTR("[weather] %s\n"), dg.error);
+}
+
+// A reason that is not an attempt (no city, no Wi-Fi): set quietly, only when it changes.
+void notice(PGM_P msg) {
+  if (strcmp_P(dg.error, msg) == 0) return;
+  strncpy_P(dg.error, msg, sizeof(dg.error) - 1);   // zero-padded, and the last byte is already 0
+  dg.error[sizeof(dg.error) - 1] = '\0';
 }
 
 // Reads from the client with a deadline for the WHOLE body: ArduinoJson's own stream reader
@@ -62,7 +83,8 @@ class DeadlineStream : public Stream {
       int ready = client_.available();
       if (ready > 0) {
         if ((size_t)ready > length - got) ready = (int)(length - got);
-        got += client_.read((uint8_t *)buffer + got, ready);
+        int n = client_.read((uint8_t *)buffer + got, ready);
+        if (n > 0) got += n;
         continue;
       }
       if (!client_.connected() || (int32_t)(millis() - deadline_) >= 0) break;
@@ -171,7 +193,11 @@ Outcome fetchOnce() {
   // The GIF decoder (~24 KB in one block) and the HTTP client + JSON parse never coexist:
   // close it first, the weather screen reopens it once the data is in.
   if (media::gifIsOpen()) media::gifClose();
-  if (ESP.getMaxFreeBlockSize() < MIN_FREE_BLOCK) return NO_MEMORY;
+  uint32_t block = ESP.getMaxFreeBlockSize();
+  if (block < MIN_FREE_BLOCK) {
+    fail(PSTR("heap too low (%d B)"), (int)block);
+    return NO_MEMORY;
+  }
 
   char coords[40];
   snprintf(coords, sizeof(coords), "latitude=%.4f&longitude=%.4f", s.lat, s.lon);
@@ -184,16 +210,32 @@ Outcome fetchOnce() {
            "&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset"
            "&timezone=auto&forecast_days=4&wind_speed_unit=kmh");
 
+  // HTTPClient::begin(client, url) keeps a CLONE of `client` and connects that one: this
+  // local object never gets a connection. Everything is read through http.getStreamPtr();
+  // reading `client` yields nothing, which is exactly what made every fetch fail with
+  // "EmptyInput" in 0.3.0-rc.1 and rc.2.
   WiFiClient client;
   HTTPClient http;
-  client.setTimeout(HTTP_TIMEOUT_MS);
   http.setTimeout(HTTP_TIMEOUT_MS);
   http.useHTTP10(true);  // no chunked encoding: the stream is the raw body
-  if (!http.begin(client, url)) return FAILED;
+  if (!http.begin(client, url)) {
+    fail(PSTR("could not start the request"));
+    return FAILED;
+  }
   int code = http.GET();
+  dg.httpCode = (int16_t)code;
   if (code != HTTP_CODE_OK) {
     http.end();
-    Serial.printf_P(PSTR("[weather] HTTP %d\n"), code);
+    if (code > 0) fail(PSTR("HTTP %d"), code);
+    else if (code == -1) fail(PSTR("connection failed"));
+    else if (code == -11) fail(PSTR("no answer (timeout)"));
+    else fail(PSTR("network error %d"), code);
+    return FAILED;
+  }
+  WiFiClient *stream = http.getStreamPtr();
+  if (!stream) {
+    http.end();
+    fail(PSTR("connection lost"));
     return FAILED;
   }
 
@@ -203,11 +245,12 @@ Outcome fetchOnce() {
     JsonDocument filter;
     buildFilter(filter);
     JsonDocument doc;
-    DeadlineStream body(client, BODY_DEADLINE_MS);
+    DeadlineStream body(*stream, BODY_DEADLINE_MS);
     DeserializationError err = deserializeJson(doc, body, DeserializationOption::Filter(filter));
     http.end();
     good = !err && extract(doc, fresh);
-    if (!good) Serial.printf_P(PSTR("[weather] unusable answer (%s)\n"), err.c_str());
+    if (err) fail(PSTR("bad JSON: %s"), err.c_str());
+    else if (!good) fail(doc.isNull() ? PSTR("answer is not JSON") : PSTR("unexpected answer"));
   }
   if (!good) return FAILED;
 
@@ -225,6 +268,7 @@ void begin() { forgetData(); }
 void loop() {
   if (!settings::hasCity()) {
     if (cache.valid || haveLocation) forgetData();  // the city was cleared (factory reset)
+    notice(PSTR("no city"));
     return;
   }
   // The location changed without requestRefresh() being called: the cache is not ours any more.
@@ -232,7 +276,10 @@ void loop() {
     forgetData();
     forceNow = true;
   }
-  if (!net::isConnected() || WiFi.status() != WL_CONNECTED) return;
+  if (!net::isConnected() || WiFi.status() != WL_CONNECTED) {
+    if (!dg.error[0] || strcmp_P(dg.error, PSTR("no city")) == 0) notice(PSTR("no Wi-Fi"));
+    return;
+  }
 
   uint32_t now = millis();
   if (!forceNow && attempted) {
@@ -247,9 +294,18 @@ void loop() {
   lastAttemptMs = millis();
   lastOk = outcome == OK;
   lastWasMemorySkip = outcome == NO_MEMORY;
+  dg.attemptMs = lastAttemptMs ? lastAttemptMs : 1;
+  if (lastOk) {
+    dg.error[0] = '\0';
+    dg.failures = 0;
+  } else if (dg.failures < 0xFFFF) {
+    dg.failures++;
+  }
 }
 
 const Data &data() { return cache; }
+
+const Diag &diag() { return dg; }
 
 void requestRefresh() {
   const settings::Settings &s = settings::get();

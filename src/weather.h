@@ -55,6 +55,15 @@ struct Data {
   Day forecast[3];          // the three days AFTER today (tomorrow first)
 };
 
+// Why the weather is (not) arriving, for the web interface and the "No weather data" screen.
+// Cleared when the city changes; `error` is empty once an attempt has worked.
+struct Diag {
+  char error[40];        // last failure ("HTTP 404", "bad JSON: ...", "heap too low (...)", "no city"...)
+  int16_t httpCode;      // HTTP status of the last attempt, or a negative HTTPClient error; 0 = none
+  uint16_t failures;     // consecutive failed attempts
+  uint32_t attemptMs;    // millis() of the last attempt (0 = none since boot / since the city changed)
+};
+
 // Called once from setup(), before the network is up. Must not touch the network.
 void begin();
 
@@ -66,6 +75,9 @@ void loop();
 
 // Cached data. Never null, never blocks. Screens must check data().valid.
 const Data &data();
+
+// What the last attempt did. Never null, never blocks. The last success is data().updatedAtMs.
+const Diag &diag();
 
 // Called when the location changed (city / lat / lon) or the user asked for a fresh
 // reading: discard the cached data (valid = offsetValid = false) when the location
