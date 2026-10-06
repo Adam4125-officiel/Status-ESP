@@ -12,6 +12,13 @@ Version numbers follow [docs/releasing.md](docs/releasing.md): new features bump
 - **Richer weather**: hourly forecast and more forecast days.
 
 
+## Memory
+- **"Not enough memory" on some pictures** (reported on the device with 0.4.0-rc.1). The GIF decoder
+  needs about 24.5 KB in one block and the idle heap's largest block is about 25 KB, so GIFs are at the
+  edge; static RAM grew with the Status-Portal client (about 42 KB). To investigate: which files fail
+  (GIF or JPEG, size, progressive JPEG), freeing the portal cache while a GIF plays, smaller decoder
+  buffers, lowering static RAM.
+
 ## Updates
 - **On-device auto-updater**: the device reads
   `https://github.com/Adam4125-officiel/Status-ESP/releases/latest/download/version.json` (stable releases

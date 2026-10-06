@@ -5,6 +5,19 @@ All notable changes to this project are documented in this file. The format foll
 changes the first, second and third number, and what a `-rc.N` pre-release is) is in
 [docs/releasing.md](docs/releasing.md).
 
+## [0.4.0-rc.2] - 2026-10-06
+
+### Changed
+- The Status-Portal screen lists **every** service, OK ones included (worst first), then the open
+  incidents and the maintenance. When that does not fit the screen it is split into pages that change
+  every `portal_page` seconds (2 to 60, default 6, set in the Status-Portal tab), with a "Page n/m" line.
+  Needs Status-Portal **1.11.0** or newer for the OK services (`services=all`); an older portal still
+  works and shows only the services with a problem. The answer may now be up to 7 KB.
+
+### Removed
+- The big digits (stacked), simple weather clock and rings themes, to save flash. A saved choice of
+  one of them falls back to the default theme.
+
 ## [0.4.0-rc.1] - 2026-10-06
 
 ### Added

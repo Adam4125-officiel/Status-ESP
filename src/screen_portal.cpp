@@ -202,9 +202,17 @@ uint32_t countsSignature(const Summary &d) {
 
 // --- Rows --------------------------------------------------------------------------------------------------
 
-// Adds a row, if there is room.
+// Paging: every row is "added" in order, but only the ones of the current page are kept. When the list is
+// longer than the screen, the page changes every portal_page seconds and the last row says "Page 2/3".
+uint16_t rowSeen;     // rows offered by buildRows() so far, on every page
+uint16_t rowSkip;     // rows that belong to the pages before the current one
+uint8_t pageIndex, pageCount = 1;
+uint32_t pageAt;      // millis() when the current page went up
+
+// Adds a row, if it belongs to the current page and there is room.
 Row *addRow(uint8_t capacity, uint8_t glyph, uint16_t color, const char *text, const char *tag, uint16_t tagColor) {
-  if (rowCount >= capacity) return nullptr;
+  uint16_t index = rowSeen++;
+  if (index < rowSkip || rowCount >= capacity) return nullptr;
   Row &r = rows[rowCount++];
   memset(&r, 0, sizeof(r));
   portal_ui::fitText(r.text, sizeof(r.text), text, TEXT_W, 2);
@@ -221,63 +229,30 @@ void addMore(uint8_t capacity, uint16_t n, const char *what) {
   addRow(capacity, G_NONE, 0, text, "", 0);
 }
 
-// How many rows each group gets: in turn, one at a time, in priority order, until the rows run out.
-// A group that cannot show everything gives its last row to the "+N more" line.
-void allocate(const uint8_t demand[3], uint8_t capacity, uint8_t out[3]) {
-  uint8_t used = 0;
-  out[0] = out[1] = out[2] = 0;
-  for (uint8_t level = 1; level <= ROWS_MAX && used < capacity; level++) {
-    for (uint8_t g = 0; g < 3 && used < capacity; g++) {
-      if (out[g] < demand[g] && out[g] < level) {
-        out[g]++;
-        used++;
-      }
-    }
-  }
-}
-
-void buildRows(const Summary &d, uint8_t capacity, uint32_t now) {
+// Every service (OK ones included, worst first), then the open incidents, then the maintenance, split
+// into pages of `capacity` rows. "+N more" only stands for what the portal itself left out.
+void buildPage(const Summary &d, uint8_t capacity, uint32_t now) {
   rowCount = 0;
+  rowSeen = 0;
+  rowSkip = (uint16_t)pageIndex * capacity;
   char tag[10];
 
-  // What each group would like to show: its items, and a "+N more" row for what the portal left out.
-  uint16_t hiddenServices = 0, hiddenIncidents = 0, hiddenMaint = 0;
   if (d.services.present) {
-    uint16_t notOk = d.services.total > d.services.operational ? d.services.total - d.services.operational : 0;
-    hiddenServices = notOk > d.services.n ? notOk - d.services.n : 0;
-  }
-  if (d.incidents.present) hiddenIncidents = d.incidents.open > d.incidents.n ? d.incidents.open - d.incidents.n : 0;
-  uint16_t maintTotal = d.maintenance.present ? d.maintenance.active + d.maintenance.upcoming : 0;
-  if (d.maintenance.present) hiddenMaint = maintTotal > d.maintenance.n ? maintTotal - d.maintenance.n : 0;
-
-  uint8_t demand[3] = {(uint8_t)((d.services.present ? d.services.n : 0) + (hiddenServices ? 1 : 0)),
-                       (uint8_t)((d.incidents.present ? d.incidents.n : 0) + (hiddenIncidents ? 1 : 0)),
-                       (uint8_t)((d.maintenance.present ? d.maintenance.n : 0) + (hiddenMaint ? 1 : 0))};
-  uint8_t give[3];
-  allocate(demand, capacity, give);
-
-  // Services.
-  if (give[0]) {
-    uint8_t items = d.services.n;
-    bool more = hiddenServices > 0 || give[0] < demand[0];
-    uint8_t shownItems = more ? give[0] - 1 : give[0];
-    if (shownItems > items) shownItems = items;
-    for (uint8_t i = 0; i < shownItems; i++) {
+    uint16_t listedNotOk = 0;
+    for (uint8_t i = 0; i < d.services.n; i++) {
       const portal::Service &s = d.services.items[i];
+      if (s.status != portal::ST_OPERATIONAL) listedNotOk++;
       addRow(capacity, G_DOT, portal_ui::statusColor(s.status), s.name, portal_ui::statusTag(s.status), portal_ui::statusColor(s.status));
     }
-    if (more) {
-      uint16_t notOk = d.services.total > d.services.operational ? d.services.total - d.services.operational : 0;
-      addMore(capacity, notOk > shownItems ? notOk - shownItems : 1, "services");
-    }
+    // Only unhealthy services the portal left out are worth a "+N more" (a portal older than 1.11.0
+    // never sends the OK ones).
+    uint16_t notOk = d.services.total > d.services.operational ? d.services.total - d.services.operational : 0;
+    if (notOk > listedNotOk) addMore(capacity, notOk - listedNotOk, "services");
   }
 
   // Open incidents: the time since they started on the right, coloured by how far along they are.
-  if (give[1]) {
-    bool more = hiddenIncidents > 0 || give[1] < demand[1];
-    uint8_t shownItems = more ? give[1] - 1 : give[1];
-    if (shownItems > d.incidents.n) shownItems = d.incidents.n;
-    for (uint8_t i = 0; i < shownItems; i++) {
+  if (d.incidents.present) {
+    for (uint8_t i = 0; i < d.incidents.n; i++) {
       const portal::Incident &inc = d.incidents.items[i];
       tag[0] = '\0';
       if (now && inc.since && now >= inc.since) portal_ui::formatSpan(tag, sizeof(tag), now - inc.since);
@@ -286,15 +261,13 @@ void buildRows(const Summary &d, uint8_t capacity, uint32_t now) {
                                                             : portal_ui::RED;
       addRow(capacity, G_BANG, color, inc.title, tag, color);
     }
-    if (more) addMore(capacity, d.incidents.open > shownItems ? d.incidents.open - shownItems : 1, "incidents");
+    if (d.incidents.open > d.incidents.n) addMore(capacity, d.incidents.open - d.incidents.n, "incidents");
   }
 
   // Maintenance: "38m left" while it runs, "in 2d" before it starts.
-  if (give[2]) {
-    bool more = hiddenMaint > 0 || give[2] < demand[2];
-    uint8_t shownItems = more ? give[2] - 1 : give[2];
-    if (shownItems > d.maintenance.n) shownItems = d.maintenance.n;
-    for (uint8_t i = 0; i < shownItems; i++) {
+  if (d.maintenance.present) {
+    uint16_t maintTotal = d.maintenance.active + d.maintenance.upcoming;
+    for (uint8_t i = 0; i < d.maintenance.n; i++) {
       const portal::Maintenance &m = d.maintenance.items[i];
       char span[10];
       span[0] = '\0';
@@ -316,8 +289,32 @@ void buildRows(const Summary &d, uint8_t capacity, uint32_t now) {
       addRow(capacity, G_MAINT, m.active ? portal_ui::LIGHT_BLUE : portal_ui::GREY, m.title, tag,
              m.active ? portal_ui::LIGHT_BLUE : portal_ui::GREY);
     }
-    if (more) addMore(capacity, maintTotal > shownItems ? maintTotal - shownItems : 1, "maintenance");
+    if (maintTotal > d.maintenance.n) addMore(capacity, maintTotal - d.maintenance.n, "maintenance");
   }
+}
+
+void buildRows(const Summary &d, uint8_t capacity, uint32_t now) {
+  buildPage(d, capacity, now);
+  if (rowSeen <= capacity) {   // everything fits: one page, no page line
+    pageIndex = 0;
+    pageCount = 1;
+    if (rowSkip) buildPage(d, capacity, now);
+    return;
+  }
+  // Several pages: one row is the "Page n/m" line.
+  const uint8_t perPage = capacity - 1;
+  buildPage(d, perPage, now);
+  pageCount = (uint8_t)((rowSeen + perPage - 1) / perPage);
+  if (pageIndex >= pageCount) {
+    pageIndex = 0;
+    buildPage(d, perPage, now);
+  }
+  char text[20];
+  snprintf(text, sizeof(text), "Page %u/%u", (unsigned)pageIndex + 1, (unsigned)pageCount);
+  Row &r = rows[rowCount++];
+  memset(&r, 0, sizeof(r));
+  strlcpy(r.text, text, sizeof(r.text));
+  r.color = portal_ui::GREY;
 }
 
 void drawRow(uint8_t index) {
@@ -477,7 +474,13 @@ void updateContent(bool leftNotice) {
   const uint32_t minute = now / 60;
   const bool newData = updated != shownUpdated;
   if (newData) tickerHas = buildTicker(d);   // every answer: the words may have changed
-  if (newData || minute != shownMinute || tickerHas != shownTicker) {
+  bool turnPage = false;
+  if (pageCount > 1 && millis() - pageAt >= (uint32_t)settings::get().portalPage * 1000UL) {
+    pageIndex = (uint8_t)((pageIndex + 1) % pageCount);
+    turnPage = true;
+  }
+  if (turnPage || newData || minute != shownMinute || tickerHas != shownTicker) {
+    if (turnPage) pageAt = millis();
     buildRows(d, tickerHas ? ROWS_WITH_TICKER : ROWS_MAX, now);
     const bool empty = rowCount == 0 && d.overall <= portal::ST_SLOW && d.services.present;
     if (!empty) drawEmptyMessage(false);   // before the rows: it clears a band they may be about to use
@@ -493,7 +496,11 @@ void updateContent(bool leftNotice) {
 
 }  // namespace
 
-void screenPortalEnter() { resetShown(); }
+void screenPortalEnter() {
+  resetShown();
+  pageIndex = 0;
+  pageAt = millis();
+}
 
 void screenPortalUpdate(bool full) {
   if (full) resetShown();

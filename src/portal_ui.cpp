@@ -23,6 +23,7 @@ const char *statusTag(uint8_t status) {
     case portal::ST_DEGRADED: return "DEGRADED";
     case portal::ST_MAINTENANCE: return "MAINT";
     case portal::ST_SLOW: return "SLOW";
+    case portal::ST_OPERATIONAL: return "OK";
     default: return "";
   }
 }

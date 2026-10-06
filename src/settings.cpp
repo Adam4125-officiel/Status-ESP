@@ -65,6 +65,7 @@ static void defaults(Settings &s) {
   s.nightEnd = 7 * 60;
   s.nightBrightness = 10;
   s.portalInterval = 60;
+  s.portalPage = 6;
   s.portalSections = portal::SEC_ALL;
   s.portalAlert = PORTAL_ALERT_INDICATOR;
 }
@@ -343,6 +344,7 @@ uint32_t apply(JsonObjectConst obj) {
     else if (portal::validKey(str)) strlcpy(S.portalKey, str, sizeof(S.portalKey));
   }
   if (readInt(obj["portal_interval"], 30, 600, n)) S.portalInterval = (uint16_t)n;
+  if (readInt(obj["portal_page"], 2, 60, n)) S.portalPage = (uint8_t)n;
   for (const PortalSwitch &sw : PORTAL_SWITCHES) {
     if (readBool(obj[sw.key], b)) S.portalSections = b ? (S.portalSections | sw.bit) : (S.portalSections & ~sw.bit);
   }
@@ -416,6 +418,7 @@ void toJson(JsonDocument &doc, bool secrets) {
 
   doc["portal_url"] = String(S.portalUrl);
   doc["portal_interval"] = S.portalInterval;
+  doc["portal_page"] = S.portalPage;
   for (const PortalSwitch &sw : PORTAL_SWITCHES) doc[sw.key] = (S.portalSections & sw.bit) ? 1 : 0;
   doc["portal_alert"] = S.portalAlert == PORTAL_ALERT_OFF ? "off" : (S.portalAlert == PORTAL_ALERT_SWITCH ? "switch" : "indicator");
 

@@ -110,7 +110,7 @@ void readServices(JsonVariantConst o, Summary &out) {
     Service &s = out.services.items[out.services.n];
     copyText(it, "name", s.name, sizeof(s.name));
     s.status = statusOf(it, "status");
-    if (s.status == ST_UNKNOWN || s.status == ST_OPERATIONAL) continue;   // the portal never lists those
+    if (s.status == ST_UNKNOWN) continue;   // operational ones come with services=all (portal >= 1.11.0)
     out.services.n++;
   }
 }

@@ -56,7 +56,7 @@ enum Section : uint8_t {
 
 // The caps of the contract (UTF-8 bytes; a folded string is never longer).
 const size_t MAX_SITE = 24;
-const size_t MAX_SERVICE_ITEMS = 6, MAX_SERVICE_NAME = 24;
+const size_t MAX_SERVICE_ITEMS = 40, MAX_SERVICE_NAME = 24;
 const size_t MAX_INCIDENT_ITEMS = 3, MAX_INCIDENT_TITLE = 40, MAX_AFFECTED = 32;
 const size_t MAX_MAINT_ITEMS = 3, MAX_MAINT_TITLE = 32;
 const size_t MAX_DISK_ITEMS = 4, MAX_DISK_NAME = 16;
@@ -66,7 +66,7 @@ const int16_t NA = -32768;   // "no value" for the integer readings below (the p
 
 struct Service {
   char name[MAX_SERVICE_NAME + 1];
-  uint8_t status;               // ST_* (never ST_OPERATIONAL: only the ones that are not are listed)
+  uint8_t status;               // ST_*; ST_OPERATIONAL only with services=all (portal >= 1.11.0)
 };
 
 struct Incident {

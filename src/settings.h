@@ -31,7 +31,7 @@
 //   portal_url "" (not set up) or "http://host[:port]" (a bare "host:port" gets the http://; https is
 //       refused, the device has no TLS; no path)    portal_key "" or 8..64 printable ASCII characters
 //       without spaces: Status-Portal's device key, write-only exactly like pw
-//   portal_interval 30..600 (s)     portal_alert "off"|"indicator"|"switch"
+//   portal_interval 30..600 (s)  portal_page 2..60 (s)     portal_alert "off"|"indicator"|"switch"
 //   portal_services portal_incidents portal_maintenance portal_resources portal_announcements 0|1:
 //       which sections of the answer are asked for (and shown)
 #pragma once
@@ -108,6 +108,7 @@ struct Settings {
   char portalUrl[64];        // portal_url, "http://host[:port]"; "" = not set up
   char portalKey[65];        // portal_key, "" = none. Write-only: never returned by the API or the export
   uint16_t portalInterval;   // portal_interval, seconds between two requests
+  uint8_t portalPage;        // portal_page, seconds each page of the Status-Portal screen stays up
   uint8_t portalSections;    // portal::Section mask: the five portal_* switches
   uint8_t portalAlert;       // portal_alert (a PortalAlert)
 };

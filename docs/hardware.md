@@ -43,7 +43,7 @@ current image**, before the LittleFS area, and the bootloader then copies it int
 | Installed firmware | Size | Free space for the next update |
 |---|---|---|
 | GeekMagic 9.0.50 / 9.0.51 | 505,200 bytes | 540,672 bytes |
-| Status-ESP 0.4.0-rc.1 | 510,304 bytes | ~536,000 bytes |
+| Status-ESP 0.4.0-rc.2 | 506,384 bytes | ~540,000 bytes |
 
 Hence the two rules of the project:
 1. our firmware must stay **below ~520 KB** so it can be installed from the stock firmware;

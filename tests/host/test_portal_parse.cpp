@@ -297,12 +297,18 @@ static void testLargest() {
   CHECK_STR(s.site, "Cafe Server Cafe Serve");
 
   // Even with one more item than the contract allows the parser stops at the caps.
-  std::string many = "{\"v\":1,\"now\":\"2026-10-06T12:00:00Z\",\"site\":\"H\",\"overall\":\"down\",\"services\":{\"total\":20,\"down\":20,\"items\":[";
-  for (int i = 0; i < 20; i++) many += std::string(i ? "," : "") + "{\"name\":\"s" + std::to_string(i) + "\",\"status\":\"down\"}";
+  std::string many = "{\"v\":1,\"now\":\"2026-10-06T12:00:00Z\",\"site\":\"H\",\"overall\":\"down\",\"services\":{\"total\":50,\"down\":50,\"items\":[";
+  for (int i = 0; i < 50; i++) many += std::string(i ? "," : "") + "{\"name\":\"s" + std::to_string(i) + "\",\"status\":\"down\"}";
   many += "]}}";
   CHECK(parse(many, SEC_SERVICES, s, err, sizeof(err)) == PARSE_OK);
   CHECK(s.services.n == MAX_SERVICE_ITEMS);
   CHECK_STR(s.services.items[5].name, "s5");
+
+  // services=all (portal >= 1.11.0): operational services are listed too.
+  std::string all = "{\"v\":1,\"now\":\"2026-10-06T12:00:00Z\",\"site\":\"H\",\"overall\":\"down\",\"services\":{\"total\":2,\"operational\":1,\"down\":1,\"items\":[{\"name\":\"Dead\",\"status\":\"down\"},{\"name\":\"Fine\",\"status\":\"operational\"}]}}";
+  CHECK(parse(all, SEC_SERVICES, s, err, sizeof(err)) == PARSE_OK);
+  CHECK(s.services.n == 2);
+  CHECK(s.services.items[1].status == ST_OPERATIONAL);
 }
 
 static void testTimestamps() {

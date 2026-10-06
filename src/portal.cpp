@@ -23,7 +23,7 @@ const uint32_t RETRY_FIRST_MS = 30000;        // after the first failure, doubli
 const uint32_t RETRY_MAX_MS = 300000;
 const uint32_t NO_MEMORY_RETRY_MS = 10000;    // heap too fragmented right now: look again soon
 const uint32_t AFTER_WEATHER_MS = 2500;       // keep clear of a weather request that has just blocked the loop
-const size_t MAX_BODY = 4096;                 // the contract's bound
+const size_t MAX_BODY = 7168;                 // the contract's bound with services=all (Status-Portal >= 1.11.0)
 const uint32_t MIN_FREE_HEAP = 15000;         // the body, the parse (~8 KB at its peak), HTTPClient and the socket
 const uint32_t MIN_FREE_BLOCK = 6000;
 const uint32_t MIN_STALE_MS = 180000;         // an answer is "fresh" for three intervals, three minutes at least
@@ -98,6 +98,7 @@ Outcome fetchOnce() {
   url += s.portalUrl;
   url += F("/api/device/summary?sections=");
   appendSections(url, sections);
+  url += F("&services=all");   // every service, OK ones included (older portals ignore it)
 
   // HTTPClient::begin(client, url) keeps a CLONE of `client` and connects that one: this local object
   // never gets a connection, everything is read through the HTTPClient itself (see weather.cpp).
