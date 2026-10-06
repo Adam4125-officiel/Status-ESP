@@ -14,8 +14,4 @@ namespace geocode {
 // `error` (a short sentence for the user) on failure; zero results is a success.
 bool search(const char *query, JsonDocument &out, String &error);
 
-// Folds UTF-8 text to printable ASCII (accents removed, ligatures expanded, anything
-// that has no ASCII form dropped); never writes more than cap bytes, always terminates.
-void toAscii(const char *in, char *out, size_t cap);
-
 }  // namespace geocode
