@@ -23,8 +23,8 @@ Version numbers follow [docs/releasing.md](docs/releasing.md): new features bump
   `https://github.com/Adam4125-officiel/Status-ESP/releases/latest/download/version.json` (stable releases
   only; schema in [docs/releasing.md](docs/releasing.md)), and offers or installs the new `.bin`.
   **Blocked by size today**: GitHub only serves HTTPS, which needs BearSSL, and BearSSL does not fit
-  in what is left. 0.3.0-rc.2 is 495,056 bytes against the 520,000-byte limit (about 25 KB of
-  flash left), and the TLS code plus its buffers would cost more than that in flash and a large
+  in what is left. 0.3.0-rc.3 is 489,488 bytes against the 520,000-byte limit (about 30 KB of
+  flash left, and the next feature, the Status-Portal client, also has to fit), and the TLS code plus its buffers would cost more than that in flash and a large
   contiguous block of the little heap that is left (see the GIF memory note below). Settle this
   first, then: following the GitHub redirect to the download host, MD5 check with the `Updater`
   class, never installing a pre-release automatically, and `/update` must stay reachable
@@ -38,9 +38,12 @@ Version numbers follow [docs/releasing.md](docs/releasing.md): new features bump
 These are not planned features but things that are missing or rough today. Fix them when they
 get in the way; remove a line when it is no longer true.
 
-- **Nothing has been tested on a device yet** (0.3.0-rc.1 and rc.2 included). The code was built, and its drawing, GIF/JPG
-  decoding and album logic were run on a PC against mock hardware; the real screen, the real
-  heap, the network calls and the web interface in a browser still have to be checked.
+- **Only part of it has been tested on a device.** On the real device (rc.3 test builds): the
+  weather fetch, the backup download and restore, saving and rotating the new themes, and the web
+  interface in a headless browser. Still unchecked on it: how the three newest themes (word
+  clock, rings, binary) look on the real screen, the earlier themes and the album on the real
+  screen, GIF decoding speed, `status-esp.local` on a real network, and the password prompt in
+  a real browser. The drawing, GIF/JPG decoding and album logic were run on a PC against mock hardware.
 - **Memory while a GIF plays is tight.** The GIF decoder takes about 24.5 KB in one block, which
   leaves only a few KB of heap for everything else. The web interface's status block shows
   `heap` and `max_block`; if uploads or settings saves misbehave while a GIF is on screen,
@@ -62,6 +65,10 @@ get in the way; remove a line when it is no longer true.
   device does not appear in a network browser, two devices with the same name are not detected,
   and it does not run in rescue mode (use `192.168.4.1` there). A computer with no mDNS client
   (older Windows versions, some networks) cannot resolve `.local` names; the IP address always works.
+- **The backup is one long blocking transfer.** Downloading it freezes the screen and every other
+  request for as long as it takes (15 s for 1.8 MB), and a restore does the same while it is
+  uploaded. Empty folders are not saved, a file whose path is over 99 characters is left out,
+  and a restore stops writing files at the first storage error but keeps what it already wrote.
 - **The weather and city requests are plain HTTP** (the device has no TLS): the chosen city's
   coordinates travel in clear text on the local network and beyond.
 

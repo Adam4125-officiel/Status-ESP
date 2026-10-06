@@ -6,8 +6,8 @@ page**, with no need to open the case or plug in a cable, and you can **go back 
 stock firmware** at any time the same way.
 
 > Status: **0.3.0 release candidate**: a clock, weather, forecast and photo-album display with a
-> web interface to configure it. It builds and passes the automated checks but has **not been
-> tested on a device yet**. The long-term goal is to show status information from
+> web interface to configure it. It builds and passes the automated checks and has been tested
+> only in part on a real device (see [ROADMAP.md](ROADMAP.md)). The long-term goal is to show status information from
 > [Status-Portal](https://github.com/Adam4125-officiel/Status-Portal), a sibling project; that
 > integration does not exist yet (the "Status-Portal" tab of the web interface is a placeholder).
 > See [ROADMAP.md](ROADMAP.md) for what is planned and what is still missing.
@@ -44,7 +44,7 @@ Version numbering and the release process are described in
 [docs/releasing.md](docs/releasing.md).
 
 ## Features
-- **Eight display themes**, chosen in the web interface or rotated automatically (you pick
+- **Eleven display themes**, chosen in the web interface or rotated automatically (you pick
   which ones take part and how long each stays):
   - *Weather clock*: time, date, sunrise and sunset, current conditions, temperature,
     humidity, wind and pressure, and a small 80x80 animated GIF of your choice;
@@ -55,7 +55,12 @@ Version numbering and the release process are described in
   - *Clock*: a big clock in the colours you choose;
   - *Analog clock*: a clock face with hour, minute and second hands, and the date;
   - *Big digits*: the hour over the minutes in very large digits, with a seconds bar;
-  - *Countdown*: the days (then hours, minutes and seconds) left until a date you pick.
+  - *Countdown*: the days (then hours, minutes and seconds) left until a date you pick;
+  - *Word clock*: the time spelled out in English by lighting words in a grid of letters, to the
+    nearest five minutes, with four dots for the minutes in between;
+  - *Rings*: three concentric rings (seconds, minutes, hours) filling around the digital time;
+  - *Binary clock*: hours, minutes and seconds as columns of dots in binary-coded decimal, with
+    the plain time below.
 - **Weather** from [Open-Meteo](https://open-meteo.com) (no account or API key): search for
   your city from the web interface; choose the units (km/h, m/s or mph; C or F; hPa, kPa, mmHg
   or inHg) and how often it refreshes.
@@ -71,7 +76,9 @@ Version numbering and the release process are described in
   tabs: Status-Portal (placeholder), Network, Weather, Time, Pictures and Settings. It needs no
   internet access. The Settings tab also shows the device status (memory, sizes, whether going
   back to the stock firmware is still possible) and has a factory reset and a reboot.
-  You can export your settings to a file and import them again, and optionally protect the
+  You can export your settings to a file and import them again, make a **full backup** (one
+  `.tar` file with every file on the device and the Wi-Fi network, password included, so keep it
+  private) and restore it, and optionally protect the
   interface, the API and `/update` with a password (never enforced in the rescue access
   point, so `/update` always stays reachable; see [docs/recovery.md](docs/recovery.md)).
 - If the Wi-Fi connection fails, the device opens an access point named **Status-ESP**
@@ -83,7 +90,9 @@ Version numbering and the release process are described in
 The device stores its own settings in `/custom.json`. That file name predates the
 Status-ESP name and is kept on purpose, so settings saved by earlier versions keep working
 after an update. Besides that file, the firmware only ever writes to, or deletes from, the
-two picture folders `/image` and `/gif`; the other files of the stock firmware are left alone.
+two picture folders `/image` and `/gif`; the other files of the stock firmware are left alone,
+except when you restore a backup you made yourself (which writes back what it contains, and
+deletes nothing).
 
 ## Going back to the stock firmware
 Upload the official GeekMagic `.bin` to `/update`. See [docs/recovery.md](docs/recovery.md).

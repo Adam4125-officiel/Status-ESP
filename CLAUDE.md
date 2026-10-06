@@ -26,37 +26,40 @@ Founding constraints:
 - The stock files on the device (images, settings, Wi-Fi) stay untouched.
 
 ## 2. Current state (handover)
-- The owner's device runs **0.1.0** (validated: display, colours, backlight, Wi-Fi, web
-  interface, `/update`). It was built before the rename, so it still identifies itself as
-  `Custom-0.1.0`, with the rescue access point `SmallTV-Custom`.
-- The repository is at **0.3.0-rc.2**, on branch `0.3.0`. **0.3.0-rc.1 is published** (as a
-  pre-release); rc.2 is committed and prepared but **not published yet** (no push, tag or release
-  has been made for it). It contains the first real features: a six-tab web interface and JSON
-  API, Open-Meteo weather, NTP time with automatic or manual time zone, JPG and animated GIF
-  playback from `/image` and `/gif`, night mode, a Wi-Fi boot delay and a factory reset (see
-  `CHANGELOG.md`), and, new in rc.2: the `status-esp.local` mDNS name, settings export and
-  import, an optional web password, a Large clock font and sunrise/sunset on the weather screen.
-  **Eight themes**, chosen manually or rotated: weather clock (`weather_clock`), simple weather
+- The owner's device ran **0.1.0** at first (validated: display, colours, backlight, Wi-Fi, web
+  interface, `/update`), then **0.3.0-rc.2**, and has since taken a few rc.3 test builds. It was
+  built before the rename, so 0.1.0 identified itself as `Custom-0.1.0`, with the rescue access
+  point `SmallTV-Custom`.
+- The repository is at **0.3.0-rc.3**, on branch `0.3.0`. **rc.1 and rc.2 are published** (as
+  pre-releases); rc.3 is published by the release step of the session that made it. The
+  firmware has a six-tab web interface and JSON API, Open-Meteo weather (with diagnostics), NTP
+  time with automatic or manual time zone (default server `time.cloudflare.com`), JPG and
+  animated GIF playback from `/image` and `/gif`, night mode, a Wi-Fi boot delay, a factory
+  reset, the `status-esp.local` mDNS name, settings export and import, an optional web password,
+  a Large clock font, sunrise/sunset on the weather screen, and, new in rc.3, a **full backup
+  and restore** of the file system (`backup.cpp`) and three more themes.
+  **Eleven themes**, chosen manually or rotated: weather clock (`weather_clock`), simple weather
   clock (`simple_weather`), forecast, photo album, clock, analog clock (`analog`), big digits
-  (`digital2`) and countdown. `firmware.bin` is 495,056 bytes (limit 520,000, so about 25 KB
-  left), static RAM 36,688 of 81,920 bytes.
-- **Neither rc.1 nor rc.2 has been tested on the device.** What was checked here: the firmware builds
-  and passes `tools/check_firmware.py`; the icons, the screens and the media code were run on
-  the host (compiled against a mock `TFT_eSPI`, with the real AnimatedGIF and tjpgd and
-  generated test pictures) and their output looked at; the album's state machine, the GIF
-  frame timing and every error path were exercised that way. Unverified, because it needs the
-  device: the real SPI output and colours of `pushImage`, the real heap while a GIF plays,
-  whether Open-Meteo and the NTP servers are reachable from the device, GIF decoding speed on
-  an 80 MHz ESP8266, and every piece of the web interface in a real browser against the real
-  device. The Status-Portal tab is a placeholder. rc.2 adds to that list: the new themes on the
-  real screen, `status-esp.local` resolving on a real network (the responder is only exercised
-  on a PC), and the password prompt in a real browser.
+  (`digital2`), countdown, word clock (`words`), rings (`rings`) and binary clock (`binary`).
+  `firmware.bin` is 489,488 bytes (limit 520,000; the working target for the next feature, the
+  Status-Portal client, is to stay under 500,000), static RAM 37,724 of 81,920 bytes.
+- **Verified on the real device (rc.3 test builds, 2026-10-06)**: the weather fetch (`weather_ok`
+  and the Auto time-zone offset arrive about 8 s after boot), the backup download (a valid tar,
+  `Content-Length` exact, 1.8 MB in 15 s, listed and extracted with `tar`), the restore (refusals
+  of junk / non-Status-ESP / truncated archives, a crafted archive with unsafe names, an empty
+  file, the Wi-Fi entry with the device's own credentials followed by the reboot), saving and
+  rotating the new themes through `/api/settings` without a crash, and the web interface loading
+  in a headless Chromium with no script error. **Not verified, because nobody can see the
+  screen from here**: how the three new themes look on the real display (they were rendered on a
+  PC against a mock `TFT_eSPI` and the pictures looked at), and the earlier list: the real SPI
+  output of `pushImage`, GIF decoding speed, `status-esp.local` resolving on a real network, and
+  the password prompt in a real browser. The Status-Portal tab is a placeholder.
 - Installing it changes the device's visible identity (rescue access point `Status-ESP`,
   hostname `status-esp`, `/v.json` reports `Status-ESP-<version>`).
 - **v0.2.0 is a tag only**: it was never published as a release and never installed.
 - The repository is going public. See section 4.
-- The CI workflow (`.github/workflows/build.yml`) is new in 0.3.0: its runs on GitHub have not
-  been checked from here, so look at them after each push.
+- The CI workflow (`.github/workflows/build.yml`) is new in 0.3.0: every run so far (the rc.1
+  and rc.2 pushes and pull-request builds) was green; look at the run after each push anyway.
 - What is **not** done, and the known limitations, are in [ROADMAP.md](ROADMAP.md).
 
 ## 3. Absolute rules (never break these)
@@ -77,6 +80,13 @@ Founding constraints:
    folders. The stock firmware keeps its own pictures there too (for example
    `/image/boot.jpg`), so the owner can delete those from the web interface as well, and the
    album shows them.
+   **The one other exception is restoring the owner's own backup** (`POST /api/backup/restore`,
+   `backup.cpp`): it writes back every file the archive holds, the stock firmware's included,
+   because that is what a backup is for. It only ever *adds or replaces* (nothing is deleted,
+   nothing is formatted), refuses any archive that does not start with the
+   `status-esp-backup.json` marker, writes each file to `/restore.tmp` and renames it into place,
+   sanitises every name (no `..`, no empty component, no component over 31 characters) and skips
+   what does not fit. Do not add another route that writes outside these exceptions.
 3. **Keep the flash layout** `board_build.ldscript = eagle.flash.4m3m.ld`.
 4. **`firmware.bin` < 520,000 bytes** (checked by `build.*` and `make_release.py`). Above that
    it can no longer be installed from the stock firmware (540,672 bytes free), and it must
@@ -194,11 +204,12 @@ src/weather.{h,cpp}          Open-Meteo fetch (streamed JSON), cache, back-off
 src/geocode.{h,cpp}          city search through Open-Meteo's geocoding API (explicit user action)
 src/weather_notice.{h,cpp}   why a weather screen is empty (no city / no network / loading / unavailable)
 src/units.h                  unit conversion for display (data is always metric)
+src/backup.{h,cpp}           full file-system backup / restore as a tar stream (see section 11)
 src/media.{h,cpp}            JPG (tjpgd) and animated GIF (AnimatedGIF) from LittleFS to the screen
 src/icons.{h,cpp}            weather icons drawn with graphics primitives, WMO code descriptions
 src/display.{h,cpp}          screen manager: themes, rotation, backlight / night mode, drawing helpers
 src/screen_*.cpp             one theme each: clock, weather (weather_clock), simple_weather, forecast,
-                             album, analog, digital2 (big digits), countdown
+                             album, analog, digital2 (big digits), countdown, words, rings, binary
 src/bigfont.h                helpers for the Font 8 (75 px digits) themes
 src/countdown_calc.h         date arithmetic for the countdown (pure, testable on a PC)
 src/mdns.{h,cpp}, mdns_dns.* the tiny mDNS responder for status-esp.local (address questions only)
@@ -264,8 +275,10 @@ is injected by `tools/version.py` from `VERSION`. That exact byte string must be
 There are **no threads and no blocking waits**: every module is a small state machine that
 `loop()` calls once per pass, so the web server (and with it `/update`) is served every pass.
 The only deliberate blocking calls are the weather fetch (at most ~5 s, once per interval, with
-a 60 s back-off after a failure), the city search (explicit user action, 5 s) and a JPG decode
-(100-300 ms, once per picture).
+a 60 s back-off after a failure), the city search (explicit user action, 5 s), a JPG decode
+(100-300 ms, once per picture), the backup download (explicit action: it streams the whole file
+system to one client, 15 s for 1.8 MB, and the screen and every other request wait meanwhile) and
+a restore upload (same, `yield()` between chunks).
 
 Start-up (`setup`): serial; `settings::begin()` mounts LittleFS **without formatting** and
 loads `/custom.json`; `display::begin()` (backlight PWM, TFT); `weather::begin()`;
@@ -289,9 +302,23 @@ degree sign is drawn as a small circle (`display::drawDegree`). The weather scre
 `weather_notice` for the "no city / no network / loading" messages.
 
 Weather: `weather.cpp` fetches `http://api.open-meteo.com/v1/forecast` over plain HTTP (the
-device has no TLS), parses the answer as a stream through an ArduinoJson filter, and keeps one
+device has no TLS), collects the ~1.1 KB answer through `http.writeToPrint()` into a String
+capped at 4 KB, parses it through an ArduinoJson filter, and keeps one
 metric `Data` struct (`units.h` converts at draw time, so a unit change needs no new fetch).
 `utc_offset_seconds` from the same answer is what the clock uses when the time zone is Auto.
+The last failure, the failure count and the attempt age are kept (`weather::diag()`) and shown by
+`/api/status`, the Weather tab and the "No weather data" screen: read them first when the weather is
+missing.
+
+Backup: `backup.cpp` writes a ustar tar on the fly (`writeTar()`, 1 KB buffer, size known beforehand
+by `tarSize()`): first the virtual marker `status-esp-backup.json`, then the virtual
+`status-esp-wifi.json` (the SSID and password stored in the SDK's flash area, read with
+`wifi_station_get_config_default()`; named so because the stock firmware has a real `/wifi.json`),
+then every file. The archive therefore holds the Wi-Fi password, and the web password when one is
+set: the download is refused in rescue mode and the web interface says so. `restoreFeed()` is a
+state machine fed chunk by chunk; it needs one 512-byte header block at a time. A restore that
+wrote at least one file or a Wi-Fi network ends in a reboot (the settings in RAM are older than
+the files).
 
 Media: JPG goes through `jd_prepare()` / `jd_decomp()` (the `tjpgd` core inside the
 TJpg_Decoder library) with a work area allocated only for the decode; GIF goes through
@@ -307,6 +334,10 @@ HTTP routes:
 | `GET /api/wifi/scan`, `POST /api/wifi` | async scan; store the network in the SDK's Wi-Fi area, then restart |
 | `GET /api/files?dir=`, `POST /api/upload?dir=`, `POST /api/delete` | list, upload, delete: only `/image` and `/gif` |
 | `GET /api/geocode?q=` | city search (top 5) through Open-Meteo |
+| `POST /api/weather/refresh` | fetch the weather again at the next pass (the Weather tab's "Check now") |
+| `GET /api/settings/export`, `POST /api/settings/import` | the settings as a file, and back (never the password) |
+| `GET /api/backup` | every LittleFS file + the Wi-Fi network as one tar; 403 in rescue mode (open hotspot) |
+| `POST /api/backup/restore` | multipart upload of such a tar, then reboot; checks the password itself, like `/api/upload` |
 | `POST /api/reboot`, `POST /api/factory-reset` | restart; delete `/custom.json` only, then restart |
 | `GET /update` | our page (firmware only), **declared before** `updater.setup()` because the server takes the first handler that matches |
 | `POST /update` | `ESP8266HTTPUpdateServer` handling (`firmware` field) |
@@ -368,6 +399,13 @@ HTTP routes:
   commit the generated file.
 - `/image` is shared with the stock firmware, which keeps pictures there (for example
   `/image/boot.jpg`): they appear in the album, and the web interface can delete them.
+- **Do not read the weather answer with a hand-written `available()` / `read()` loop over
+  `http.getStreamPtr()`.** On the real device that saw the transfer end after one or two TCP
+  segments (414 or 950 of ~1120 body bytes, `IncompleteInput`), while `http.writeToPrint()` /
+  `getString()` got all of it with the same request. The cause was never found; the first
+  version of the fetch also read from the *unconnected* local `WiFiClient` (`HTTPClient::begin`
+  keeps a clone of the client it is given), which is why the stream is always `http.getStreamPtr()`
+  and never the `client` variable. Look at `weather::diag()` before blaming the network.
 - `/custom.json` keeps its name through the Status-ESP rename on purpose (section 5).
   Renaming it, or giving it a different layout without a migration, silently drops the
   owner's settings.
