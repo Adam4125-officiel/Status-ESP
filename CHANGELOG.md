@@ -18,6 +18,10 @@ changes the first, second and third number, and what a `-rc.N` pre-release is) i
   screen shows the whole days left, switches to HH:MM:SS during the last 24 hours and says
   "Reached!" (and how long ago) afterwards. The target is local time as the device's clock shows
   it. A countdown without a date is skipped by the auto-switch.
+- **Sunrise and sunset** on the weather clock screen (in the city's own time, 24 or 12 hours
+  like the clock), from the same Open-Meteo request. A polar day or night, where Open-Meteo
+  reports no time, simply shows no line. The "feels like" line and the three statistics moved
+  a few pixels to make room.
 - **`status-esp.local`**: once connected to Wi-Fi the device answers to that name over mDNS, so
   the IP address is not needed. It is shown on the "Connected" screen, in the Network tab and
   in the status block. It is a small responder of our own (about 4.7 KB; the ESP8266mDNS

@@ -86,6 +86,18 @@ int8_t weekdayOf(const char *iso) {
   return (int8_t)((y + y / 4 - y / 100 + y / 400 + OFFSET[m - 1] + d) % 7);
 }
 
+// Minutes since midnight of an Open-Meteo local time "YYYY-MM-DDTHH:MM", -1 if it is not one
+// (Open-Meteo answers null, i.e. no string at all, for a polar day or night).
+int16_t minutesOfLocalTime(const char *iso) {
+  if (!iso || strlen(iso) < 16 || iso[10] != 'T' || iso[13] != ':') return -1;
+  for (int i : {11, 12, 14, 15}) {
+    if (iso[i] < '0' || iso[i] > '9') return -1;
+  }
+  int h = (iso[11] - '0') * 10 + (iso[12] - '0');
+  int m = (iso[14] - '0') * 10 + (iso[15] - '0');
+  return (h > 23 || m > 59) ? -1 : (int16_t)(h * 60 + m);
+}
+
 // Keeps only what is used: the answer is ~1.5 KB of text, the filtered document a lot less.
 void buildFilter(JsonDocument &filter) {
   filter["utc_offset_seconds"] = true;
@@ -102,6 +114,8 @@ void buildFilter(JsonDocument &filter) {
   day["weather_code"][0] = true;
   day["temperature_2m_max"][0] = true;
   day["temperature_2m_min"][0] = true;
+  day["sunrise"][0] = true;
+  day["sunset"][0] = true;
 }
 
 // Fills `out` from the parsed document. Returns false when the answer is not usable.
@@ -133,6 +147,8 @@ bool extract(JsonDocument &doc, Data &out) {
   out.isDay = (cur["is_day"] | 1) != 0;
   out.todayMinC = dMin[0].as<float>();
   out.todayMaxC = dMax[0].as<float>();
+  out.sunriseMin = minutesOfLocalTime(daily["sunrise"][0] | "");   // optional: never fails the answer
+  out.sunsetMin = minutesOfLocalTime(daily["sunset"][0] | "");
   for (int i = 0; i < 3; i++) {
     Day &d = out.forecast[i];
     d.code = (uint8_t)(dCode[i + 1] | 0);
@@ -165,7 +181,7 @@ Outcome fetchOnce() {
   url += coords;
   url += F("&current=temperature_2m,apparent_temperature,relative_humidity_2m,surface_pressure,"
            "wind_speed_10m,weather_code,is_day"
-           "&daily=weather_code,temperature_2m_max,temperature_2m_min"
+           "&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset"
            "&timezone=auto&forecast_days=4&wind_speed_unit=kmh");
 
   WiFiClient client;

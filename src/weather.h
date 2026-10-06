@@ -18,7 +18,7 @@
 //   http://api.open-meteo.com/v1/forecast?latitude=..&longitude=..
 //     &current=temperature_2m,apparent_temperature,relative_humidity_2m,
 //              surface_pressure,wind_speed_10m,weather_code,is_day
-//     &daily=weather_code,temperature_2m_max,temperature_2m_min
+//     &daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset
 //     &timezone=auto&forecast_days=4&wind_speed_unit=kmh
 // "utc_offset_seconds" in the answer is the offset of that city right now (DST
 // included): it drives the clock when the time zone is set to Auto.
@@ -50,6 +50,8 @@ struct Data {
   bool isDay;
   float todayMinC;
   float todayMaxC;
+  int16_t sunriseMin;       // today's sunrise / sunset, minutes since local midnight (the city's
+  int16_t sunsetMin;        // own time zone); -1 = not reported (polar day or night)
   Day forecast[3];          // the three days AFTER today (tomorrow first)
 };
 

@@ -5,7 +5,8 @@
 //   y  56..82   date
 //   y  88..168  left: the GIF, or the weather icon when there is none (or it cannot play)
 //               right: temperature, conditions, "feels like"
-//   y 186..230  humidity | wind | pressure, in the user's units
+//   y 174..190  sunrise and sunset times (when the weather answer has them)
+//   y 190..232  humidity | wind | pressure, in the user's units
 //
 // Update(false) repaints one thing at a time: a changed time field, the colons, the date
 // when the day changes, the whole lower area when weather::data() changed, one GIF frame.
@@ -36,8 +37,9 @@ const int16_t AREA_Y = 86;            // the weather area is everything below th
 const int16_t AREA_H = config::SCREEN_H - AREA_Y;
 const int16_t BOX_X = 6, BOX_Y = 88, BOX_SIZE = 80;
 const int16_t COL_X = 94;
-const int16_t TEMP_Y = 88, DESC_Y = 140, FEELS_Y = 160;
-const int16_t CAPTION_Y = 186, VALUE_Y = 204;
+const int16_t TEMP_Y = 88, DESC_Y = 138, FEELS_Y = 156;
+const int16_t SUN_Y = 174;
+const int16_t CAPTION_Y = 190, VALUE_Y = 206;
 const uint32_t GIF_RETRY_MS = 10000;
 
 // --- Time row -----------------------------------------------------------------------
@@ -216,6 +218,42 @@ void drawStat(int16_t cx, const char *caption, const char *value) {
   tft.drawString(value, cx, VALUE_Y, 4);
 }
 
+// "07:42", or "7:42 AM" with the 12-hour setting.
+void formatMinutes(char *buf, size_t size, int minutes) {
+  int h = minutes / 60, m = minutes % 60;
+  if (settings::get().hour12) {
+    snprintf(buf, size, "%d:%02d %s", h % 12 == 0 ? 12 : h % 12, m, h >= 12 ? "PM" : "AM");
+  } else {
+    snprintf(buf, size, "%02d:%02d", h, m);
+  }
+}
+
+// An arrow (up = sunrise, down = sunset) and the time, left edge at x. Returns the right edge.
+int16_t drawSunTime(int16_t x, bool rising, int minutes, uint16_t color) {
+  char text[12];
+  formatMinutes(text, sizeof(text), minutes);
+  int16_t top = SUN_Y + 3;
+  if (rising) tft.fillTriangle(x, top + 9, x + 10, top + 9, x + 5, top, color);
+  else tft.fillTriangle(x, top, x + 10, top, x + 5, top + 9, color);
+  tft.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
+  tft.setTextDatum(TL_DATUM);
+  tft.setTextPadding(0);
+  tft.drawString(text, x + 14, SUN_Y, 2);
+  return x + 14 + tft.textWidth(text, 2);
+}
+
+void drawSun(const weather::Data &w) {
+  if (w.sunriseMin < 0 || w.sunsetMin < 0) return;
+  char rise[12], set[12];
+  formatMinutes(rise, sizeof(rise), w.sunriseMin);
+  formatMinutes(set, sizeof(set), w.sunsetMin);
+  const int16_t GAP = 26;
+  int16_t total = 14 + tft.textWidth(rise, 2) + GAP + 14 + tft.textWidth(set, 2);
+  int16_t x = (config::SCREEN_W - total) / 2;
+  x = drawSunTime(x, true, w.sunriseMin, TFT_YELLOW);
+  drawSunTime(x + GAP, false, w.sunsetMin, TFT_ORANGE);
+}
+
 void clearBox() { tft.fillRect(BOX_X, BOX_Y, BOX_SIZE, BOX_SIZE, TFT_BLACK); }
 
 void drawIcon(const weather::Data &w) {
@@ -240,6 +278,8 @@ void drawWeatherArea(const weather::Data &w) {
   tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
   tft.drawString("Feels ", COL_X, FEELS_Y, 2);
   drawTemperature(COL_X + tft.textWidth("Feels ", 2), FEELS_Y, w.feelsC, 2, 2, 2, 4, TFT_DARKGREY);
+
+  drawSun(w);
 
   char caption[24], value[16];
   snprintf(value, sizeof(value), "%u%%", (unsigned)w.humidity);
