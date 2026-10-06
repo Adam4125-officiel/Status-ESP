@@ -8,6 +8,7 @@
 // `Status-ESP` (/update and the web interface stay reachable at 192.168.4.1). In rescue
 // mode with nobody connected for 5 minutes the device reboots to retry the Wi-Fi.
 // The optional boot delay (settings boot_delay) is waited, radio off, before step 1.
+// Once connected, a tiny mDNS responder (mdns.h) answers to status-esp.local.
 #pragma once
 
 #include <Arduino.h>

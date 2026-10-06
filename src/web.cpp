@@ -22,6 +22,7 @@
 #include "display.h"
 #include "generated/web_index.h"
 #include "geocode.h"
+#include "mdns.h"
 #include "media.h"
 #include "net.h"
 #include "settings.h"
@@ -133,6 +134,7 @@ static void handleStatus() {
   doc["fw"] = FW_FULL_NAME;
   doc["ap"] = net::isAp();
   doc["ip"] = net::ip();
+  if (mdns::active()) doc["mdns"] = mdns::name();
   if (net::isConnected()) {
     doc["ssid"] = WiFi.SSID();
     doc["rssi"] = WiFi.RSSI();

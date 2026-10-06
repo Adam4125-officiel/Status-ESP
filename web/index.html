@@ -413,10 +413,11 @@ function loadStatus() {
     var b = $("#banner");
     b.hidden = !s.ap;
     b.textContent = s.ap ? "Rescue mode: the device is not connected to your Wi-Fi (hotspot Status-ESP). Time and weather are unavailable until you set the Wi-Fi in the Network tab." : "";
-    $("#wifi-now").textContent = s.ap ? "Not connected to a Wi-Fi network." : "Connected to " + (s.ssid || "?") + " (" + s.rssi + " dBm), IP " + s.ip + ".";
+    $("#wifi-now").textContent = s.ap ? "Not connected to a Wi-Fi network." : "Connected to " + (s.ssid || "?") + " (" + s.rssi + " dBm), IP " + s.ip + (s.mdns ? ", also reachable at http://" + s.mdns : "") + ".";
     var rows = [
       ["Version", s.fw],
       ["IP address", s.ip + (s.ap ? " (access point)" : "")],
+      ["Name", s.mdns ? "http://" + s.mdns : (s.ap ? "none in rescue mode" : "not running")],
       ["Wi-Fi", s.ap ? "none (rescue hotspot)" : (s.ssid || "?") + ", " + s.rssi + " dBm"],
       ["Local time", s.time ? s.time + (s.offset_known ? "" : " (UTC)") : "not set yet"],
       ["Uptime", fmtDuration(s.uptime)],

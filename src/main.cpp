@@ -12,6 +12,7 @@
 
 #include "config.h"
 #include "display.h"
+#include "mdns.h"
 #include "net.h"
 #include "settings.h"
 #include "timekeeping.h"
@@ -50,7 +51,7 @@ static void updateBootScreen() {
       display::showStatus("Connecting...", "Wi-Fi, up to 40 s");
       break;
     case net::CONNECTED:
-      display::showStatus("Connected", ("http://" + net::ip()).c_str());
+      display::showStatus("Connected", ("http://" + net::ip()).c_str(), mdns::name().c_str());
       display::showThemesAfter(IP_SCREEN_MS);
       break;
     case net::ACCESS_POINT:  // the rescue instructions stay on screen

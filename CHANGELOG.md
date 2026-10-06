@@ -14,6 +14,12 @@ changes the first, second and third number, and what a `-rc.N` pre-release is) i
   seconds pass, and the date) and *Simple weather clock* (a big time, the weather icon and
   the current temperature). They are in the theme list and in the auto-switch checkboxes.
   TFT_eSPI's Font 8 (narrow build) is now compiled in for the big digits.
+- **`status-esp.local`**: once connected to Wi-Fi the device answers to that name over mDNS, so
+  the IP address is not needed. It is shown on the "Connected" screen, in the Network tab and
+  in the status block. It is a small responder of our own (about 4.7 KB; the ESP8266mDNS
+  library costs about 21 KB, which the size limit cannot afford): it answers address
+  questions only, so the device does not show up in a network browser and two devices with the
+  same name are not detected. It does not run in rescue mode.
 
 ## [0.3.0-rc.1] - 2026-10-05
 

@@ -4,6 +4,7 @@
 #include <LittleFS.h>
 
 #include "config.h"
+#include "mdns.h"
 #include "settings.h"
 
 namespace net {
@@ -36,6 +37,12 @@ static bool readStockWifi(String &ssid, String &pass) {
 static void enter(State s) {
   st = s;
   stateSince = millis();
+}
+
+// Station connected: start answering to status-esp.local (never done in rescue-AP mode).
+static void connected() {
+  enter(CONNECTED);
+  mdns::begin();
 }
 
 static void startSdkAttempt() {
@@ -73,7 +80,7 @@ void loop() {
       break;
     case TRY_SDK:
       if (WiFi.status() == WL_CONNECTED) {
-        enter(CONNECTED);
+        connected();
       } else if (now - stateSince >= config::WIFI_TIMEOUT_MS) {
         String ssid, pass;
         if (readStockWifi(ssid, pass)) {
@@ -86,13 +93,14 @@ void loop() {
       break;
     case TRY_STOCK:
       if (WiFi.status() == WL_CONNECTED) {
-        enter(CONNECTED);
+        connected();
       } else if (now - stateSince >= config::WIFI_TIMEOUT_MS) {
         startRescueAp();
       }
       break;
     case CONNECTED:
-      break;  // the SDK reconnects by itself if the router goes away
+      mdns::loop();  // the SDK reconnects by itself if the router goes away
+      break;
     case ACCESS_POINT:
       if (WiFi.softAPgetStationNum() == 0 && now - apStartedAt > config::AP_RETRY_MS) ESP.restart();
       break;
