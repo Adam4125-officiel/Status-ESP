@@ -22,13 +22,14 @@
 // Leave  : release resources (GIF decoder, files). May draw nothing. Idempotent.
 //
 // Names: screenClock*, screenWeather* (theme weather_clock), screenForecast*,
-// screenAlbum*. All four sets are declared below; the manager calls them through its
-// own table, so a screen file only has to define its three functions.
+// screenAlbum*, screenAnalog*, screenDigital2*, screenSimpleWeather*. All sets are
+// declared below; the manager calls them through its own table, so a screen file only has
+// to define its three functions.
 //
 // Helpers for screens: the global `tft`, display::drawFit / drawMessage / drawDegree,
 // timekeeping.h (time, date, colours), units.h and weather.h (data), media.h.
 // On-screen text is ASCII only (TFT_eSPI's built-in fonts); the degree sign is drawn
-// as a small circle (drawDegree). Fonts loaded: GLCD, 2, 4, 6 (digits), 7 (7-segment).
+// as a small circle (drawDegree). Fonts loaded: GLCD, 2, 4, 6 (digits), 7 (7-segment), 8 (the narrow "8N" digits, see bigfont.h).
 // ---------------------------------------------------------------------------------
 #pragma once
 
@@ -54,6 +55,18 @@ void screenForecastLeave();
 void screenAlbumEnter();
 void screenAlbumUpdate(bool full);
 void screenAlbumLeave();
+
+void screenAnalogEnter();
+void screenAnalogUpdate(bool full);
+void screenAnalogLeave();
+
+void screenDigital2Enter();
+void screenDigital2Update(bool full);
+void screenDigital2Leave();
+
+void screenSimpleWeatherEnter();
+void screenSimpleWeatherUpdate(bool full);
+void screenSimpleWeatherLeave();
 
 namespace display {
 

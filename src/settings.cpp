@@ -10,7 +10,8 @@ namespace settings {
 static Settings S;
 static bool mounted = false;
 
-static const char *const THEME_NAMES[THEME_COUNT] = {"weather_clock", "forecast", "album", "clock"};
+static const char *const THEME_NAMES[THEME_COUNT] = {"weather_clock", "forecast", "album",   "clock",
+                                                     "analog",        "digital2", "simple_weather"};
 
 const char *themeName(uint8_t theme) {
   return theme < THEME_COUNT ? THEME_NAMES[theme] : THEME_NAMES[THEME_CLOCK];

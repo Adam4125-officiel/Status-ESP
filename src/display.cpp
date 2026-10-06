@@ -20,6 +20,9 @@ static const Screen SCREENS[settings::THEME_COUNT] = {
     {screenForecastEnter, screenForecastUpdate, screenForecastLeave},   // THEME_FORECAST
     {screenAlbumEnter, screenAlbumUpdate, screenAlbumLeave},            // THEME_ALBUM
     {screenClockEnter, screenClockUpdate, screenClockLeave},            // THEME_CLOCK
+    {screenAnalogEnter, screenAnalogUpdate, screenAnalogLeave},         // THEME_ANALOG
+    {screenDigital2Enter, screenDigital2Update, screenDigital2Leave},   // THEME_DIGITAL2
+    {screenSimpleWeatherEnter, screenSimpleWeatherUpdate, screenSimpleWeatherLeave},   // THEME_SIMPLE_WEATHER
 };
 
 static const uint8_t NO_THEME = 255;
@@ -119,6 +122,7 @@ static bool available(uint8_t theme) {
   switch (theme) {
     case settings::THEME_WEATHER_CLOCK:
     case settings::THEME_FORECAST:
+    case settings::THEME_SIMPLE_WEATHER:
       return settings::hasCity();
     case settings::THEME_ALBUM:
       hasPicture = false;

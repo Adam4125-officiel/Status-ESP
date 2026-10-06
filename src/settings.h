@@ -19,7 +19,7 @@
 //   hc mc sc "#RRGGBB"    hour12 0|1    date_fmt 0 DD/MM/YYYY|1 MM/DD/YYYY|2 YYYY-MM-DD
 //   colon 0|1             font 0 digital (Font 7)|1 plain (Font 6)     ntp "" or host name
 //   album_auto 0|1        album_interval 2..3600 (s)    album_file "" or file in /image
-//   theme "weather_clock"|"forecast"|"album"|"clock"
+//   theme "weather_clock"|"forecast"|"album"|"clock"|"analog"|"digital2"|"simple_weather"
 //   auto_switch 0|1       auto_interval 5..3600 (s)     auto_themes ["clock", ...]
 //   night_en 0|1          night_start "HH:MM"           night_end "HH:MM"     night_brt 0..100
 #pragma once
@@ -34,7 +34,10 @@ enum Theme : uint8_t {
   THEME_FORECAST = 1,
   THEME_ALBUM = 2,
   THEME_CLOCK = 3,
-  THEME_COUNT = 4
+  THEME_ANALOG = 4,
+  THEME_DIGITAL2 = 5,
+  THEME_SIMPLE_WEATHER = 6,
+  THEME_COUNT = 7        // autoMask is a uint8_t: at most 8 themes
 };
 enum WindUnit : uint8_t { WIND_KMH = 0, WIND_MS = 1, WIND_MPH = 2 };
 enum TempUnit : uint8_t { TEMP_C = 0, TEMP_F = 1 };

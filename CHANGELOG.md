@@ -5,6 +5,16 @@ All notable changes to this project are documented in this file. The format foll
 changes the first, second and third number, and what a `-rc.N` pre-release is) is in
 [docs/releasing.md](docs/releasing.md).
 
+## [0.3.0-rc.2] - 2026-10-06
+
+### Added
+- **Three more display themes**, all drawn from scratch (nothing is copied from the stock
+  firmware): *Analog clock* (a face with hour, minute and second hands and the date below it),
+  *Big digits* (the hour stacked over the minutes in 75 px digits, a bar that fills as the
+  seconds pass, and the date) and *Simple weather clock* (a big time, the weather icon and
+  the current temperature). They are in the theme list and in the auto-switch checkboxes.
+  TFT_eSPI's Font 8 (narrow build) is now compiled in for the big digits.
+
 ## [0.3.0-rc.1] - 2026-10-05
 
 ### Added
