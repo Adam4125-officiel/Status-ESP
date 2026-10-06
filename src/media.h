@@ -1,10 +1,8 @@
 // Pictures: JPG decoding (TJpg_Decoder) and animated GIF playback (AnimatedGIF), both
 // from LittleFS straight to the screen (the global `tft`, see display.h).
 //
-// OWNER: the media module. Phase 1 ships a stub (media.cpp); the real implementation
-// must keep this interface unchanged. Stock folders are reused read-only except the two
-// the user may upload to / delete from (config::DIR_IMAGE "/image", config::DIR_GIF
-// "/gif"); the firmware itself never writes or deletes anything in them.
+// Stock folders are reused read-only except the two the user may upload to / delete from
+// (config::DIR_IMAGE "/image", config::DIR_GIF "/gif"); this module only ever READS files.
 //
 // Threading: no threads, everything is called from loop() through the screens.
 //
@@ -28,6 +26,12 @@ namespace media {
 // JPEG, or does not fit in memory. Progressive JPEGs are not supported by the decoder.
 bool drawJpg(const char *path, int16_t x, int16_t y);
 
+// Like drawJpg(), for a picture of any size: the decoder's 1/2, 1/4 or 1/8 reduction is
+// picked so that it fits the box, it is centred in it, and only the part of the box it does
+// not cover is painted black (a picture that fills the box causes no black flash). Fails
+// with "picture too large" when even 1/8 does not fit. Same blocking behaviour as drawJpg().
+bool drawJpgFit(const char *path, int16_t boxX, int16_t boxY, int16_t boxW, int16_t boxH);
+
 // --- GIF -------------------------------------------------------------------------
 // At most one GIF is open at a time (gifOpen closes a previous one first).
 
@@ -37,6 +41,10 @@ bool drawJpg(const char *path, int16_t x, int16_t y);
 // crashing. loop == true: the animation restarts forever (weather screen);
 // loop == false: gifPlayFrame() returns false once the last frame has been shown.
 bool gifOpen(const char *path, int16_t x, int16_t y, bool loop = true);
+
+// Like gifOpen(), with the GIF's canvas centred in the given box instead of placed at a
+// corner. The box is not cleared: the caller does that once the open succeeded.
+bool gifOpenCentered(const char *path, int16_t boxX, int16_t boxY, int16_t boxW, int16_t boxH, bool loop = true);
 
 // Non-blocking, call it on every loop pass while a GIF is open. If the current
 // frame's delay has not elapsed it returns true at once without drawing; otherwise it
