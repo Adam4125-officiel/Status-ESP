@@ -1,6 +1,4 @@
 // Weather icons drawn with TFT_eSPI primitives (never copy GeekMagic assets).
-//
-// OWNER: the weather module. Phase 1 ships a stub (icons.cpp).
 #pragma once
 
 #include <Arduino.h>

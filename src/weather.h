@@ -1,9 +1,6 @@
 // Weather: fetch, parse and cache the current conditions and a short forecast from
 // Open-Meteo (https://open-meteo.com): no API key, plain HTTP, no TLS anywhere.
 //
-// OWNER: the weather module. Phase 1 ships a stub (weather.cpp) so that everything
-// else compiles; the real implementation must keep this interface unchanged.
-//
 // Threading: there are no threads. Everything runs from loop(), one call after the
 // other. weather::loop() is called on every loop pass and is where the work happens.
 //
