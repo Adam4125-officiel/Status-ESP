@@ -30,7 +30,14 @@ Founding constraints:
   interface, `/update`), then **0.3.0-rc.2**, and has since taken a few rc.3 test builds. It was
   built before the rename, so 0.1.0 identified itself as `Custom-0.1.0`, with the rescue access
   point `SmallTV-Custom`.
-- The repository is at **0.3.0-rc.3**, on branch `0.3.0`. **rc.1 and rc.2 are published** (as
+- **0.4.0-rc.1 (branch `0.4.0`, from `0.3.0`)** adds the Status-Portal client (`portal.cpp`, contract:
+  Status-Portal's `GET /api/device/summary` with `X-Api-Key`, Status-Portal >= 1.10.0), the
+  Status-Portal tab, the `portal` and `resources` themes and the alert modes (`switch` / `indicator`
+  / `off`). `firmware.bin` is 510,304 bytes, static RAM 41,260: **the flash budget is nearly spent**
+  (limit 520,000), so any further feature must first find savings. Verified on the device: the tab
+  saves, a bad address gives `connection failed` without a crash, heap stayed ~32 KB. Not verified:
+  real portal data (the owner's portal was still on 1.9.1).
+- The 0.3.0 line: the repository was at **0.3.0-rc.3**, on branch `0.3.0`. **rc.1 and rc.2 are published** (as
   pre-releases); rc.3 is published by the release step of the session that made it. The
   firmware has a six-tab web interface and JSON API, Open-Meteo weather (with diagnostics), NTP
   time with automatic or manual time zone (default server `time.cloudflare.com`), JPG and

@@ -11,12 +11,6 @@ Version numbers follow [docs/releasing.md](docs/releasing.md): new features bump
   TFT_eSPI fonts are all the firmware has today (the "Large" font is Font 8).
 - **Richer weather**: hourly forecast and more forecast days.
 
-## Status-Portal integration
-- Show the status of the services monitored by
-  [Status-Portal](https://github.com/Adam4125-officiel/Status-Portal) on the display: overall status,
-  services that are down, open incidents. Status-Portal already exposes a public JSON API (`/api/status`).
-- Fill the "Status-Portal" tab of the web interface (portal address, refresh interval, which services
-  to show, alert colours).
 
 ## Updates
 - **On-device auto-updater**: the device reads

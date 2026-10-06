@@ -28,6 +28,15 @@ changes the first, second and third number, and what a `-rc.N` pre-release is) i
   65535); a bare `192.0.2.10:5000` gets its `http://`. The key is write-only like the web
   password: `GET /api/settings` only says whether one is set (`portal_key_set`), the export never
   has it and an import never touches it.
+- **Two new themes**: `portal` (overall status in a coloured banner, counts, services down or
+  degraded, open incidents, maintenance in progress or upcoming, announcements as a ticker) and
+  `resources` (CPU, RAM and disk bars of the portal's server, with the high-load flag). Blocks that
+  are switched off or empty are hidden; "not configured" and "unreachable: <reason>" are said in
+  words. Both can be chosen or added to the auto-switch rotation.
+- **Alert mode** (`portal_alert`): `switch` shows the Status-Portal screen with a red or orange
+  banner as long as the portal reports a problem, then the normal rotation resumes; `indicator`
+  draws a small red or orange dot in the top-right corner of every other screen; `off` does
+  nothing.
 - `POST /api/portal/refresh` asks Status-Portal again at the next loop pass (for the "Test
   connection" button).
 - **The Status-Portal tab** replaces the "Coming soon" placeholder: portal address, API key
