@@ -38,7 +38,7 @@ go-ahead, including a release candidate of a new version.
 - `tools/version.py`, a PlatformIO pre-build script, reads and validates it and defines
   `FW_VERSION` for the compiler. An invalid `VERSION` fails the build with a clear message.
   Nothing else carries the version: do not hard-code it anywhere.
-- `src/main.cpp` builds the full name `Status-ESP-<version>` from it. This is what `/v.json`
+- `src/config.h` builds the full name `Status-ESP-<version>` from it. This is what `/v.json`
   reports and what appears in the binary; `tools/make_release.py` checks that exact string is
   inside the image.
 - The git tag is **`v` + `VERSION`** (`v0.3.0-rc.1`, `v0.3.0`). `tools/release.sh` creates it;

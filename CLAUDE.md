@@ -29,16 +29,28 @@ Founding constraints:
 - The owner's device runs **0.1.0** (validated: display, colours, backlight, Wi-Fi, web
   interface, `/update`). It was built before the rename, so it still identifies itself as
   `Custom-0.1.0`, with the rescue access point `SmallTV-Custom`.
-- The repository is at **0.3.0-rc.1**, on branch `0.3.0`: translation of everything to English,
-  rename to Status-ESP, the `VERSION` file, and the release tooling. It builds, but it has
-  **not been tested on the device**. Installing it changes the device's visible identity
-  (rescue access point `Status-ESP`, hostname `status-esp`, `/v.json` reports
-  `Status-ESP-<version>`).
+- The repository is at **0.3.0-rc.1**, on branch `0.3.0`. It contains the first real features:
+  a six-tab web interface and JSON API, Open-Meteo weather, NTP time with automatic or manual
+  time zone, four display themes (weather clock, forecast, photo album, big clock) with manual
+  choice or rotation, JPG and animated GIF playback from `/image` and `/gif`, night mode, a
+  Wi-Fi boot delay and a factory reset (see `CHANGELOG.md`). `firmware.bin` is 472,048 bytes
+  (limit 520,000), static RAM 35,084 of 81,920 bytes.
+- **None of it has been tested on the device.** What was checked here: the firmware builds
+  and passes `tools/check_firmware.py`; the icons, the screens and the media code were run on
+  the host (compiled against a mock `TFT_eSPI`, with the real AnimatedGIF and tjpgd and
+  generated test pictures) and their output looked at; the album's state machine, the GIF
+  frame timing and every error path were exercised that way. Unverified, because it needs the
+  device: the real SPI output and colours of `pushImage`, the real heap while a GIF plays,
+  whether Open-Meteo and the NTP servers are reachable from the device, GIF decoding speed on
+  an 80 MHz ESP8266, and every piece of the web interface in a real browser against the real
+  device. The Status-Portal tab is a placeholder.
+- Installing it changes the device's visible identity (rescue access point `Status-ESP`,
+  hostname `status-esp`, `/v.json` reports `Status-ESP-<version>`).
 - **v0.2.0 is a tag only**: it was never published as a release and never installed.
 - The repository is going public. See section 4.
 - The CI workflow (`.github/workflows/build.yml`) is new in 0.3.0 and has never run: watch
   the first run after the branch is pushed.
-- There are no real features yet (clock, weather, images...): to be defined with the owner.
+- What is **not** done, and the known limitations, are in [ROADMAP.md](ROADMAP.md).
 
 ## 3. Absolute rules (never break these)
 1. **Every firmware must keep `/update`**, reachable on normal Wi-Fi **and** in the rescue
@@ -47,6 +59,14 @@ Founding constraints:
 2. **Never format LittleFS**: keep `cfg.setAutoFormat(false)`, never call
    `LittleFS.format()`, never overwrite or delete the stock files (list in
    `docs/stock-firmware.md`). Our own files use dedicated names (`/custom.json`...).
+   **The one exception is the two user folders `/image/` and `/gif/`**: the web interface
+   uploads files into them and deletes files from them (`/api/upload`, `/api/delete`), and
+   that is the only thing the firmware ever writes or deletes outside `/custom.json`. Every
+   other stock file (the stock `*.json`, `/config.json`, the `.vlw` fonts...) stays
+   untouched, and `/api/delete` answers 403 for any path that is not directly inside those two
+   folders. The stock firmware keeps its own pictures there too (for example
+   `/image/boot.jpg`), so the owner can delete those from the web interface as well, and the
+   album shows them.
 3. **Keep the flash layout** `board_build.ldscript = eagle.flash.4m3m.ld`.
 4. **`firmware.bin` < 520,000 bytes** (checked by `build.*` and `make_release.py`). Above that
    it can no longer be installed from the stock firmware (540,672 bytes free), and it must
@@ -59,6 +79,14 @@ Founding constraints:
 7. Never show the "FileSystem" form on `/update` again (it would erase the whole file area).
 8. No personal information in the repository (section 4).
 9. Never commit a `.bin` (section 4).
+10. **Memory: the GIF decoder is about 24.5 KB in ONE contiguous block, against a heap of a
+    few tens of KB.** It exists only while a GIF is on screen and never alongside an HTTP
+    fetch. `media::gifOpen()` / `gifOpenCentered()` allocate it with `new` after checking
+    `ESP.getMaxFreeBlockSize()` and the heap left for the web server (a refusal is a
+    `media::lastError()` message, never a crash); `gifClose()` frees it; `weather::fetchOnce()`
+    closes it before it opens a connection and the weather screen reopens it afterwards. Do
+    not allocate it statically, do not keep it open off screen, and do not add another network
+    call that can run while a GIF plays without closing it first.
 
 ## 4. Privacy (public repository)
 - **Commit nothing personal**: name, e-mail, user name, user-profile or home-directory paths,
@@ -138,8 +166,24 @@ The full description is in [docs/releasing.md](docs/releasing.md); the essential
 ```
 VERSION                      single source of truth for the version (one line, no leading "v")
 platformio.ini               build (pinned versions) + TFT_eSPI display config (build_flags)
-src/main.cpp                 the whole firmware (a single file for now)
+src/main.cpp                 setup() / loop() and the boot screens; everything else is a module
+src/config.h                 FW_NAME / FW_FULL_NAME, pins, folder names, limits
+src/settings.{h,cpp}         every setting, /custom.json, validation (the same JSON as /api/settings)
+src/net.{h,cpp}              Wi-Fi state machine: boot delay, connection attempts, rescue AP, async scan
+src/web.{h,cpp}              HTTP routes, the JSON API, file upload / delete, /update page
+src/timekeeping.{h,cpp}      SNTP (UTC) + the UTC offset applied by us, date formatting, night window
+src/weather.{h,cpp}          Open-Meteo fetch (streamed JSON), cache, back-off
+src/geocode.{h,cpp}          city search through Open-Meteo's geocoding API (explicit user action)
+src/weather_notice.{h,cpp}   why a weather screen is empty (no city / no network / loading / unavailable)
+src/units.h                  unit conversion for display (data is always metric)
+src/media.{h,cpp}            JPG (tjpgd) and animated GIF (AnimatedGIF) from LittleFS to the screen
+src/icons.{h,cpp}            weather icons drawn with graphics primitives, WMO code descriptions
+src/display.{h,cpp}          screen manager: themes, rotation, backlight / night mode, drawing helpers
+src/screen_*.cpp             one theme each: clock, weather (weather_clock), forecast, album
+src/generated/               web_index.h, built from web/index.html (git-ignored)
+web/index.html               the whole web interface: one page, six tabs, vanilla JS
 tools/version.py             PlatformIO pre-script: reads and validates VERSION, defines FW_VERSION
+tools/embed_web.py           PlatformIO pre-script: gzips web/index.html into src/generated/web_index.h
 tools/setup.ps1 | setup.sh   create .venv with PlatformIO (project-local)
 tools/build.ps1 | build.sh   build + enforce the size limit
 tools/make_release.py        makes dist/v<version>/ : Status-ESP-<version>.bin, version.json, checksums.txt
@@ -153,6 +197,7 @@ docs/recovery.md             going back to stock, rescue Wi-Fi, update errors
 docs/releasing.md            versioning policy and release procedure
 .github/workflows/build.yml  CI: build + validate on every push and PR (does not publish)
 CHANGELOG.md                 Keep a Changelog format, newest first
+ROADMAP.md                   what is NOT done: planned features and known limitations
 .gitignore | .gitattributes  keep .bin and the local toolchain out; keep .sh/.py on LF endings
 ```
 
@@ -188,41 +233,75 @@ bash tools/upload.sh <device-ip>  # with the owner's go-ahead!
 The device can therefore only be driven over the network (web interface, API, data fetched
 online).
 
-## 11. Architecture of `src/main.cpp`
-The firmware name and version are two macros: `FW_NAME` is `"Status-ESP"` and `FW_FULL_NAME`
-is `FW_NAME "-" FW_VERSION`, for example `"Status-ESP-0.3.0-rc.1"`. `FW_VERSION` is injected by
-`tools/version.py` from `VERSION`. That exact byte string must be in the binary:
+## 11. Architecture (`src/`)
+The firmware name and version are two macros in `config.h`: `FW_NAME` is `"Status-ESP"` and
+`FW_FULL_NAME` is `FW_NAME "-" FW_VERSION`, for example `"Status-ESP-0.3.0-rc.1"`. `FW_VERSION`
+is injected by `tools/version.py` from `VERSION`. That exact byte string must be in the binary:
 `make_release.py` checks for it.
 
-Start-up (`setup`):
-1. Mounts LittleFS **without formatting**, loads `/custom.json` (`brt`, `blinv`).
-2. Backlight PWM (range 0-1023, 1 kHz), display init, "connecting to Wi-Fi" screen.
-3. `startWifi()`: credentials remembered by the SDK, else the stock `/config.json`
-   (`{"a":ssid,"p":password}`), else the open access point `Status-ESP` (20 s per attempt).
-   The hostname is `status-esp`.
-4. `setupWeb()`, then the final screen: the web interface IP, or the rescue-mode instructions.
+There are **no threads and no blocking waits**: every module is a small state machine that
+`loop()` calls once per pass, so the web server (and with it `/update`) is served every pass.
+The only deliberate blocking calls are the weather fetch (at most ~5 s, once per interval, with
+a 60 s back-off after a failure), the city search (explicit user action, 5 s) and a JPG decode
+(100-300 ms, once per picture).
 
-Loop (`loop`): `server.handleClient()`; in rescue mode with no client for 5 minutes, the
-device restarts (new Wi-Fi attempt, useful after a power cut).
+Start-up (`setup`): serial; `settings::begin()` mounts LittleFS **without formatting** and
+loads `/custom.json`; `display::begin()` (backlight PWM, TFT); `weather::begin()`;
+`net::begin()` (boot delay, then SDK credentials, then the stock `/config.json`, then the open
+rescue access point `Status-ESP`, 20 s per attempt, hostname `status-esp`); `web::begin()`;
+"connecting" screen.
+Loop order: `web::loop()`, `net::loop()`, the boot screen, `timekeeping::loop()`,
+`weather::loop()`, `display::loop()`. In rescue mode with no client for 5 minutes the device
+restarts to retry the Wi-Fi.
+
+Settings: one struct in RAM, loaded from and saved to `/custom.json` (ArduinoJson). The file
+and `GET/POST /api/settings` use the same JSON shape, validated and clamped in
+`settings::apply()`, which returns a `CH_*` mask of what changed; `display::settingsChanged()`
+turns that into a live repaint. Keys `brt` and `blinv` are the ones written by 0.1.0 and must
+not change. Writes happen only when the user saves, never on a timer.
+
+Screens: the contract is written at the top of `display.h`. A theme is `Enter` / `Update(full)` /
+`Leave`; `Update(false)` runs on every loop pass and must redraw only what changed (no
+full-screen clear, no flicker), `Update(true)` follows a clear. On-screen text is ASCII; the
+degree sign is drawn as a small circle (`display::drawDegree`). The weather screens share
+`weather_notice` for the "no city / no network / loading" messages.
+
+Weather: `weather.cpp` fetches `http://api.open-meteo.com/v1/forecast` over plain HTTP (the
+device has no TLS), parses the answer as a stream through an ArduinoJson filter, and keeps one
+metric `Data` struct (`units.h` converts at draw time, so a unit change needs no new fetch).
+`utc_offset_seconds` from the same answer is what the clock uses when the time zone is Auto.
+
+Media: JPG goes through `jd_prepare()` / `jd_decomp()` (the `tjpgd` core inside the
+TJpg_Decoder library) with a work area allocated only for the decode; GIF goes through
+AnimatedGIF, one frame per `gifPlayFrame()` call, honouring the frame delays. Rule 10 in
+section 3 is the memory rule. `drawJpgFit()` and `gifOpenCentered()` are what the album uses to
+fit and centre pictures that are not exactly 240x240.
 
 HTTP routes:
 | Route | Purpose |
 |---|---|
-| `GET /` | status page + settings |
-| `GET /set?brt=0..100` / `?blinv=toggle` | brightness / backlight polarity (saved in `/custom.json`) |
-| `GET /wifi`, `POST /wifi` | scan + network choice (stored in the SDK's Wi-Fi area), then restart |
+| `GET /` | the web interface (one gzipped page from PROGMEM) |
+| `GET /api/status`, `GET/POST /api/settings` | status block; every setting, partial updates, applied live |
+| `GET /api/wifi/scan`, `POST /api/wifi` | async scan; store the network in the SDK's Wi-Fi area, then restart |
+| `GET /api/files?dir=`, `POST /api/upload?dir=`, `POST /api/delete` | list, upload, delete: only `/image` and `/gif` |
+| `GET /api/geocode?q=` | city search (top 5) through Open-Meteo |
+| `POST /api/reboot`, `POST /api/factory-reset` | restart; delete `/custom.json` only, then restart |
 | `GET /update` | our page (firmware only), **declared before** `updater.setup()` because the server takes the first handler that matches |
 | `POST /update` | `ESP8266HTTPUpdateServer` handling (`firmware` field) |
-| `GET /reboot` | restart |
+| `GET /set?brt=&blinv=`, `/wifi`, `/reboot` | the 0.1.0 routes, kept for compatibility |
 | `GET /v.json` | `{"m":"SmallTV-Ultra","v":"Status-ESP-<version>"}` (same shape as the stock firmware's) |
 | anything else | 404, or a redirect to `http://192.168.4.1/` in rescue mode (captive portal) |
 
 ## 12. Conventions
-- Text shown on the display is **plain ASCII** (TFT_eSPI's GLCD/Font2/Font4 fonts only cover
-  ASCII). Use `drawFit()` for variable-length text.
+- Text shown on the display is **plain ASCII** (TFT_eSPI's built-in fonts only cover ASCII;
+  the build loads GLCD, Font 2, 4, 6 and 7, and 6 and 7 are digits only). Use `drawFit()` for
+  variable-length text and draw the degree sign with `drawDegree()`.
 - The web interface and code comments are in English. PowerShell scripts must stay **pure
   ASCII**: Windows PowerShell 5.1 reads a BOM-less file as ANSI.
-- Constant strings use `F("...")` to save RAM (about 80 KB in total, about 43 KB free).
+- Constant strings use `F("...")` to save RAM (80 KB in total; the build's static use is about
+  35 KB). The free heap and the largest free block are in the web interface's status block
+  (`heap`, `max_block`): read them on the device after any change that allocates, and with a
+  GIF playing, since that is the worst case (rule 10).
 - Keep the versions pinned in `platformio.ini`; a platform or library update is a change to
   test on the device and to record in the changelog.
 - Everything committed is in English. Replies to the owner are in French.
@@ -250,24 +329,30 @@ HTTP routes:
   `releases/latest/download/version.json` never points at a pre-release. That is intended.
 - `cksum -c checksums.txt` needs GNU coreutils 9 or newer; older systems can compare by hand
   with `sha256sum`.
+- **Do not use the `TJpg_Decoder` class (`TJpgDec`, `drawFsJpg()`...).** Its `User_Config.h`
+  defines `TJPGD_LOAD_SD_LIBRARY` unconditionally and its file functions default to `SPIFFS`,
+  so using it links the SD library, SdFat and the whole SPIFFS implementation: firmware.bin
+  went from 456 KB to 530 KB, over the limit, and the class keeps a 3.5 KB work area in RAM for
+  ever. `media.cpp` calls `jd_prepare()` / `jd_decomp()` from `tjpgd.h` directly instead. If you
+  ever think of going back to the wrapper, check the size first (`nm --size-sort` on
+  `firmware.elf` shows `spiffs_*` and `SDFS` when it has crept back in).
+- `pushImage()` needs `tft.setSwapBytes(true)` for the native-endian RGB565 that tjpgd and
+  AnimatedGIF produce (the wire wants the high byte first); `media.cpp` sets it before every
+  push. Nothing else in the firmware uses `pushImage()`.
+- The ESP8266 stack is small (4 KB): keep pixel rows and decoder state in the heap objects
+  that own them (the GIF `Player` holds its own row buffer), not in locals.
+- `web/index.html` is only compiled in through `tools/embed_web.py`, which writes the
+  git-ignored `src/generated/web_index.h`. A build from a clean checkout makes it; do not
+  commit the generated file.
+- `/image` is shared with the stock firmware, which keeps pictures there (for example
+  `/image/boot.jpg`): they appear in the album, and the web interface can delete them.
 - `/custom.json` keeps its name through the Status-ESP rename on purpose (section 5).
   Renaming it, or giving it a different layout without a migration, silently drops the
   owner's settings.
 
-## 14. Ideas for later (to validate with the owner)
-- NTP clock, weather (Open-Meteo needs no key), showing images/GIFs from LittleFS.
-- Reuse the stock files (images in `/image/`, GIFs in `/gif/`) read-only.
-- **Status-Portal integration**: show the status information of
-  [Status-Portal](https://github.com/Adam4125-officiel/Status-Portal) on the display. Nothing
-  exists yet; the design is to be defined with the owner.
-- **On-device auto-updater** reading
-  `https://github.com/Adam4125-officiel/Status-ESP/releases/latest/download/version.json`
-  (the schema is in `docs/releasing.md`). Points to settle first: the repository must be public
-  (agreed); HTTPS on the ESP8266 goes through BearSSL, whose RAM and code-size cost has to fit
-  the roughly 43 KB of free RAM and the 520,000-byte limit; the download URL redirects to
-  `objects.githubusercontent.com`, so redirects must be followed; verify the MD5 with the
-  `Updater` class; never install a pre-release automatically; and `/update` must stay
-  reachable whatever the updater does.
-- Optional password on `/update` (today it is open to the whole local network, like the
-  stock firmware).
-- Split `main.cpp` into modules when it grows.
+## 14. What is left
+Planned features and known limitations are in [ROADMAP.md](ROADMAP.md): the remaining stock
+themes, the Status-Portal integration (the Status-Portal tab is only a placeholder), the
+on-device auto-updater, a password for the web interface, and so on. Add an idea there, not
+here; when something ships, remove it from `ROADMAP.md` (the changelog is the record of what
+exists). Check every idea against the 520,000-byte limit and the memory rule first.

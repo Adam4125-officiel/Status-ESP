@@ -18,8 +18,46 @@ changes the first, second and third number, and what a `-rc.N` pre-release is) i
 - `.gitignore`, `.gitattributes` and the CI workflow (`.github/workflows/build.yml`), which
   earlier documentation referred to but which were missing from the repository.
 - `docs/releasing.md`: versioning policy and release procedure.
+- **A new web interface with six tabs** (Status-Portal, Network, Weather, Time, Pictures,
+  Settings). It is one gzipped page embedded in the firmware, generated at build time from
+  `web/index.html` by `tools/embed_web.py`; it needs no internet access and also works at
+  `http://192.168.4.1/` in rescue mode. Every save shows a "Saved" or error message.
+  The Status-Portal tab is a placeholder: the integration is planned (see `ROADMAP.md`).
+- A JSON API behind it: `/api/status`, `/api/settings` (partial updates, every value
+  validated and clamped, applied live), `/api/wifi/scan`, `/api/wifi`, `/api/files`,
+  `/api/upload`, `/api/delete`, `/api/geocode`, `/api/reboot` and `/api/factory-reset`.
+  The old `/set`, `/wifi`, `/reboot` and `/v.json` still answer.
+- **Weather from Open-Meteo** (no API key, plain HTTP): search for a city from the web
+  interface, current conditions and the next three days. Units are chosen separately for
+  wind (km/h, m/s, mph), temperature (C, F) and pressure (hPa, kPa, mmHg, inHg); the update
+  interval is 10 to 180 minutes. Weather icons are drawn with graphics primitives.
+- **Time over NTP** (your own server first, then pool.ntp.org, time.google.com and
+  time.cloudflare.com). The time zone is either automatic (the UTC offset Open-Meteo reports
+  for the chosen city, so daylight saving follows) or a manual offset in 15-minute steps.
+  Colours for hours, minutes and seconds, 12 or 24 hours, three date formats, colon blink and
+  a "Digital" or "Plain" font.
+- **Four display themes**: weather clock (time, date, conditions, temperature, humidity, wind,
+  pressure and a small GIF), forecast (next three days), photo album and a big clock. Choose
+  one, or let the device rotate through the ones you tick every 5 to 3600 seconds.
+- **Photo album** from the stock `/image` folder: baseline JPEGs and animated GIFs, each shown
+  for a configurable time, or one fixed picture. Pictures larger than the screen are reduced
+  to fit; a picture that cannot be shown is skipped instead of stopping the album.
+- **A GIF on the weather screen**, picked from the stock `/gif` folder (80x80 pixels).
+- Uploading and deleting files in `/image` and `/gif` from the Pictures and Weather tabs.
+  These are the only two folders the firmware ever writes to or deletes from.
+- **Night mode**: a second, lower brightness between two times of day (the window may cross
+  midnight).
+- A delay before connecting to Wi-Fi after boot (0 to 120 s) for routers that start slower
+  than the display, and a **factory reset** that deletes only `/custom.json`.
 
 ### Changed
+- The firmware is no longer a single `src/main.cpp`: it is split into modules (settings, net,
+  web, timekeeping, weather, media, display and one file per theme). `main.cpp` only calls them.
+- The old status page is replaced by the new web interface. Brightness and backlight polarity
+  keep their `brt` and `blinv` keys in `/custom.json`.
+- Libraries added, pinned to exact versions: ArduinoJson 7.4.3, TJpg_Decoder 1.1.0 (only its
+  `tjpgd` decoder is used, see `CLAUDE.md`) and AnimatedGIF 2.2.3.
+- `firmware.bin` grew from 375,504 to 472,048 bytes (limit 520,000).
 - Everything is now in English: documentation, code comments, scripts, the device's web
   interface and the on-screen text.
 - Renamed to **Status-ESP** (previously "SmallTV-Custom"): the rescue access point is now

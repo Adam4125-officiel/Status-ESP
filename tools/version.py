@@ -2,7 +2,7 @@
 #
 # This is the ONLY place where the firmware version enters the build: it reads the
 # VERSION file at the repository root, validates it, and defines FW_VERSION as a C
-# string literal (e.g. "0.3.0-rc.1"). src/main.cpp builds the full name from it.
+# string literal (e.g. "0.3.0-rc.1"). src/config.h builds the full name from it.
 # An invalid VERSION aborts the build instead of producing a mislabelled image.
 
 import os
