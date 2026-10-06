@@ -5,6 +5,41 @@ All notable changes to this project are documented in this file. The format foll
 changes the first, second and third number, and what a `-rc.N` pre-release is) is in
 [docs/releasing.md](docs/releasing.md).
 
+## [0.4.0-rc.1] - 2026-10-06
+
+### Added
+- **Status-Portal client** (`portal.cpp`). The device asks a Status-Portal 1.10.0 or newer how its
+  services are doing (`GET /api/device/summary`, key in the `X-Api-Key` header, plain `http://` on the
+  local network: the ESP8266 has no TLS) and keeps the answer for the screens and the alert. It
+  asks only for the sections that are switched on, every 30 to 600 seconds (60 by default), checks
+  the status code before it reads anything (a 404 or 405 answers with a 2.4 KB HTML page that is
+  dropped unread), reads the body through `HTTPClient` into a String capped at 4 KB, and never
+  runs while a GIF decoder is alive or right after a weather request. Failures say why in words:
+  `bad key (HTTP 401)`, `HTTP 404: endpoint off or portal too old`, `connection failed`, `no answer
+  (timeout)`, `bad JSON: IncompleteInput (812 B)`, `answer cut short (700 of 1168 B)`... and the
+  retry gets later after each one (30 s, 60 s, ... at most the interval), so a portal that is down
+  does not stall the display every few seconds. `/api/status` gains `portal_on`, `portal_ok`,
+  `portal_age`, `portal_overall`, `portal_err`, `portal_try_age`, `portal_fails` and `portal_http`,
+  like the weather's.
+- **Status-Portal settings** (`portal_url`, `portal_key`, `portal_interval`, `portal_alert` and the
+  five section switches `portal_services`, `portal_incidents`, `portal_maintenance`,
+  `portal_resources`, `portal_announcements`). The address is checked when it is saved, with a
+  sentence for each way it can be wrong (`https://` cannot work, no path, no credentials, port 1 to
+  65535); a bare `192.0.2.10:5000` gets its `http://`. The key is write-only like the web
+  password: `GET /api/settings` only says whether one is set (`portal_key_set`), the export never
+  has it and an import never touches it.
+- `POST /api/portal/refresh` asks Status-Portal again at the next loop pass (for the "Test
+  connection" button).
+- **Host tests** (`tools/test_host.sh`, run by CI): the answer parser, the address checker and the
+  UTF-8 fold are built with the PC's g++ and the address and undefined-behaviour sanitizers, and
+  checked against the contract's example, a worst-case 2.7 KB answer made of quotes, backslashes,
+  accents and emoji, every truncation of the example, null and missing fields, a newer schema
+  version, the portal's HTML 404 page, and 20,000 randomly damaged answers.
+
+### Changed
+- The UTF-8 to ASCII fold moved out of `geocode.cpp` into `ascii.cpp`, and the capped String that
+  collects an HTTP answer into `http_body.h`, so the weather and Status-Portal clients share them.
+
 ## [0.3.0-rc.3] - 2026-10-06
 
 ### Fixed

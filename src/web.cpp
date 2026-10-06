@@ -9,6 +9,7 @@
 //   POST /api/delete           only directly inside /image/ or /gif/ (403 otherwise)
 //   GET  /api/geocode?q=       city search (Open-Meteo)
 //   POST /api/weather/refresh  fetch the weather again now
+//   POST /api/portal/refresh   ask Status-Portal again now ("Test connection")
 //   GET  /api/backup           every stored file as one tar (Wi-Fi password included; not in rescue mode)
 //   POST /api/backup/restore   put such a tar back (multipart), then reboot
 //   POST /api/reboot           POST /api/factory-reset   (deletes only /custom.json)
@@ -30,6 +31,8 @@
 #include "mdns.h"
 #include "media.h"
 #include "net.h"
+#include "portal.h"
+#include "portal_url.h"
 #include "settings.h"
 #include "timekeeping.h"
 #include "weather.h"
@@ -212,13 +215,30 @@ static void handleStatus() {
     doc["weather_fails"] = wd.failures;
     doc["weather_http"] = wd.httpCode;
   }
+  doc["portal_on"] = portal::configured();
+  if (portal::configured()) {   // why Status-Portal is not answering (empty when it is); never the address or the key
+    doc["portal_ok"] = portal::fresh();
+    if (portal::updatedAtMs()) {
+      doc["portal_age"] = (millis() - portal::updatedAtMs()) / 1000;
+      doc["portal_overall"] = portal::statusName(portal::data().overall);
+    }
+    const portal::Diag &pd = portal::diag();
+    if (pd.error[0]) doc["portal_err"] = pd.error;
+    if (pd.attemptMs) {
+      doc["portal_try_age"] = (millis() - pd.attemptMs) / 1000;
+      doc["portal_fails"] = pd.failures;
+      doc["portal_http"] = pd.httpCode;
+    }
+  }
   sendJson(200, doc);
 }
 
-// The settings as the API returns them: never the password itself, only whether one is set.
+// The settings as the API returns them: never the password or the Status-Portal key themselves, only
+// whether one is set.
 static void settingsToJson(JsonDocument &doc) {
   settings::toJson(doc);
   doc["pw_set"] = settings::get().password[0] != '\0';
+  doc["portal_key_set"] = settings::get().portalKey[0] != '\0';
 }
 
 static void handleSettingsGet() {
@@ -239,11 +259,52 @@ static void applySettingsAndReply(JsonDocument &body, bool persist) {
   if (changed & settings::CH_NTP) timekeeping::applySettings();
   if (changed & settings::CH_LOCATION) weather::requestRefresh();
   if (changed & settings::CH_AUTH) applyUpdaterCredentials();
+  if (changed & settings::CH_PORTAL) portal::settingsChanged();
 
   JsonDocument doc;
   settingsToJson(doc);
   doc["ok"] = true;
   sendJson(200, doc);
+}
+
+// The Status-Portal address and key are refused with a sentence, not ignored: a typo that vanishes
+// silently looks exactly like a save that worked. Replies 400 itself and returns false when refused.
+static bool checkPortalFields(JsonDocument &body) {
+  if (body["portal_url"].is<const char *>()) {
+    const char *typed = body["portal_url"].as<const char *>();
+    char normal[portal::MAX_URL + 1];
+    if (typed[0] != '\0') {
+      switch (portal::checkUrl(typed, normal, sizeof(normal))) {
+        case portal::URL_OK: break;
+        case portal::URL_HTTPS:
+          sendError(400, F("https cannot work, the device has no TLS: use the portal's http:// address"));
+          return false;
+        case portal::URL_SCHEME:
+          sendError(400, F("Only http:// addresses work"));
+          return false;
+        case portal::URL_CREDENTIALS:
+          sendError(400, F("No user name or password in the address: the key is separate"));
+          return false;
+        case portal::URL_PATH:
+          sendError(400, F("Give only the address and port, without a path"));
+          return false;
+        case portal::URL_PORT:
+          sendError(400, F("The port must be a number from 1 to 65535"));
+          return false;
+        default:
+          sendError(400, F("Not a usable address: use http://<ip address>:<port>"));
+          return false;
+      }
+    }
+  }
+  if (body["portal_key"].is<const char *>()) {
+    const char *key = body["portal_key"].as<const char *>();
+    if (key[0] != '\0' && !portal::validKey(key)) {
+      sendError(400, F("The key must be 8 to 64 characters without spaces"));
+      return false;
+    }
+  }
+  return true;
 }
 
 static void handleSettingsPost() {
@@ -256,6 +317,7 @@ static void handleSettingsPost() {
       return;
     }
   }
+  if (!checkPortalFields(body)) return;
   // ?save=0 applies without writing flash: used by the live brightness slider, which
   // fires on every movement; the final value is saved when the slider is released.
   bool persist = !(server.hasArg("save") && server.arg("save") == "0");
@@ -282,6 +344,9 @@ static void handleSettingsImport() {
   if (!readJsonBody(body)) return;
   body.remove("pw");        // an import never touches the password, in either direction
   body.remove("pw_set");
+  body.remove("portal_key");   // nor the Status-Portal key (an export never has it either)
+  body.remove("portal_key_set");
+  if (!checkPortalFields(body)) return;
   JsonDocument known;
   settings::toJson(known);
   size_t recognised = 0;
@@ -686,6 +751,12 @@ static void handleWeatherRefresh() {
   sendOk();
 }
 
+// Asks Status-Portal again at the next loop pass (the Status-Portal tab's "Test connection").
+static void handlePortalRefresh() {
+  portal::requestRefresh();
+  sendOk();
+}
+
 static void handleReboot() {
   sendOk();
   delay(300);
@@ -802,6 +873,7 @@ void begin() {
   server.on("/api/backup/restore", HTTP_POST, handleRestoreDone, handleRestoreChunk);   // checks the password itself
   route("/api/geocode", HTTP_GET, handleGeocode);
   route("/api/weather/refresh", HTTP_POST, handleWeatherRefresh);
+  route("/api/portal/refresh", HTTP_POST, handlePortalRefresh);
   route("/api/reboot", HTTP_POST, handleReboot);
   route("/api/factory-reset", HTTP_POST, handleFactoryReset);
 

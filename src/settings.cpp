@@ -4,11 +4,16 @@
 #include <math.h>
 
 #include "config.h"
+#include "portal_data.h"
+#include "portal_url.h"
 
 namespace settings {
 
 static Settings S;
 static bool mounted = false;
+
+static_assert(sizeof(Settings::portalUrl) == portal::MAX_URL + 1, "portalUrl must hold exactly what portal::checkUrl accepts");
+static_assert(sizeof(Settings::portalKey) == portal::MAX_KEY + 1, "portalKey must hold exactly what portal::validKey accepts");
 
 static const char *const THEME_NAMES[THEME_COUNT] = {"weather_clock", "forecast", "album",          "clock",
                                                      "analog",        "digital2", "simple_weather", "countdown",
@@ -59,6 +64,9 @@ static void defaults(Settings &s) {
   s.nightStart = 22 * 60;
   s.nightEnd = 7 * 60;
   s.nightBrightness = 10;
+  s.portalInterval = 60;
+  s.portalSections = portal::SEC_ALL;
+  s.portalAlert = PORTAL_ALERT_INDICATOR;
 }
 
 // --- Validation helpers -------------------------------------------------------
@@ -208,12 +216,28 @@ static uint32_t diff(const Settings &a, const Settings &b) {
   if (a.albumAuto != b.albumAuto || a.albumInterval != b.albumInterval || strcmp(a.albumFile, b.albumFile) != 0) ch |= CH_ALBUM;
   if (a.bootDelay != b.bootDelay) ch |= CH_BOOT_DELAY;
   if (strcmp(a.password, b.password) != 0) ch |= CH_AUTH;
+  if (strcmp(a.portalUrl, b.portalUrl) != 0 || strcmp(a.portalKey, b.portalKey) != 0 ||
+      a.portalInterval != b.portalInterval || a.portalSections != b.portalSections ||
+      a.portalAlert != b.portalAlert) ch |= CH_PORTAL;
   if (a.cdYear != b.cdYear || a.cdMonth != b.cdMonth || a.cdDay != b.cdDay || a.cdMinutes != b.cdMinutes ||
       strcmp(a.cdLabel, b.cdLabel) != 0) ch |= CH_COUNTDOWN;
   return ch;
 }
 
 // --- apply / toJson -----------------------------------------------------------
+
+// The five Status-Portal switches: one JSON key per bit of Settings::portalSections.
+struct PortalSwitch {
+  const char *key;
+  uint8_t bit;
+};
+static const PortalSwitch PORTAL_SWITCHES[] = {
+    {"portal_services", portal::SEC_SERVICES},
+    {"portal_incidents", portal::SEC_INCIDENTS},
+    {"portal_maintenance", portal::SEC_MAINTENANCE},
+    {"portal_resources", portal::SEC_RESOURCES},
+    {"portal_announcements", portal::SEC_ANNOUNCEMENTS},
+};
 
 uint32_t apply(JsonObjectConst obj) {
   Settings old = S;
@@ -307,6 +331,28 @@ uint32_t apply(JsonObjectConst obj) {
     else if (validPassword(str)) strlcpy(S.password, str, sizeof(S.password));
   }
 
+  if (obj["portal_url"].is<const char *>()) {
+    str = obj["portal_url"].as<const char *>();
+    char url[sizeof(S.portalUrl)];
+    if (str[0] == '\0') S.portalUrl[0] = '\0';
+    else if (portal::checkUrl(str, url, sizeof(url)) == portal::URL_OK) strlcpy(S.portalUrl, url, sizeof(S.portalUrl));
+  }
+  if (obj["portal_key"].is<const char *>()) {
+    str = obj["portal_key"].as<const char *>();
+    if (str[0] == '\0') S.portalKey[0] = '\0';
+    else if (portal::validKey(str)) strlcpy(S.portalKey, str, sizeof(S.portalKey));
+  }
+  if (readInt(obj["portal_interval"], 30, 600, n)) S.portalInterval = (uint16_t)n;
+  for (const PortalSwitch &sw : PORTAL_SWITCHES) {
+    if (readBool(obj[sw.key], b)) S.portalSections = b ? (S.portalSections | sw.bit) : (S.portalSections & ~sw.bit);
+  }
+  if (obj["portal_alert"].is<const char *>()) {
+    str = obj["portal_alert"].as<const char *>();
+    if (strcmp(str, "off") == 0) S.portalAlert = PORTAL_ALERT_OFF;
+    else if (strcmp(str, "indicator") == 0) S.portalAlert = PORTAL_ALERT_INDICATOR;
+    else if (strcmp(str, "switch") == 0) S.portalAlert = PORTAL_ALERT_SWITCH;
+  }
+
   return diff(old, S);
 }
 
@@ -368,7 +414,13 @@ void toJson(JsonDocument &doc, bool secrets) {
   doc["cd_time"] = String(buf);
   doc["cd_label"] = String(S.cdLabel);
 
+  doc["portal_url"] = String(S.portalUrl);
+  doc["portal_interval"] = S.portalInterval;
+  for (const PortalSwitch &sw : PORTAL_SWITCHES) doc[sw.key] = (S.portalSections & sw.bit) ? 1 : 0;
+  doc["portal_alert"] = S.portalAlert == PORTAL_ALERT_OFF ? "off" : (S.portalAlert == PORTAL_ALERT_SWITCH ? "switch" : "indicator");
+
   if (secrets && S.password[0]) doc["pw"] = String(S.password);
+  if (secrets && S.portalKey[0]) doc["portal_key"] = String(S.portalKey);
 }
 
 // --- Persistence ----------------------------------------------------------------
