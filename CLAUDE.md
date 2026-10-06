@@ -29,13 +29,18 @@ Founding constraints:
 - The owner's device runs **0.1.0** (validated: display, colours, backlight, Wi-Fi, web
   interface, `/update`). It was built before the rename, so it still identifies itself as
   `Custom-0.1.0`, with the rescue access point `SmallTV-Custom`.
-- The repository is at **0.3.0-rc.1**, on branch `0.3.0`. It contains the first real features:
-  a six-tab web interface and JSON API, Open-Meteo weather, NTP time with automatic or manual
-  time zone, four display themes (weather clock, forecast, photo album, big clock) with manual
-  choice or rotation, JPG and animated GIF playback from `/image` and `/gif`, night mode, a
-  Wi-Fi boot delay and a factory reset (see `CHANGELOG.md`). `firmware.bin` is 472,048 bytes
-  (limit 520,000), static RAM 35,084 of 81,920 bytes.
-- **None of it has been tested on the device.** What was checked here: the firmware builds
+- The repository is at **0.3.0-rc.2**, on branch `0.3.0`. **0.3.0-rc.1 is published** (as a
+  pre-release); rc.2 is committed and prepared but **not published yet** (no push, tag or release
+  has been made for it). It contains the first real features: a six-tab web interface and JSON
+  API, Open-Meteo weather, NTP time with automatic or manual time zone, JPG and animated GIF
+  playback from `/image` and `/gif`, night mode, a Wi-Fi boot delay and a factory reset (see
+  `CHANGELOG.md`), and, new in rc.2: the `status-esp.local` mDNS name, settings export and
+  import, an optional web password, a Large clock font and sunrise/sunset on the weather screen.
+  **Eight themes**, chosen manually or rotated: weather clock (`weather_clock`), simple weather
+  clock (`simple_weather`), forecast, photo album, clock, analog clock (`analog`), big digits
+  (`digital2`) and countdown. `firmware.bin` is 495,056 bytes (limit 520,000, so about 25 KB
+  left), static RAM 36,688 of 81,920 bytes.
+- **Neither rc.1 nor rc.2 has been tested on the device.** What was checked here: the firmware builds
   and passes `tools/check_firmware.py`; the icons, the screens and the media code were run on
   the host (compiled against a mock `TFT_eSPI`, with the real AnimatedGIF and tjpgd and
   generated test pictures) and their output looked at; the album's state machine, the GIF
@@ -43,19 +48,24 @@ Founding constraints:
   device: the real SPI output and colours of `pushImage`, the real heap while a GIF plays,
   whether Open-Meteo and the NTP servers are reachable from the device, GIF decoding speed on
   an 80 MHz ESP8266, and every piece of the web interface in a real browser against the real
-  device. The Status-Portal tab is a placeholder.
+  device. The Status-Portal tab is a placeholder. rc.2 adds to that list: the new themes on the
+  real screen, `status-esp.local` resolving on a real network (the responder is only exercised
+  on a PC), and the password prompt in a real browser.
 - Installing it changes the device's visible identity (rescue access point `Status-ESP`,
   hostname `status-esp`, `/v.json` reports `Status-ESP-<version>`).
 - **v0.2.0 is a tag only**: it was never published as a release and never installed.
 - The repository is going public. See section 4.
-- The CI workflow (`.github/workflows/build.yml`) is new in 0.3.0 and has never run: watch
-  the first run after the branch is pushed.
+- The CI workflow (`.github/workflows/build.yml`) is new in 0.3.0: its runs on GitHub have not
+  been checked from here, so look at them after each push.
 - What is **not** done, and the known limitations, are in [ROADMAP.md](ROADMAP.md).
 
 ## 3. Absolute rules (never break these)
 1. **Every firmware must keep `/update`**, reachable on normal Wi-Fi **and** in the rescue
    access point. Without it the device cannot be recovered without opening it. Never block
-   `loop()` for long (the web server must keep answering).
+   `loop()` for long (the web server must keep answering). **The optional web password is
+   therefore never enforced in the rescue access point** (rule 11): forgot it -> switch the
+   router off until the open `Status-ESP` hotspot appears -> connect -> remove the password or
+   factory-reset. Any change to authentication must keep that way out.
 2. **Never format LittleFS**: keep `cfg.setAutoFormat(false)`, never call
    `LittleFS.format()`, never overwrite or delete the stock files (list in
    `docs/stock-firmware.md`). Our own files use dedicated names (`/custom.json`...).
@@ -187,7 +197,11 @@ src/units.h                  unit conversion for display (data is always metric)
 src/media.{h,cpp}            JPG (tjpgd) and animated GIF (AnimatedGIF) from LittleFS to the screen
 src/icons.{h,cpp}            weather icons drawn with graphics primitives, WMO code descriptions
 src/display.{h,cpp}          screen manager: themes, rotation, backlight / night mode, drawing helpers
-src/screen_*.cpp             one theme each: clock, weather (weather_clock), forecast, album
+src/screen_*.cpp             one theme each: clock, weather (weather_clock), simple_weather, forecast,
+                             album, analog, digital2 (big digits), countdown
+src/bigfont.h                helpers for the Font 8 (75 px digits) themes
+src/countdown_calc.h         date arithmetic for the countdown (pure, testable on a PC)
+src/mdns.{h,cpp}, mdns_dns.* the tiny mDNS responder for status-esp.local (address questions only)
 src/generated/               web_index.h, built from web/index.html (git-ignored)
 web/index.html               the whole web interface: one page, six tabs, vanilla JS
 tools/version.py             PlatformIO pre-script: reads and validates VERSION, defines FW_VERSION
@@ -302,7 +316,7 @@ HTTP routes:
 
 ## 12. Conventions
 - Text shown on the display is **plain ASCII** (TFT_eSPI's built-in fonts only cover ASCII;
-  the build loads GLCD, Font 2, 4, 6 and 7, and 6 and 7 are digits only). Use `drawFit()` for
+  the build loads GLCD, Font 2, 4, 6, 7 and 8 (the narrow "8N" build), and 6, 7 and 8 are digits only). Use `drawFit()` for
   variable-length text and draw the degree sign with `drawDegree()`.
 - The web interface and code comments are in English. PowerShell scripts must stay **pure
   ASCII**: Windows PowerShell 5.1 reads a BOM-less file as ANSI.
@@ -359,8 +373,8 @@ HTTP routes:
   owner's settings.
 
 ## 14. What is left
-Planned features and known limitations are in [ROADMAP.md](ROADMAP.md): the remaining stock
-themes, the Status-Portal integration (the Status-Portal tab is only a placeholder), the
-on-device auto-updater, a password for the web interface, and so on. Add an idea there, not
+Planned features and known limitations are in [ROADMAP.md](ROADMAP.md): smooth
+fonts, the Status-Portal integration (the Status-Portal tab is only a placeholder), the
+on-device auto-updater (blocked by the size of HTTPS/BearSSL), and so on. Add an idea there, not
 here; when something ships, remove it from `ROADMAP.md` (the changelog is the record of what
 exists). Check every idea against the 520,000-byte limit and the memory rule first.

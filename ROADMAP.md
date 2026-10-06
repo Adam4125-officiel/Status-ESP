@@ -7,11 +7,9 @@ record of what exists).
 Version numbers follow [docs/releasing.md](docs/releasing.md): new features bump the minor number.
 
 ## Display
-- **Remaining stock themes**: Time Style 2, Time Style 3 and Simple Weather Clock (0.3.0 ships Weather
-  clock, Forecast, Photo album and one Clock style).
-- **More clock fonts**, including smooth (anti-aliased) fonts loaded from LittleFS.
-- **Countdown / day counter** screen (the stock firmware has one).
-- **Richer weather**: hourly forecast, more forecast days, sunrise/sunset.
+- **Smooth (anti-aliased) fonts** loaded from LittleFS, as more clock fonts. The built-in
+  TFT_eSPI fonts are all the firmware has today (the "Large" font is Font 8).
+- **Richer weather**: hourly forecast and more forecast days.
 
 ## Status-Portal integration
 - Show the status of the services monitored by
@@ -24,15 +22,15 @@ Version numbers follow [docs/releasing.md](docs/releasing.md): new features bump
 - **On-device auto-updater**: the device reads
   `https://github.com/Adam4125-officiel/Status-ESP/releases/latest/download/version.json` (stable releases
   only; schema in [docs/releasing.md](docs/releasing.md)), and offers or installs the new `.bin`.
-  To settle first: HTTPS on the ESP8266 (BearSSL RAM and code size), following the GitHub redirect to the
-  download host, MD5 check with the `Updater` class, never installing a pre-release automatically, and
-  `/update` must stay reachable whatever the updater does.
+  **Blocked by size today**: GitHub only serves HTTPS, which needs BearSSL, and BearSSL does not fit
+  in what is left. 0.3.0-rc.2 is 495,056 bytes against the 520,000-byte limit (about 25 KB of
+  flash left), and the TLS code plus its buffers would cost more than that in flash and a large
+  contiguous block of the little heap that is left (see the GIF memory note below). Settle this
+  first, then: following the GitHub redirect to the download host, MD5 check with the `Updater`
+  class, never installing a pre-release automatically, and `/update` must stay reachable
+  whatever the updater does.
 
-## Security and convenience
-- Optional password on `/update` and on the web interface (today they are open to the local network,
-  like the stock firmware).
-- `status-esp.local` address via mDNS, so the IP is not needed.
-- Export / import of the settings (`/custom.json`) from the web interface.
+## Settings
 - Import of the stock firmware's settings (city, units, time format...) on first boot, once their file
   formats are known.
 
@@ -40,7 +38,7 @@ Version numbers follow [docs/releasing.md](docs/releasing.md): new features bump
 These are not planned features but things that are missing or rough today. Fix them when they
 get in the way; remove a line when it is no longer true.
 
-- **Nothing has been tested on a device yet.** The code was built, and its drawing, GIF/JPG
+- **Nothing has been tested on a device yet** (0.3.0-rc.1 and rc.2 included). The code was built, and its drawing, GIF/JPG
   decoding and album logic were run on a PC against mock hardware; the real screen, the real
   heap, the network calls and the web interface in a browser still have to be checked.
 - **Memory while a GIF plays is tight.** The GIF decoder takes about 24.5 KB in one block, which
@@ -60,6 +58,10 @@ get in the way; remove a line when it is no longer true.
   Across midnight the forecast keeps its old days until the next successful fetch.
 - **With the time zone on Auto, the clock shows UTC until the first weather answer** (it needs a
   city and a network): the offset comes from Open-Meteo, not from the NTP servers.
+- **`status-esp.local` is a minimal mDNS responder.** It answers address questions only: the
+  device does not appear in a network browser, two devices with the same name are not detected,
+  and it does not run in rescue mode (use `192.168.4.1` there). A computer with no mDNS client
+  (older Windows versions, some networks) cannot resolve `.local` names; the IP address always works.
 - **The weather and city requests are plain HTTP** (the device has no TLS): the chosen city's
   coordinates travel in clear text on the local network and beyond.
 

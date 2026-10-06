@@ -44,28 +44,36 @@ Version numbering and the release process are described in
 [docs/releasing.md](docs/releasing.md).
 
 ## Features
-- **Four display themes**, chosen in the web interface or rotated automatically (you pick
+- **Eight display themes**, chosen in the web interface or rotated automatically (you pick
   which ones take part and how long each stays):
-  - *Weather clock*: time, date, current conditions, temperature, humidity, wind and
-    pressure, and a small 80x80 animated GIF of your choice;
+  - *Weather clock*: time, date, sunrise and sunset, current conditions, temperature,
+    humidity, wind and pressure, and a small 80x80 animated GIF of your choice;
+  - *Simple weather clock*: a big time, the weather icon and the current temperature;
   - *Forecast*: the next three days with icon, highest and lowest temperature;
   - *Photo album*: the JPG and animated GIF files in `/image`, one after the other or one fixed
     picture;
-  - *Clock*: a big clock in the colours you choose.
+  - *Clock*: a big clock in the colours you choose;
+  - *Analog clock*: a clock face with hour, minute and second hands, and the date;
+  - *Big digits*: the hour over the minutes in very large digits, with a seconds bar;
+  - *Countdown*: the days (then hours, minutes and seconds) left until a date you pick.
 - **Weather** from [Open-Meteo](https://open-meteo.com) (no account or API key): search for
   your city from the web interface; choose the units (km/h, m/s or mph; C or F; hPa, kPa, mmHg
   or inHg) and how often it refreshes.
 - **Time** over NTP, with an automatic time zone (the offset of the chosen city, daylight
   saving included) or a manual UTC offset; 12 or 24 hours, three date formats, colon blink,
-  colours and font of the clock.
+  colours and font of the clock (Digital, Plain or Large).
 - **Pictures**: upload and delete files in `/image` (album, 240x240) and `/gif` (weather
   screen, 80x80) from the web interface. Baseline JPEG and GIF.
 - **Night mode** (a lower brightness between two times), brightness slider, backlight
   polarity, and a delay before connecting to Wi-Fi at boot for routers that start slowly.
-- **Web interface** at `http://<device-ip>/` (hostname `status-esp`), a single page with six
+- **Web interface** at `http://<device-ip>/` or `http://status-esp.local/` (the device answers
+  to that name over mDNS once it is on your Wi-Fi), a single page with six
   tabs: Status-Portal (placeholder), Network, Weather, Time, Pictures and Settings. It needs no
   internet access. The Settings tab also shows the device status (memory, sizes, whether going
   back to the stock firmware is still possible) and has a factory reset and a reboot.
+  You can export your settings to a file and import them again, and optionally protect the
+  interface, the API and `/update` with a password (never enforced in the rescue access
+  point, so `/update` always stays reachable; see [docs/recovery.md](docs/recovery.md)).
 - If the Wi-Fi connection fails, the device opens an access point named **Status-ESP**
   (open, no password) at `http://192.168.4.1` where you can pick a network or update the
   firmware. It retries the Wi-Fi connection automatically every 5 minutes.

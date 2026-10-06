@@ -43,7 +43,7 @@ current image**, before the LittleFS area, and the bootloader then copies it int
 | Installed firmware | Size | Free space for the next update |
 |---|---|---|
 | GeekMagic 9.0.50 / 9.0.51 | 505,200 bytes | 540,672 bytes |
-| Status-ESP 0.3.0-rc.1 | 472,048 bytes | ~574,000 bytes |
+| Status-ESP 0.3.0-rc.2 | 495,056 bytes | ~551,000 bytes |
 
 Hence the two rules of the project:
 1. our firmware must stay **below ~520 KB** so it can be installed from the stock firmware;
@@ -52,7 +52,7 @@ Hence the two rules of the project:
 The enforced limit is `firmware.bin` < 520,000 bytes.
 
 ## Memory (RAM)
-The ESP8266 has about 80 KB of RAM. The 0.3.0 build uses about 35 KB of it statically (the
+The ESP8266 has about 80 KB of RAM. The 0.3.0 build uses about 36.7 KB of it statically (the
 `RAM:` line of `pio run`); the rest is the heap, shared by the network stack, the web server
 and, while a GIF is on screen, the GIF decoder (about 24.5 KB in one contiguous block). That is
 why the decoder is allocated only while a GIF is shown and never alongside a weather fetch (rule
