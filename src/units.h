@@ -51,6 +51,17 @@ inline const char *pressureLabel() {
   }
 }
 
+// printf("%.*f") without newlib's float printf, which linking costs about 6 KB (tools/linkflags.py
+// removes it from the build, so a "%f" anywhere prints nothing: use this instead).
+inline void formatFixed(char *buf, size_t n, float value, uint8_t decimals) {
+  long scale = 1;
+  for (uint8_t i = 0; i < decimals; i++) scale *= 10;
+  long scaled = lroundf(fabsf(value) * scale);
+  const char *sign = (value < 0 && scaled != 0) ? "-" : "";
+  if (decimals == 0) snprintf(buf, n, "%s%ld", sign, scaled);
+  else snprintf(buf, n, "%s%ld.%0*ld", sign, scaled / scale, (int)decimals, scaled % scale);
+}
+
 // "-3", "21": whole degrees, no unit. Convert first with temperature().
 inline void formatWhole(char *buf, size_t n, float value) {
   int v = (int)lroundf(value);
@@ -61,8 +72,8 @@ inline void formatWhole(char *buf, size_t n, float value) {
 inline void formatPressure(char *buf, size_t n, float hpa) {
   float v = pressure(hpa);
   switch (settings::get().pressUnit) {
-    case settings::PRESS_KPA: snprintf(buf, n, "%.1f", v); break;
-    case settings::PRESS_INHG: snprintf(buf, n, "%.2f", v); break;
+    case settings::PRESS_KPA: formatFixed(buf, n, v, 1); break;
+    case settings::PRESS_INHG: formatFixed(buf, n, v, 2); break;
     default: snprintf(buf, n, "%d", (int)lroundf(v)); break;
   }
 }

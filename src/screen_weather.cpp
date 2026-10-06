@@ -203,7 +203,7 @@ int16_t drawTemperature(int16_t x, int16_t y, float celsius, uint8_t numFont, ui
 void formatWind(char *buf, size_t size, float kmh) {
   float v = units::wind(kmh);
   if (settings::get().windUnit == settings::WIND_MS) {
-    snprintf(buf, size, "%.1f", v);   // m/s: whole numbers are too coarse
+    units::formatFixed(buf, size, v, 1);   // m/s: whole numbers are too coarse
   } else {
     snprintf(buf, size, "%d", (int)lroundf(v));
   }

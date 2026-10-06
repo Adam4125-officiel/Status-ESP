@@ -24,6 +24,11 @@ changes the first, second and third number, and what a `-rc.N` pre-release is) i
   (with a "Check now" button, `POST /api/weather/refresh`) and on the "No weather data" screen.
 
 ### Changed
+- **The firmware is 19 KB smaller** (495,056 -> 476,096 bytes before the new features) so that
+  the next features still fit under the 520,000-byte limit: the core's forced floating-point
+  `printf` / `scanf` (and `strtod`) are no longer linked (`tools/linkflags.py`; the few decimals
+  that were printed with `%f` now go through `units::formatFixed()`), and ArduinoJson is built
+  with 32-bit floats and integers.
 - **The default NTP server is `time.cloudflare.com`** (then `pool.ntp.org` and `time.google.com`).
   A custom server is still tried first, followed by `time.cloudflare.com` and `pool.ntp.org`.
 

@@ -12,6 +12,7 @@
 #include "media.h"
 #include "net.h"
 #include "settings.h"
+#include "units.h"
 
 namespace weather {
 
@@ -199,12 +200,15 @@ Outcome fetchOnce() {
     return NO_MEMORY;
   }
 
-  char coords[40];
-  snprintf(coords, sizeof(coords), "latitude=%.4f&longitude=%.4f", s.lat, s.lon);
+  char lat[16], lon[16];
+  units::formatFixed(lat, sizeof(lat), s.lat, 4);
+  units::formatFixed(lon, sizeof(lon), s.lon, 4);
   String url;
   url.reserve(300);
-  url += F("http://api.open-meteo.com/v1/forecast?");
-  url += coords;
+  url += F("http://api.open-meteo.com/v1/forecast?latitude=");
+  url += lat;
+  url += F("&longitude=");
+  url += lon;
   url += F("&current=temperature_2m,apparent_temperature,relative_humidity_2m,surface_pressure,"
            "wind_speed_10m,weather_code,is_day"
            "&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset"
