@@ -7,6 +7,12 @@ changes the first, second and third number, and what a `-rc.N` pre-release is) i
 
 ## [0.4.0-rc.5] - 2026-10-07
 
+### Added
+- **Jellyfin band on the Status-Portal screen.** While Jellyfin is transcoding or running a scheduled task
+  (trickplay generation, a library scan), the status banner is split: the status keeps the top half in a
+  smaller font and a blue band under it says "Jellyfin  2 transcodes", or the name of the task. It goes
+  back to the one big word when Jellyfin is idle. Needs Status-Portal **1.11.0-rc.4**.
+
 ### Changed
 - On the Status-Portal screen the latency now comes before the status word ("45ms OK", "1.8s SLOW").
 - Jellyfin's activity is no longer listed on the Resources screen (the lines were easy to miss). The

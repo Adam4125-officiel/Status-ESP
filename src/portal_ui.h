@@ -5,6 +5,10 @@
 
 #include <Arduino.h>
 
+namespace portal {
+struct Summary;
+}
+
 namespace portal_ui {
 
 // RGB565.
@@ -42,6 +46,14 @@ void drawNotice(Kind kind);
 
 // Copies `text` into out, cut with "..." so that it is at most maxW pixels wide in `font`.
 void fitText(char *out, size_t cap, const char *text, int16_t maxW, uint8_t font);
+
+// What Jellyfin is doing, as one line for a band: "Jellyfin  2 transcodes", "Jellyfin  Generate Trickplay
+// Images +1", "Jellyfin  2 transcodes, 1 task", cut to fit the screen. Empty while it is idle.
+void jellyfinLine(const portal::Summary &d, char *out, size_t cap);
+
+// A band across the screen, `h` pixels high from `y`, filled with `fill`, with `text` centred in it in font 2
+// (16 px: the band must be at least that high). The caller fits the text.
+void drawBand(int16_t y, int16_t h, uint16_t fill, uint16_t ink, const char *text);
 
 // A duration in seconds as short text: "<1m", "12m", "5h20m", "30h", "3d".
 void formatSpan(char *out, size_t cap, uint32_t seconds);

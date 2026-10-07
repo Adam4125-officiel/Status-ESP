@@ -53,7 +53,7 @@ uint8_t shownRows;
 
 int8_t shownNoticeKind;                    // portal_ui::Kind on the screen, -1 = content (or nothing yet)
 uint32_t shownNoticeKey;
-int16_t shownBanner;                       // portal::Status in the banner, -1 = nothing
+int32_t shownBanner;                       // bannerSignature() of what the banner shows, -1 = nothing
 uint32_t shownCounts;                      // signature of the counts line, 0 = nothing
 uint32_t shownUpdated;                     // portal::updatedAtMs() the rows were built from
 uint32_t shownMinute;                      // the portal minute they were built in (ages and countdowns)
@@ -124,15 +124,38 @@ const char *bannerWord(uint8_t status) {
   }
 }
 
-void drawBanner(uint8_t status) {
+// The banner is the overall status, 36 px high. While Jellyfin is busy it is split in two so that the
+// status keeps the top (smaller, in font 2) and a blue band under it says what Jellyfin is doing.
+const int16_t BANNER_STATUS_H = 19;   // the status half; a black line follows it, then the 16 px Jellyfin band
+
+void drawBanner(const Summary &d) {
+  const uint8_t status = d.overall;
   uint16_t fill = status == portal::ST_DOWN ? portal_ui::RED
                 : status == portal::ST_DEGRADED ? portal_ui::ORANGE
                 : status == portal::ST_MAINTENANCE ? portal_ui::BLUE
                 : status == portal::ST_SLOW ? portal_ui::YELLOW
                                             : (uint16_t)0x0400;   // dark green
   uint16_t ink = (status == portal::ST_DEGRADED || status == portal::ST_SLOW) ? (uint16_t)TFT_BLACK : (uint16_t)TFT_WHITE;
-  tft.fillRect(0, 0, config::SCREEN_W, BANNER_H, fill);
-  display::drawFit(bannerWord(status), 5, ink, fill);
+  char jellyfin[48];
+  portal_ui::jellyfinLine(d, jellyfin, sizeof(jellyfin));
+  if (!jellyfin[0]) {
+    tft.fillRect(0, 0, config::SCREEN_W, BANNER_H, fill);
+    display::drawFit(bannerWord(status), 5, ink, fill);
+    return;
+  }
+  portal_ui::drawBand(0, BANNER_STATUS_H, fill, ink, bannerWord(status));
+  tft.fillRect(0, BANNER_STATUS_H, config::SCREEN_W, 1, TFT_BLACK);
+  portal_ui::drawBand(BANNER_STATUS_H + 1, BANNER_H - BANNER_STATUS_H - 1, portal_ui::BLUE, TFT_WHITE, jellyfin);
+}
+
+// Changes when what drawBanner() would draw changes: the overall status and Jellyfin's line.
+int32_t bannerSignature(const Summary &d) {
+  char jellyfin[48];
+  portal_ui::jellyfinLine(d, jellyfin, sizeof(jellyfin));
+  uint32_t h = 2166136261u;
+  h = hashBytes(h, jellyfin, strlen(jellyfin) + 1);
+  h = hashBytes(h, &d.overall, sizeof(d.overall));
+  return (int32_t)(h & 0x7FFFFFFF);
 }
 
 struct Segment {
@@ -482,9 +505,10 @@ void updateContent(bool leftNotice) {
   const uint32_t now = portal::nowEpoch();
 
   if (leftNotice) tft.fillScreen(TFT_BLACK);   // the notice's words are still there
-  if (shownBanner != d.overall) {
-    drawBanner(d.overall);
-    shownBanner = d.overall;
+  const int32_t banner = bannerSignature(d);
+  if (shownBanner != banner) {
+    drawBanner(d);
+    shownBanner = banner;
   }
   uint32_t counts = countsSignature(d);
   if (counts != shownCounts) {

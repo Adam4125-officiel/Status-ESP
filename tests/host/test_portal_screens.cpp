@@ -753,6 +753,100 @@ static void testLatencyAndJellyfin() {
   expectClean("portal, widest latency");
 }
 
+
+// ---- Jellyfin's band over the status banner ------------------------------------------------------------------
+
+// The contract's example with what Jellyfin is doing in its header.
+static std::string withJellyfin(const char *jellyfin, const char *base = EXAMPLE) {
+  std::string j = base;
+  size_t at = j.find("\"site\":");
+  at = j.find(",", at);
+  j.insert(at + 1, std::string("\"jellyfin\":") + jellyfin + ",");
+  return j;
+}
+
+static void testJellyfinBand() {
+  // Idle (or an older portal): the banner is as it was, one 36 px band with the big word.
+  defaults();
+  beginFrame("portal_jellyfin_idle");
+  install(withJellyfin("{\"transcodes\":0,\"tasks\":[]}"));
+  tft.resetStats();
+  show(screenPortalEnter, screenPortalUpdate);
+  CHECK(drew("DOWN") && !drewContaining("Jellyfin"));
+  expectClean("portal, Jellyfin idle");
+
+  // Transcoding: the status keeps the top half, a band says what Jellyfin does.
+  defaults();
+  beginFrame("portal_jellyfin_transcodes");
+  install(withJellyfin("{\"transcodes\":2,\"tasks\":[]}"));
+  tft.resetStats();
+  show(screenPortalEnter, screenPortalUpdate);
+  CHECK(drew("DOWN") && drew("Jellyfin  2 transcodes"));
+  CHECK(drew("OK 2") && drew("Nextcloud"));   // nothing below the banner moved
+  expectClean("portal, Jellyfin transcoding");
+
+  // Nothing changed: no drawing at all. A change of Jellyfin's line redraws the banner only.
+  tft.resetStats();
+  screenPortalUpdate(false);
+  CHECK(tft.ops == 0);
+  g_ms += 1000;
+  install(withJellyfin("{\"transcodes\":1,\"tasks\":[]}"));
+  tft.resetStats();
+  screenPortalUpdate(false);
+  CHECK(drew("Jellyfin  1 transcode") && drew("DOWN") && !drew("Nextcloud"));
+  expectClean("portal, Jellyfin changed");
+
+  // Only a task: its name, with "+1" when there is another.
+  defaults();
+  beginFrame("portal_jellyfin_task");
+  install(withJellyfin("{\"transcodes\":0,\"tasks\":[\"Generate Trickplay Images\"]}"));
+  tft.resetStats();
+  show(screenPortalEnter, screenPortalUpdate);
+  CHECK(drewContaining("Generate Trickplay"));
+  expectClean("portal, Jellyfin task");
+  defaults();
+  install(withJellyfin("{\"transcodes\":0,\"tasks\":[\"Scan Media Library\",\"Generate Trickplay Images\"]}"));
+  tft.resetStats();
+  show(screenPortalEnter, screenPortalUpdate);
+  CHECK(drew("Jellyfin  Scan Media Library +1"));
+  defaults();
+  install(withJellyfin("{\"transcodes\":2,\"tasks\":[\"Scan Media Library\",\"Generate Trickplay Images\"]}"));
+  tft.resetStats();
+  show(screenPortalEnter, screenPortalUpdate);
+  CHECK(drew("Jellyfin  2 transcodes, 2 tasks"));
+  expectClean("portal, Jellyfin transcodes and tasks");
+
+  // It ends while the screen is up: the big banner comes back whole.
+  g_ms += 60000;
+  install(withJellyfin("{\"transcodes\":0,\"tasks\":[]}"));
+  tft.resetStats();
+  screenPortalUpdate(false);
+  CHECK(drew("DOWN") && !drewContaining("Jellyfin"));
+  expectClean("portal, Jellyfin ended");
+
+  // The widest line, over every status: it fits whichever colour the status band is.
+  const char *overalls[] = {"operational", "slow", "maintenance", "degraded", "down"};
+  for (const char *o : overalls) {
+    defaults();
+    beginFrame("portal_jellyfin_worst");
+    std::string w = worst(o);
+    size_t at = w.find("\"overall\":");
+    at = w.find(",", at);
+    w.insert(at + 1, std::string("\"jellyfin\":{\"transcodes\":255,\"tasks\":[\"") + repeat('W', 28) + "\",\"" + repeat('W', 28) + "\",\"" + repeat('W', 28) + "\"]},");
+    install(w);
+    tft.resetStats();
+    show(screenPortalEnter, screenPortalUpdate);
+    CHECK(drewContaining("Jellyfin  255 transcodes"));
+    expectClean("portal, Jellyfin worst case");
+  }
+  defaults();
+  const std::string longTask = "{\"transcodes\":0,\"tasks\":[\"" + repeat('W', 28) + "\"]}";
+  install(withJellyfin(longTask.c_str()));
+  tft.resetStats();
+  show(screenPortalEnter, screenPortalUpdate);
+  expectClean("portal, Jellyfin long task name");
+}
+
 // An answer with a section the firmware does not know, or fields it does not use, changes nothing.
 static void testNewerPortal() {
   defaults();
@@ -774,6 +868,7 @@ int main() {
   testResources();
   testResourcesPaging();
   testLatencyAndJellyfin();
+  testJellyfinBand();
   testNewerPortal();
   beginFrame("");
   printf("%d checks, %d failed\n", checks, failures);

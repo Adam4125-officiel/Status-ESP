@@ -1,5 +1,6 @@
 #include "portal_ui.h"
 
+#include "config.h"
 #include "display.h"
 #include "net.h"
 #include "portal.h"
@@ -118,6 +119,33 @@ void formatSpan(char *out, size_t cap, uint32_t seconds) {
   else if (minutes < 600) snprintf(out, cap, "%uh%02um", (unsigned)(minutes / 60), (unsigned)(minutes % 60));
   else if (minutes < 2880) snprintf(out, cap, "%uh", (unsigned)(minutes / 60));
   else snprintf(out, cap, "%ud", (unsigned)(minutes / 1440));
+}
+
+void jellyfinLine(const portal::Summary &d, char *out, size_t cap) {
+  out[0] = '\0';
+  if (!portal::jellyfinBusy(d)) return;
+  const auto &j = d.jellyfin;
+  char what[56];
+  if (j.transcodes) {
+    // "2 transcodes", and how many tasks run beside them.
+    int n = snprintf(what, sizeof(what), "%u transcode%s", (unsigned)j.transcodes, j.transcodes == 1 ? "" : "s");
+    if (j.taskN && n > 0 && (size_t)n < sizeof(what)) snprintf(what + n, sizeof(what) - n, ", %u task%s", (unsigned)j.taskN, j.taskN == 1 ? "" : "s");
+  } else {
+    // Only tasks: the first one's name tells more than a count, and "+1" says there are others.
+    int n = snprintf(what, sizeof(what), "%s", j.task[0]);
+    if (j.taskN > 1 && n > 0 && (size_t)n < sizeof(what)) snprintf(what + n, sizeof(what) - n, " +%u", (unsigned)(j.taskN - 1));
+  }
+  char line[72];
+  snprintf(line, sizeof(line), "Jellyfin  %s", what);
+  fitText(out, cap, line, config::SCREEN_W - 8, 2);
+}
+
+void drawBand(int16_t y, int16_t h, uint16_t fill, uint16_t ink, const char *text) {
+  tft.fillRect(0, y, config::SCREEN_W, h, fill);
+  tft.setTextColor(ink, fill);
+  tft.setTextDatum(TC_DATUM);
+  tft.setTextPadding(0);
+  tft.drawString(text, config::SCREEN_W / 2, y + (h - 16) / 2, 2);
 }
 
 }  // namespace portal_ui
