@@ -728,7 +728,7 @@ static void testResourcesPaging() {
 // ---- Latency beside the status, and Jellyfin's activity ---------------------------------------------------
 
 static void testLatencyAndJellyfin() {
-  // services=all with the latency of the last check (portal >= 1.11.0-rc.3): "OK 45ms", "SLOW 1.2s".
+  // services=all with the latency of the last check (portal >= 1.11.0-rc.3): "45ms OK", "1.2s SLOW".
   defaults();
   beginFrame("portal_latency");
   install("{\"v\":1,\"now\":\"2026-10-06T12:00:00Z\",\"site\":\"H\",\"overall\":\"down\","
@@ -738,7 +738,7 @@ static void testLatencyAndJellyfin() {
           "{\"name\":\"Manual\",\"status\":\"operational\"}]}}", SEC_SERVICES);
   tft.resetStats();
   show(screenPortalEnter, screenPortalUpdate);
-  CHECK(drew("OK 45ms") && drew("SLOW 1.8s") && drew("OK 12s"));
+  CHECK(drew("45ms OK") && drew("1.8s SLOW") && drew("12s OK"));
   CHECK(drew("OK"));            // nothing measured: just the word
   CHECK(drew("DOWN"));          // a down service shows no latency
   expectClean("portal, latency");
@@ -749,7 +749,7 @@ static void testLatencyAndJellyfin() {
           "\"services\":{\"total\":1,\"slow\":1,\"items\":[{\"name\":\"WWWWWWWWWWWWWWWWWWWWWWWW\",\"status\":\"slow\",\"ms\":65535}]}}", SEC_SERVICES);
   tft.resetStats();
   show(screenPortalEnter, screenPortalUpdate);
-  CHECK(drew("SLOW 65s"));
+  CHECK(drew("65s SLOW"));
   expectClean("portal, widest latency");
 }
 

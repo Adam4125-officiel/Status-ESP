@@ -5,6 +5,11 @@ All notable changes to this project are documented in this file. The format foll
 changes the first, second and third number, and what a `-rc.N` pre-release is) is in
 [docs/releasing.md](docs/releasing.md).
 
+## [0.4.0-rc.5] - 2026-10-07
+
+### Changed
+- On the Status-Portal screen the latency now comes before the status word ("45ms OK", "1.8s SLOW").
+
 ## [0.4.0-rc.4] - 2026-10-07
 
 ### Fixed
@@ -30,7 +35,7 @@ changes the first, second and third number, and what a `-rc.N` pre-release is) i
   newer (`resources=all`); an older portal still works and shows its four fullest disks and no GPU. The
   answer may now be up to 8 KB.
 - The Status-Portal screen shows the latency of the last check beside a healthy or slow service
-  ("OK 45ms", "SLOW 1.2s"), as the portal measured it. Needs Status-Portal **1.11.0-rc.3**; with an older
+  ("45ms OK", "1.2s SLOW"), as the portal measured it. Needs Status-Portal **1.11.0-rc.3**; with an older
   one, or for a service that was never measured, the tag is just the word.
 
 ### Added

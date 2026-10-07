@@ -216,15 +216,18 @@ void formatLatency(char *out, size_t cap, uint16_t ms) {
   else snprintf(out, cap, "%us", (unsigned)(ms / 1000));
 }
 
-// The status word, and for a healthy or slow service the latency the portal measured beside it
-// ("OK 45ms", "SLOW 1.2s"). Nothing is added when the portal sent none (older portal, or never measured).
+// The latency the portal measured and then the status word, for a healthy or slow service ("45ms OK",
+// "1.8s SLOW"): the number first, so the word the eye is looking for stays at the right edge. Nothing
+// is added when the portal sent none (older portal, or never measured).
 void serviceTag(char *out, size_t cap, const portal::Service &s) {
-  strlcpy(out, portal_ui::statusTag(s.status), cap);
-  if (!s.ms || (s.status != portal::ST_OPERATIONAL && s.status != portal::ST_SLOW)) return;
+  const char *word = portal_ui::statusTag(s.status);
+  if (!s.ms || (s.status != portal::ST_OPERATIONAL && s.status != portal::ST_SLOW)) {
+    strlcpy(out, word, cap);
+    return;
+  }
   char latency[8];
   formatLatency(latency, sizeof(latency), s.ms);
-  size_t used = strlen(out);
-  snprintf(out + used, cap - used, " %s", latency);
+  snprintf(out, cap, "%s %s", latency, word);
 }
 
 // Adds a row, if it belongs to the current page and there is room.
