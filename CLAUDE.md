@@ -119,6 +119,14 @@ Founding constraints:
     closes it before it opens a connection and the weather screen reopens it afterwards. Do
     not allocate it statically, do not keep it open off screen, and do not add another network
     call that can run while a GIF plays without closing it first.
+    **A GIF yields to the web server instead of reserving room for it.** The decoder takes about
+    24.3 KB of an idle heap of about 31 KB. It used to need 6 KB to remain after it (the old
+    `HEAP_LEFT_AFTER_GIF`), which left 0.5 KB of slack and refused every GIF ("not enough memory")
+    as soon as the idle heap drifted. Now it needs 2 KB (`media.cpp`), and a hook in `web::begin()`
+    closes the GIF when a request finds less than `config::WEB_MIN_HEAP` (4 KB) free; the screen
+    reopens it afterwards (the album and the weather screen already restart a GIF that was closed
+    under them). The hook never refuses a request, `/update` included. `/api/status` shows what it
+    saw: `req_heap`, `gif` (0 none, 1 playing and kept, 2 closed for this request) and `media_err`.
 11. **The web password (setting `pw`, HTTP Basic, user `admin`) is never enforced in rescue
     access-point mode** (`web.cpp`: `authEnforced()` is `password set && !net::isAp()`), and it
     must keep covering **every** route except `/v.json`, the 404 / captive-portal answers and

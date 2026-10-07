@@ -40,6 +40,12 @@
 namespace web {
 
 static ESP8266WebServer server(80);
+
+// What the hook in begin() saw when the current request started: the free heap, and whether a GIF was
+// playing (0 no, 1 yes and it stayed, 2 yes and it was closed to make room). Shown by /api/status so that
+// "why does my GIF stop" can be answered from the web interface.
+static uint32_t requestHeap;
+static uint8_t requestGif;
 static ESP8266HTTPUpdateServer updater;
 static bool listening = false;
 
@@ -183,6 +189,9 @@ static void handleStatus() {
     doc["rssi"] = WiFi.RSSI();
   }
   doc["heap"] = ESP.getFreeHeap();
+  doc["req_heap"] = requestHeap;
+  doc["gif"] = requestGif;
+  if (media::lastError()[0]) doc["media_err"] = media::lastError();
   doc["max_block"] = ESP.getMaxFreeBlockSize();
   doc["sketch"] = ESP.getSketchSize();
   uint32_t freeOta = ESP.getFreeSketchSpace();
@@ -853,6 +862,19 @@ static void handleNotFound() {
 // --- Setup / loop --------------------------------------------------------------------------------------------------
 
 void begin() {
+  // A playing GIF leaves little heap, and a request needs some (rule 10 in CLAUDE.md): when less than
+  // WEB_MIN_HEAP is free the GIF yields. The hook runs on every request, /update included, right after
+  // the request line is read and before anything is allocated for it. It never refuses a request.
+  server.addHook([](const String &, const String &, WiFiClient *, ESP8266WebServer::ContentTypeFunction) {
+    requestHeap = ESP.getFreeHeap();
+    requestGif = media::gifIsOpen() ? 1 : 0;
+    if (requestGif && requestHeap < config::WEB_MIN_HEAP) {
+      media::gifClose();
+      requestGif = 2;
+    }
+    return ESP8266WebServer::CLIENT_REQUEST_CAN_CONTINUE;
+  });
+
   // Must stay before updater.setup(): see handleUpdatePage().
   route("/update", HTTP_GET, handleUpdatePage);
   updater.setup(&server, "/update");

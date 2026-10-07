@@ -13,11 +13,14 @@ Version numbers follow [docs/releasing.md](docs/releasing.md): new features bump
 
 
 ## Memory
-- **"Not enough memory" on some pictures** (reported on the device with 0.4.0-rc.1). The GIF decoder
-  needs about 24.5 KB in one block and the idle heap's largest block is about 25 KB, so GIFs are at the
-  edge; static RAM grew with the Status-Portal client (about 42 KB). To investigate: which files fail
-  (GIF or JPEG, size, progressive JPEG), freeing the portal cache while a GIF plays, smaller decoder
-  buffers, lowering static RAM.
+- **GIFs and the heap.** A GIF now needs 26 KB free to open (it was 31 KB, with 0.5 KB of slack
+  at idle), and yields to web requests (see CLAUDE.md, rule 10). Still open: the decoder is one
+  24.3 KB block, so a GIF plays with about 6 KB of heap left, and a fetch (weather, portal)
+  closes it and restarts it. Lowering static RAM (42.6 KB, of which the Status-Portal cache is
+  2.4 KB and about 10 KB is string literals the toolchain keeps in RAM, 3.5 KB of them in
+  `web.cpp`) would give every GIF more room. Not seen on the device with the album's own pictures:
+  progressive JPEGs are skipped with a message, and the baseline ones all decode with the
+  decoder's 3.5 KB workspace (checked on a PC against every picture on the device).
 
 ## Updates
 - **On-device auto-updater**: the device reads

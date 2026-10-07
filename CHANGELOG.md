@@ -5,6 +5,21 @@ All notable changes to this project are documented in this file. The format foll
 changes the first, second and third number, and what a `-rc.N` pre-release is) is in
 [docs/releasing.md](docs/releasing.md).
 
+## [0.4.0-rc.4] - 2026-10-07
+
+### Fixed
+- **GIFs no longer fail with "not enough memory" when the heap has drifted a little.** The decoder
+  (about 24.3 KB) used to be refused unless 6 KB stayed free after it, which left half a kilobyte of
+  slack on an idle heap of about 31 KB: a web request, a backup download or a larger Status-Portal
+  answer was enough to make every GIF fail. It now needs 2 KB, and a web request that finds less than
+  4 KB free closes the GIF for as long as it takes, then the screen starts it again. `/update` is
+  unaffected (it was already served with a playing GIF; it still is).
+
+### Added
+- `/api/status` gains `req_heap` (free heap when the last request started), `gif` (0 no GIF, 1 playing
+  and kept, 2 closed to make room for that request) and `media_err` (the last picture error, when
+  there is one), so "why did my GIF stop" can be answered from the web interface.
+
 ## [0.4.0-rc.3] - 2026-10-07
 
 ### Changed
