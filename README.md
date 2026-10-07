@@ -5,13 +5,12 @@ Alternative firmware for the **GeekMagic SmallTV-Ultra**, a small connected disp
 page**, with no need to open the case or plug in a cable, and you can **go back to the
 stock firmware** at any time the same way.
 
-> Status: **0.3.0 release candidate**: a clock, weather, forecast and photo-album display with a
-> web interface to configure it. It builds and passes the automated checks and has been tested
-> only in part on a real device (see [ROADMAP.md](ROADMAP.md)). The long-term goal is to show status information from
-> [Status-Portal](https://github.com/Adam4125-officiel/Status-Portal), a sibling project: since
-> 0.4.0 the display can show its service status, incidents, maintenance, server resources and
-> announcements (see [Status-Portal](#status-portal) below).
-> See [ROADMAP.md](ROADMAP.md) for what is planned and what is still missing.
+> Status: **1.0.0, the first stable release**: a clock, weather, forecast and photo-album display with a
+> web interface to configure it, and a window on [Status-Portal](https://github.com/Adam4125-officiel/Status-Portal),
+> a sibling project: the display shows its service status, incidents, maintenance, server resources
+> (CPU, memory, GPUs, disks, Jellyfin's activity) and announcements (see [Status-Portal](#status-portal)
+> below; Status-Portal 1.11.0 or newer is best). It builds and passes the automated checks; what has and has not
+> been tested on a real device is in [CLAUDE.md](CLAUDE.md) and [ROADMAP.md](ROADMAP.md), which also say what is planned.
 
 ## Installation
 **Only for the SmallTV-Ultra** (ESP8266). Not for the SmallTV, Pro, HelloCubic, ...: they
@@ -98,8 +97,8 @@ deletes nothing).
 ## Status-Portal
 The display can show information from a [Status-Portal](https://github.com/Adam4125-officiel/Status-Portal)
 server on your local network:
-1. Update Status-Portal to **1.10.0 or newer**, open its admin panel, **System → Display device**,
-   enable it and copy the key.
+1. Update Status-Portal to **1.11.0 or newer** (1.10.0 works but shows less: no GPUs, latencies, Jellyfin
+   band or full service list), open its admin panel, **System → Display device**, enable it and copy the key.
 2. In the device's web interface, **Status-Portal** tab: enter the portal's local address with
    `http://` (for example `http://192.0.2.10:5000`; the ESP8266 cannot do `https://`) and the key,
    choose what to show and the alert mode, then **Test connection**.

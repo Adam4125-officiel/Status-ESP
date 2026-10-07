@@ -13,6 +13,9 @@ Versions look like `X.Y.Z`:
 | **Y** (minor) | Features are added. | Frequent, especially early on. |
 | **Z** (patch) | Only bug fixes, security fixes and performance fixes. **No new features.** | As needed. |
 
+**1.0.0 is the first stable release** (2026-10-07). The project owner chose that number for the first
+version they judged stable, rolling up the 0.3.0 and 0.4.0 work; nothing in this table changed with it.
+
 If a change adds a feature, it bumps Y, even if it also fixes bugs. A Z release never adds
 anything the user could call a feature.
 

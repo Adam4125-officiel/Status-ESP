@@ -34,22 +34,28 @@ Version numbers follow [docs/releasing.md](docs/releasing.md): new features bump
   class, never installing a pre-release automatically, and `/update` must stay reachable
   whatever the updater does.
 
+## Status-Portal
+- **A progress bar for Jellyfin's tasks.** The band says what Jellyfin is doing ("2 transcodes", the name
+  of a trickplay or scan task) but not how far along it is: Status-Portal's Jellyfin cache keeps names only.
+  It would need the portal to keep `CurrentProgressPercentage` and send it, then a percentage in the band.
+
 ## Settings
 - Import of the stock firmware's settings (city, units, time format...) on first boot, once their file
   formats are known.
 
-## Known limitations of 0.3.0
+## Known limitations
 These are not planned features but things that are missing or rough today. Fix them when they
 get in the way; remove a line when it is no longer true.
 
-- **Only part of it has been tested on a device.** On the real device (rc.3 test builds): the
-  weather fetch, the backup download and restore, saving and rotating the new themes, and the web
-  interface in a headless browser. Still unchecked on it: how the three newest themes (word
-  clock, rings, binary) look on the real screen, the earlier themes and the album on the real
-  screen, GIF decoding speed, `status-esp.local` on a real network, and the password prompt in
-  a real browser. The drawing, GIF/JPG decoding and album logic were run on a PC against mock hardware.
+- **Only part of it has been tested on a device.** Checked on the real device: the weather fetch, the
+  backup download and restore, saving and rotating themes, the Status-Portal link, `/update` with a GIF
+  playing, a GIF opening and staying open. Still unchecked on it, because nobody can see the screen from
+  the development machine: how any theme looks on the real display, the paged Resources screen with GPUs,
+  the latency beside the status and Jellyfin's band with real data (the owner's portal was not yet on
+  1.11.0), GIF decoding speed, `status-esp.local` on a real network, and the password prompt in a real
+  browser. The drawing, the parsing and the album logic were run on a PC against a stand-in (`tests/host/`).
 - **Memory while a GIF plays is tight.** The GIF decoder takes about 24.5 KB in one block, which
-  leaves only a few KB of heap for everything else. The web interface's status block shows
+  leaves only about 6 KB of heap for everything else (a web request that would be short closes the GIF first). The web interface's status block shows
   `heap` and `max_block`; if uploads or settings saves misbehave while a GIF is on screen,
   look there first. Not measured on the device.
 - **Weather screen GIF is not clipped to its 80x80 box.** A larger GIF (say 240x240) draws over

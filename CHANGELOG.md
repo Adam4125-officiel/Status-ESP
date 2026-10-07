@@ -5,6 +5,39 @@ All notable changes to this project are documented in this file. The format foll
 changes the first, second and third number, and what a `-rc.N` pre-release is) is in
 [docs/releasing.md](docs/releasing.md).
 
+## [1.0.0] - 2026-10-07
+
+The first stable release. It is the 0.4.0-rc.5 build with a new version string, and it rolls up
+everything from 0.3.0 and 0.4.0; the candidates below have the details. Install it through the device's
+`/update` page like any release; the stock firmware stays one upload away. Needs **Status-Portal 1.11.0**
+for the Status-Portal screens at their best (1.10.0 works, with less to show).
+
+### Added
+- **A full web interface** (six tabs) and JSON API, **Open-Meteo weather** with diagnostics, **NTP time**
+  with automatic or manual time zone, the `status-esp.local` name, settings export and import, an optional
+  web password, a night mode, and a **full backup and restore** of the device's files.
+- **Eight display themes**, chosen manually or rotated: weather clock, forecast, photo album (baseline JPEGs
+  and animated GIFs), clock, analog clock, countdown, word clock and binary clock.
+- **Status-Portal on the display**: the `portal` screen (overall status banner, counts, every service with
+  its latency, open incidents, maintenance, a ticker for announcements, paged when it does not fit) and the
+  `resources` screen (CPU, RAM, every GPU, up to eight disks, network, paged every `portal_page` seconds),
+  an alert mode (`switch` takes the screen over while the portal reports a problem, `indicator` draws a
+  dot, `off`), and a blue band while Jellyfin transcodes or runs a task.
+
+### Fixed
+- GIFs no longer fail with "not enough memory" when the heap has drifted a little: the decoder needs 2 KB
+  to stay free after it, and yields to a web request that would be short of memory.
+- The weather arrives (0.3.0-rc.3 fixed a fetch that read only part of the answer).
+
+### Changed
+- The big-digits, simple-weather and rings themes were removed to save flash; a saved choice of one of
+  them falls back to the default theme.
+- The firmware is 509,456 bytes against the 520,000-byte limit: there is not much flash left.
+
+### Not verified
+- How the new screens look on the real display with real data from a portal on 1.11.0: they were checked on
+  a PC against a stand-in for the display, and the device's link to a portal on an older version.
+
 ## [0.4.0-rc.5] - 2026-10-07
 
 ### Added
