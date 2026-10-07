@@ -645,7 +645,6 @@ static void testResourcesPaging() {
 
   // portal_page seconds after it went up, the next page replaces the blocks that differ.
   g_ms += 3000;
-  beginFrame("resources_page2");
   tft.resetStats();
   screenResourcesUpdate(false);
   CHECK(drew("Page 2/2") && drewContaining("Disk2") && drewContaining("Disk6") && !drewContaining("Disk1"));
@@ -784,11 +783,13 @@ static void testJellyfinActivity() {
 
   // One transcode reads in the singular; tasks alone have no transcode line.
   defaults();
+  beginFrame("resources_jellyfin_singular");
   install(withJellyfin("{\"transcodes\":1,\"tasks\":[]}"));
   tft.resetStats();
   show(screenResourcesEnter, screenResourcesUpdate);
   CHECK(drew("Jellyfin   1 transcode"));
   defaults();
+  beginFrame("resources_jellyfin_tasks");
   install(withJellyfin("{\"transcodes\":0,\"tasks\":[\"Scan Media Library\",\"Generate Trickplay Images\",\"Extract Chapter Images\"]}"));
   tft.resetStats();
   show(screenResourcesEnter, screenResourcesUpdate);
@@ -796,6 +797,7 @@ static void testJellyfinActivity() {
   expectClean("resources, Jellyfin tasks only");
 
   // The tasks end while the screen shows them: their lines go, the disks come back in their place.
+  beginFrame("resources_jellyfin_done");
   g_ms += 60000;
   install(withJellyfin("{\"transcodes\":0,\"tasks\":[]}"));
   tft.resetStats();
