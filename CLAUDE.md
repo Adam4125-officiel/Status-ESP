@@ -37,6 +37,11 @@ Founding constraints:
   (limit 520,000), so any further feature must first find savings. Verified on the device: the tab
   saves, a bad address gives `connection failed` without a crash, heap stayed ~32 KB. Not verified:
   real portal data (the owner's portal was still on 1.9.1).
+  **0.4.0-rc.3** pages the Resources screen (CPU, RAM, GPUs, up to eight disks, Jellyfin's activity,
+  split evenly over pages that turn every `portal_page` seconds), and writes the portal's latency beside
+  OK/SLOW on the Status-Portal screen. It asks for `services=all&resources=all` (Status-Portal >=
+  1.11.0-rc.3; an older portal just sends less) and the answer bound is 8 KB. `firmware.bin` is
+  508,096 bytes, static RAM 42,612: about 12 KB of flash left.
 - The 0.3.0 line: the repository was at **0.3.0-rc.3**, on branch `0.3.0`. **rc.1 and rc.2 are published** (as
   pre-releases); rc.3 is published by the release step of the session that made it. The
   firmware has a six-tab web interface and JSON API, Open-Meteo weather (with diagnostics), NTP
