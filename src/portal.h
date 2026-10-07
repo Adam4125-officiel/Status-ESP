@@ -3,7 +3,7 @@
 //
 //   GET http://<portal>/api/device/summary?sections=<the switched-on ones>      X-Api-Key: <key>
 //
-// The answer is compact JSON of at most 4 KB (portal_data.h has the contract and the parser).
+// The answer is compact JSON of at most 8 KB (portal_data.h has the contract and the parser).
 //
 // Threading and blocking: there are no threads. portal::loop() runs on every loop pass and returns at
 // once unless a request is due. When one is due it blocks for at most ~3 s (the portal is on the LAN:

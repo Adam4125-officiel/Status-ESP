@@ -5,6 +5,16 @@ All notable changes to this project are documented in this file. The format foll
 changes the first, second and third number, and what a `-rc.N` pre-release is) is in
 [docs/releasing.md](docs/releasing.md).
 
+## [0.4.0-rc.3] - 2026-10-07
+
+### Changed
+- The Resources screen no longer cuts what does not fit. CPU, RAM, every GPU (its load, then its
+  video memory) and up to eight disks are split evenly over pages that change every `portal_page`
+  seconds, the same setting the Status-Portal screen uses (2 to 60, default 6), with "Page n/m" in the
+  footer next to the network rates. The disks and the GPUs come from Status-Portal **1.11.0-rc.2** or
+  newer (`resources=all`); an older portal still works and shows its four fullest disks and no GPU. The
+  answer may now be up to 8 KB.
+
 ## [0.4.0-rc.2] - 2026-10-06
 
 ### Changed

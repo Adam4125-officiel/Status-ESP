@@ -59,7 +59,8 @@ const size_t MAX_SITE = 24;
 const size_t MAX_SERVICE_ITEMS = 40, MAX_SERVICE_NAME = 24;
 const size_t MAX_INCIDENT_ITEMS = 3, MAX_INCIDENT_TITLE = 40, MAX_AFFECTED = 32;
 const size_t MAX_MAINT_ITEMS = 3, MAX_MAINT_TITLE = 32;
-const size_t MAX_DISK_ITEMS = 4, MAX_DISK_NAME = 16;
+const size_t MAX_DISK_ITEMS = 8, MAX_DISK_NAME = 16;     // with resources=all (portal >= 1.11.0-rc.2); 4 without
+const size_t MAX_GPU_ITEMS = 4, MAX_GPU_NAME = 20;
 const size_t MAX_ANN_ITEMS = 3, MAX_ANN_TITLE = 32, MAX_ANN_TEXT = 80;
 
 const int16_t NA = -32768;   // "no value" for the integer readings below (the portal sends null)
@@ -88,6 +89,14 @@ struct Disk {
   int16_t pct;                  // used percent, rounded; NA when unknown
   uint8_t sev;                  // SEV_*
   uint16_t freeGb;              // rounded
+};
+
+struct Gpu {
+  char name[MAX_GPU_NAME + 1];
+  int16_t pct;                  // load, rounded; NA when unknown
+  uint8_t sev;                  // SEV_*
+  uint16_t memUsedDg, memTotalDg;   // video memory in gigabytes, in tenths
+  int16_t tempC;                // NA when the card exposes none
 };
 
 struct Announcement {
@@ -138,6 +147,9 @@ struct Summary {
     uint8_t diskCount;          // how many disks the portal sees (the fullest ones are listed)
     uint8_t n;
     Disk disks[MAX_DISK_ITEMS];
+    uint8_t gpuCount;           // how many GPUs the portal sees (only sent with resources=all)
+    uint8_t gpuN;
+    Gpu gpus[MAX_GPU_ITEMS];
   } resources;
 
   struct {

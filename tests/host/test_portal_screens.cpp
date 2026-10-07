@@ -138,6 +138,7 @@ static const uint32_t START_MS = 100000, START_EPOCH = 1791288030u;
 static void defaults() {
   memset(&g_settings, 0, sizeof(g_settings));
   g_settings.portalInterval = 60;
+  g_settings.portalPage = 6;
   g_settings.portalSections = SEC_ALL;
   g_settings.portalAlert = settings::PORTAL_ALERT_INDICATOR;
   g_online = true;
@@ -596,6 +597,134 @@ static void testResources() {
   expectClean("resources null");
 }
 
+
+// ---- Resources, paged ---------------------------------------------------------------------------------------
+
+// A resources answer with `gpus` cards and `disks` disks (resources=all, portal >= 1.11.0-rc.2).
+static std::string pagedAnswer(int gpus, int disks, const char *name = "RTX 3080", int diskNameLen = 0) {
+  std::string j = "{\"v\":1,\"now\":\"2026-10-06T12:00:00Z\",\"site\":\"Home Server\",\"overall\":\"operational\","
+                  "\"resources\":{\"cpu\":23.4,\"cpu_sev\":\"ok\",\"cpu_temp_c\":54.0,\"mem\":61.2,\"mem_sev\":\"warn\","
+                  "\"mem_used_gb\":9.8,\"mem_total_gb\":16.0,\"net_up_mb_s\":0.12,\"net_down_mb_s\":1.4,\"disk_count\":";
+  j += std::to_string(disks) + ",\"disks\":[";
+  for (int i = 0; i < disks; i++) {
+    std::string n = diskNameLen ? repeat('W', diskNameLen) : "Disk" + std::to_string(i + 1);
+    j += std::string(i ? "," : "") + "{\"name\":\"" + n + "\",\"pct\":" + std::to_string(90 - i * 5) + ".0,\"sev\":\"" +
+         (i < 2 ? "crit" : "ok") + "\",\"free_gb\":" + std::to_string(100 + i) + ".0}";
+  }
+  j += "],\"gpu_count\":" + std::to_string(gpus) + ",\"gpus\":[";
+  for (int i = 0; i < gpus; i++)
+    j += std::string(i ? "," : "") + "{\"name\":\"" + name + "\",\"pct\":" + std::to_string(40 + i) +
+         ",\"sev\":\"ok\",\"mem_used_gb\":4.2,\"mem_total_gb\":10.0,\"temp_c\":61}";
+  j += "]},\"announcements\":{\"count\":0,\"items\":[]}}";
+  return j;
+}
+
+static void testResourcesPaging() {
+  // CPU, RAM, one GPU (two blocks) and six disks: ten blocks, two pages of five (CPU..Disk1, Disk2..Disk6).
+  defaults();
+  beginFrame("resources_page1");
+  install(pagedAnswer(1, 6));
+  tft.resetStats();
+  show(screenResourcesEnter, screenResourcesUpdate);
+  CHECK(drewContaining("CPU") && drewContaining("RAM") && drewContaining("GPU RTX 3080") && drewContaining("61C"));
+  CHECK(drewContaining("VRAM   4.2 / 10.0 GB") && drew("42%"));   // 4.2 of 10.0 GB
+  CHECK(drewContaining("Disk1") && !drewContaining("Disk2"));
+  CHECK(drew("Page 1/2") && drewContaining("down 1.4 MB/s"));
+  expectClean("resources page 1");
+
+  // Nothing changed and the page is not due yet: not one drawing call.
+  g_ms += 3000;
+  tft.resetStats();
+  screenResourcesUpdate(false);
+  CHECK(tft.ops == 0);
+  // A new answer with the same content does not redraw anything either.
+  install(pagedAnswer(1, 6));
+  tft.resetStats();
+  screenResourcesUpdate(false);
+  CHECK(tft.ops == 0);
+
+  // portal_page seconds after it went up, the next page replaces the blocks that differ.
+  g_ms += 3000;
+  beginFrame("resources_page2");
+  tft.resetStats();
+  screenResourcesUpdate(false);
+  CHECK(drew("Page 2/2") && drewContaining("Disk2") && drewContaining("Disk6") && !drewContaining("Disk1"));
+  CHECK(!drew("Home Server") && !drewContaining("CPU"));   // the header and the blocks that did not change
+  expectClean("resources page 2");
+
+  // And round to the first again.
+  g_ms += 6000;
+  tft.resetStats();
+  screenResourcesUpdate(false);
+  CHECK(drew("Page 1/2") && drewContaining("CPU"));
+  expectClean("resources back to page 1");
+
+  // Six blocks fit on one page: no "Page n/m", the rates stay centred and nothing turns.
+  defaults();
+  beginFrame("resources_one_page");
+  install(pagedAnswer(0, 4));
+  tft.resetStats();
+  show(screenResourcesEnter, screenResourcesUpdate);
+  CHECK(!drewContaining("Page ") && drewContaining("Disk4") && drewContaining("down 1.4 MB/s"));
+  g_ms += 20000;
+  tft.resetStats();
+  screenResourcesUpdate(false);
+  CHECK(tft.ops == 0);
+  expectClean("resources, one page");
+
+  // The answer shrinks to one page while the second was showing: back to the first, footer re-laid out.
+  defaults();
+  install(pagedAnswer(1, 6));
+  show(screenResourcesEnter, screenResourcesUpdate);
+  g_ms += 6000;
+  screenResourcesUpdate(false);
+  CHECK(drewContaining("Disk6"));
+  install(pagedAnswer(0, 2));
+  tft.resetStats();
+  screenResourcesUpdate(false);
+  CHECK(drewContaining("CPU") && !drewContaining("Page ") && drewContaining("Disk2"));
+  expectClean("resources, shrinks to one page");
+
+  // A portal that sends no GPUs (older, or none installed): CPU, RAM and the disks, as before.
+  defaults();
+  install(EXAMPLE);
+  tft.resetStats();
+  show(screenResourcesEnter, screenResourcesUpdate);
+  CHECK(!drewContaining("GPU") && !drewContaining("VRAM") && !drewContaining("Page "));
+
+  // Several cards each carry their number.
+  defaults();
+  install(pagedAnswer(2, 0));
+  tft.resetStats();
+  show(screenResourcesEnter, screenResourcesUpdate);
+  CHECK(drewContaining("GPU1 RTX 3080") && drewContaining("VRAM1") && drewContaining("GPU2 RTX 3080") && drewContaining("VRAM2"));
+  CHECK(drew("Page 1/1") == false);   // six blocks: one page
+  expectClean("resources, two GPUs");
+
+  // The most the contract allows: four cards and eight disks with the widest letters, three pages of six.
+  defaults();
+  beginFrame("resources_paged_worst");
+  install(pagedAnswer(4, 8, repeat('W', 20).c_str(), 16));
+  tft.resetStats();
+  show(screenResourcesEnter, screenResourcesUpdate);
+  CHECK(drew("Page 1/3"));
+  expectClean("resources, worst case page 1");
+  for (int page = 2; page <= 3; page++) {
+    g_ms += 6000;
+    tft.resetStats();
+    screenResourcesUpdate(false);
+    char want[12];
+    snprintf(want, sizeof(want), "Page %d/3", page);
+    CHECK(drew(want));
+    expectClean("resources, worst case, later page");
+  }
+  g_ms += 6000;
+  tft.resetStats();
+  screenResourcesUpdate(false);
+  CHECK(drew("Page 1/3"));
+  expectClean("resources, worst case, round again");
+}
+
 // An answer with a section the firmware does not know, or fields it does not use, changes nothing.
 static void testNewerPortal() {
   defaults();
@@ -615,6 +744,7 @@ int main() {
   testNotices();
   testWorstCase();
   testResources();
+  testResourcesPaging();
   testNewerPortal();
   beginFrame("");
   printf("%d checks, %d failed\n", checks, failures);

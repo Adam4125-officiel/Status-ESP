@@ -311,6 +311,68 @@ static void testLargest() {
   CHECK(s.services.items[1].status == ST_OPERATIONAL);
 }
 
+// resources=all (portal >= 1.11.0-rc.2): eight disks and up to four GPUs, with the nastiest strings.
+static void testGpusAndTheLargestRequest() {
+  const char *nasty = "\"A\\\xC3\xA9\xC3\x86\xF0\x9F\x98\x80z/";
+  std::string j = "{\"v\":1,\"now\":\"2026-10-06T12:00:00Z\",\"site\":\"H\",\"overall\":\"down\",";
+  j += "\"services\":{\"total\":65535,\"operational\":1,\"slow\":2,\"degraded\":3,\"maintenance\":4,\"down\":5,\"items\":[";
+  for (int i = 0; i < 40; i++) j += std::string(i ? "," : "") + "{\"name\":\"" + esc(capped(nasty, 24)) + "\",\"status\":\"down\"}";
+  j += "]},\"incidents\":{\"open\":9,\"items\":[";
+  for (int i = 0; i < 3; i++)
+    j += std::string(i ? "," : "") + "{\"title\":\"" + esc(capped(nasty, 40)) + "\",\"status\":\"monitoring\",\"since\":\"2026-10-06T11:40:12Z\",\"services\":\"" +
+         esc(capped(nasty, 32)) + "\"}";
+  j += "]},\"maintenance\":{\"active\":1,\"upcoming\":2,\"items\":[";
+  for (int i = 0; i < 3; i++)
+    j += std::string(i ? "," : "") + "{\"title\":\"" + esc(capped(nasty, 32)) + "\",\"state\":\"upcoming\",\"services\":\"" + esc(capped(nasty, 32)) +
+         "\",\"starts\":\"2026-10-08T22:00:00Z\",\"ends\":\"2026-10-09T01:00:00Z\"}";
+  j += "]},\"resources\":{\"cpu\":100.0,\"cpu_sev\":\"crit\",\"cpu_temp_c\":105.5,\"mem\":99.9,\"mem_sev\":\"crit\","
+       "\"mem_used_gb\":1023.9,\"mem_total_gb\":1024.0,\"net_up_mb_s\":1234.56,\"net_down_mb_s\":9876.54,\"disk_count\":26,\"disks\":[";
+  for (int i = 0; i < 8; i++)
+    j += std::string(i ? "," : "") + "{\"name\":\"" + esc(capped(nasty, 16)) + "\",\"pct\":99.9,\"sev\":\"crit\",\"free_gb\":12345.6}";
+  j += "],\"gpu_count\":9,\"gpus\":[";
+  for (int i = 0; i < 4; i++)
+    j += std::string(i ? "," : "") + "{\"name\":\"" + esc(capped(nasty, 20)) + "\",\"pct\":99.9,\"sev\":\"crit\",\"mem_used_gb\":9999.9,\"mem_total_gb\":9999.9,\"temp_c\":99.9}";
+  j += "]},\"announcements\":{\"count\":3,\"items\":[";
+  for (int i = 0; i < 3; i++)
+    j += std::string(i ? "," : "") + "{\"title\":\"" + esc(capped(nasty, 32)) + "\",\"text\":\"" + esc(capped(nasty, 80)) + "\",\"type\":\"critical\",\"pinned\":true}";
+  j += "]}}";
+  printf("largest document with services=all and resources=all: %zu bytes\n", j.size());
+  CHECK(j.size() <= 8192);   // the portal's ceiling for it (MAX_BYTES_ALL); the device caps the body at the same value
+
+  Summary s;
+  char err[64];
+  CHECK(parse(j, SEC_ALL, s, err, sizeof(err)) == PARSE_OK);
+  CHECK(s.services.n == MAX_SERVICE_ITEMS && s.resources.n == MAX_DISK_ITEMS && s.resources.gpuN == MAX_GPU_ITEMS);
+  CHECK(s.resources.gpuCount == 9 && s.resources.diskCount == 26);
+  CHECK(s.resources.gpus[3].pct == 100 && s.resources.gpus[3].sev == SEV_CRIT && s.resources.gpus[3].tempC == 100);
+  CHECK(s.resources.gpus[0].memUsedDg == 65535);   // 9999.9 GB in tenths, clamped
+  CHECK(strlen(s.resources.gpus[0].name) <= MAX_GPU_NAME);
+
+  // More cards and disks than the contract allows: the parser stops at its caps.
+  std::string many = "{\"v\":1,\"now\":\"2026-10-06T12:00:00Z\",\"site\":\"H\",\"overall\":\"operational\",\"resources\":{\"cpu\":1,\"disks\":[";
+  for (int i = 0; i < 20; i++) many += std::string(i ? "," : "") + "{\"name\":\"d" + std::to_string(i) + "\",\"pct\":1}";
+  many += "],\"gpus\":[";
+  for (int i = 0; i < 20; i++) many += std::string(i ? "," : "") + "{\"name\":\"g" + std::to_string(i) + "\",\"pct\":1}";
+  many += "]}}";
+  CHECK(parse(many, SEC_RESOURCES, s, err, sizeof(err)) == PARSE_OK);
+  CHECK(s.resources.n == MAX_DISK_ITEMS && s.resources.gpuN == MAX_GPU_ITEMS);
+  CHECK(s.resources.gpuCount == MAX_GPU_ITEMS);   // never fewer than the listed ones, when the count is missing
+  CHECK_STR(s.resources.gpus[3].name, "g3");
+
+  // An older portal, or a host with no GPU: no key, or an empty list, and no cards.
+  std::string none = "{\"v\":1,\"now\":\"2026-10-06T12:00:00Z\",\"site\":\"H\",\"overall\":\"operational\",\"resources\":{\"cpu\":1,\"disks\":[]}}";
+  CHECK(parse(none, SEC_RESOURCES, s, err, sizeof(err)) == PARSE_OK);
+  CHECK(s.resources.gpuN == 0 && s.resources.gpuCount == 0);
+  std::string empty = "{\"v\":1,\"now\":\"2026-10-06T12:00:00Z\",\"site\":\"H\",\"overall\":\"operational\",\"resources\":{\"cpu\":1,\"disks\":[],\"gpu_count\":0,\"gpus\":[]}}";
+  CHECK(parse(empty, SEC_RESOURCES, s, err, sizeof(err)) == PARSE_OK);
+  CHECK(s.resources.gpuN == 0);
+
+  // A GPU with nothing known about it: dashes and zeros, never garbage.
+  std::string blank = "{\"v\":1,\"now\":\"2026-10-06T12:00:00Z\",\"site\":\"H\",\"overall\":\"operational\",\"resources\":{\"gpus\":[{\"name\":null,\"pct\":null,\"temp_c\":null}]}}";
+  CHECK(parse(blank, SEC_RESOURCES, s, err, sizeof(err)) == PARSE_OK);
+  CHECK(s.resources.gpuN == 1 && s.resources.gpus[0].pct == NA && s.resources.gpus[0].tempC == NA && s.resources.gpus[0].name[0] == '\0');
+}
+
 static void testTimestamps() {
   CHECK(parseTimestamp("2026-10-06T12:00:00Z") == 1791288000u);
   CHECK(parseTimestamp("2000-02-29T00:00:00Z") == 951782400u);
@@ -446,6 +508,7 @@ int main() {
   testRefusals();
   testTruncated();
   testLargest();
+  testGpusAndTheLargestRequest();
   testTimestamps();
   testFold();
   testUrl();

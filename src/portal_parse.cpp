@@ -165,6 +165,20 @@ void readResources(JsonVariantConst o, Summary &out) {
     d.freeGb = (uint16_t)((tenths(it, "free_gb") + 5) / 10);
   }
   if (out.resources.diskCount < out.resources.n) out.resources.diskCount = out.resources.n;
+  // resources=all (portal >= 1.11.0-rc.2) adds the GPUs; an older portal sends none, which reads as none.
+  uint16_t gc = count(o, "gpu_count");
+  out.resources.gpuCount = (uint8_t)(gc > 255 ? 255 : gc);
+  for (JsonVariantConst it : member(o, "gpus").as<JsonArrayConst>()) {
+    if (out.resources.gpuN >= MAX_GPU_ITEMS) break;
+    Gpu &g = out.resources.gpus[out.resources.gpuN++];
+    copyText(it, "name", g.name, sizeof(g.name));
+    g.pct = percent(it, "pct");
+    g.sev = severity(it, "sev");
+    g.memUsedDg = tenths(it, "mem_used_gb");
+    g.memTotalDg = tenths(it, "mem_total_gb");
+    g.tempC = whole(it, "temp_c");
+  }
+  if (out.resources.gpuCount < out.resources.gpuN) out.resources.gpuCount = out.resources.gpuN;
 }
 
 void readAnnouncements(JsonVariantConst o, Summary &out) {
@@ -229,12 +243,12 @@ ParseResult parse(const Text &body, uint8_t sections, Summary &out, char *error,
   out.sections = sections;
   if (error && errorCap) error[0] = '\0';
 
-  // No filter: the answer is at most 4 KB, every list and string in it has a cap, and the sections that
+  // No filter: the answer is at most 8 KB, every list and string in it has a cap, and the sections that
   // were not asked for are not sent. (A filter would save little memory and cost 1.5 KB of flash.)
   JsonDocument doc;
   DeserializationError err = deserializeJson(doc, body);
   if (err) {
-    // The length tells a truncated answer from a malformed one: the whole thing is at most 4 KB.
+    // The length tells a truncated answer from a malformed one: the whole thing is at most 8 KB.
     setError(error, errorCap, "bad JSON: %s (%u B)", err.c_str(), (unsigned)body.length());
     return PARSE_NOT_JSON;
   }
