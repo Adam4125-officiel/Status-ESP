@@ -72,8 +72,44 @@ a{color:#8cf}
 <section class="tab" id="t-portal">
   <div class="card">
     <h2>Status-Portal</h2>
-    <p>Coming soon.</p>
-    <p class="hint">Showing the status of your services from Status-Portal on this display is planned.</p>
+    <p class="hint">Shows the state of your services, incidents, maintenance, announcements and server load from <a href="https://github.com/Adam4125-officiel/Status-Portal" target="_blank" rel="noopener">Status-Portal</a> on the display. It needs Status-Portal <b>1.10.0 or newer</b>: in the portal, open <b>System &rarr; Display device</b>, switch the device API on and copy the key. Then enter the portal's address and that key here.</p>
+    <form data-settings id="f-portal" autocomplete="off">
+      <label for="portal_url">Portal address</label>
+      <input type="text" id="portal_url" name="portal_url" maxlength="63" placeholder="http://192.0.2.10:5000" autocapitalize="off" autocorrect="off" spellcheck="false">
+      <p class="hint">Its address on your own network, with the port (5000 unless you changed it), for example <b>http://192.0.2.10:5000</b>. Plain <b>http://</b> only: this device cannot do TLS, so an <b>https://</b> address or a public name behind a proxy will not work. No path after the port. Use the IP address: this device cannot resolve <b>.local</b> names.</p>
+      <label for="portal_key">API key</label>
+      <input type="password" id="portal_key" maxlength="64" autocomplete="new-password" placeholder="paste the key from the portal">
+      <p class="hint" id="portal-key-state"></p>
+      <label for="portal_interval">Ask the portal every (seconds, 30 - 600)</label>
+      <input type="number" id="portal_interval" name="portal_interval" data-t="n" min="30" max="600" step="1">
+      <label for="portal_page">When the list does not fit, change page every (seconds, 2 - 60)</label>
+      <input type="number" id="portal_page" name="portal_page" data-t="n" min="2" max="60" step="1">
+
+      <h3>What to show</h3>
+      <label class="inline"><input type="checkbox" name="portal_services" data-t="b"> Services that are down, degraded, in maintenance or slow</label>
+      <label class="inline"><input type="checkbox" name="portal_incidents" data-t="b"> Open incidents</label>
+      <label class="inline"><input type="checkbox" name="portal_maintenance" data-t="b"> Maintenance in progress and coming up</label>
+      <label class="inline"><input type="checkbox" name="portal_announcements" data-t="b"> Announcements</label>
+      <label class="inline"><input type="checkbox" name="portal_resources" data-t="b"> The server's CPU, memory, GPUs, disks and Jellyfin activity (the Resources screen)</label>
+      <p class="hint">The device only asks the portal for what is ticked. A block with nothing in it is left out of the screen.</p>
+
+      <h3>When something is wrong</h3>
+      <select id="portal_alert" name="portal_alert">
+        <option value="switch">Switch to the Status-Portal screen</option>
+        <option value="indicator">Small dot in a corner of every screen</option>
+        <option value="off">Do nothing</option>
+      </select>
+      <p class="hint">"Switch" shows the Status-Portal screen with a red banner until the problem clears, then goes back to what was showing; the dot is red or orange. "Wrong" means the portal reports its overall status as down (red) or degraded (orange). A service that is only slow, or in planned maintenance, is not an alarm. Pick the <b>Status-Portal</b> and <b>Resources</b> themes in Settings to see the screens in the normal rotation.</p>
+
+      <button>Save</button>
+      <button type="button" class="alt" id="portal-test">Test connection</button>
+      <button type="button" class="alt" id="portal-key-clear">Remove the key</button>
+    </form>
+  </div>
+  <div class="card">
+    <h2>Status</h2>
+    <p id="portal-status">Loading...</p>
+    <p class="hint">If the portal does not answer, the reason is shown here and on the device screen. <b>404</b> means the device API is switched off on the portal, the portal is older than 1.10.0, or the address or port is wrong. <b>bad key</b> means the key was regenerated or mistyped. The key is sent in clear text over your network, so keep this to a trusted LAN.</p>
   </div>
 </section>
 
@@ -239,12 +275,11 @@ a{color:#8cf}
         <option value="album">Photo album</option>
         <option value="clock">Clock</option>
         <option value="analog">Analog clock</option>
-        <option value="digital2">Big digits (stacked)</option>
-        <option value="simple_weather">Simple weather clock</option>
         <option value="countdown">Countdown</option>
         <option value="words">Word clock</option>
-        <option value="rings">Rings</option>
         <option value="binary">Binary clock</option>
+        <option value="portal">Status-Portal</option>
+        <option value="resources">Resources (Status-Portal)</option>
       </select>
       <p class="hint">To choose a theme manually, turn auto-switch off.</p>
       <label class="inline"><input type="checkbox" name="auto_switch" data-t="b"> Auto-switch between themes</label>
@@ -256,14 +291,13 @@ a{color:#8cf}
         <label class="inline"><input type="checkbox" name="auto_themes" value="album"> Photo album</label>
         <label class="inline"><input type="checkbox" name="auto_themes" value="clock"> Clock</label>
         <label class="inline"><input type="checkbox" name="auto_themes" value="analog"> Analog clock</label>
-        <label class="inline"><input type="checkbox" name="auto_themes" value="digital2"> Big digits (stacked)</label>
-        <label class="inline"><input type="checkbox" name="auto_themes" value="simple_weather"> Simple weather clock</label>
         <label class="inline"><input type="checkbox" name="auto_themes" value="countdown"> Countdown</label>
         <label class="inline"><input type="checkbox" name="auto_themes" value="words"> Word clock</label>
-        <label class="inline"><input type="checkbox" name="auto_themes" value="rings"> Rings</label>
         <label class="inline"><input type="checkbox" name="auto_themes" value="binary"> Binary clock</label>
+        <label class="inline"><input type="checkbox" name="auto_themes" value="portal"> Status-Portal</label>
+        <label class="inline"><input type="checkbox" name="auto_themes" value="resources"> Resources (Status-Portal)</label>
       </div>
-      <p class="hint">A theme without data (no city set, no picture uploaded, no countdown date) is skipped.</p>
+      <p class="hint">A theme without data (no city set, no picture uploaded, no countdown date, Status-Portal not set up) is skipped.</p>
       <button>Save</button>
     </form>
   </div>
@@ -307,7 +341,7 @@ a{color:#8cf}
   <div class="card">
     <h2>Back up the settings</h2>
     <a class="btn alt" href="/api/settings/export" download="status-esp-settings.json">Export settings</a>
-    <p class="hint">Downloads every setting on this page as a file. The Wi-Fi network and the uploaded pictures are not part of it.</p>
+    <p class="hint">Downloads every setting on this page as a file. The Wi-Fi network, the uploaded pictures, the password and the Status-Portal key are not part of it.</p>
     <label for="imp-file">Restore a settings file</label>
     <input type="file" id="imp-file" accept=".json,application/json">
     <button type="button" id="imp-btn">Import settings</button>
@@ -316,7 +350,7 @@ a{color:#8cf}
 
   <div class="card">
     <h2>Full backup</h2>
-    <div class="banner">The backup file contains your <b>Wi-Fi password</b> (and the <b>web password</b> if you set one), in clear text. Keep it private and never share it.</div>
+    <div class="banner">The backup file contains your <b>Wi-Fi password</b> (and the <b>web password</b> and the <b>Status-Portal key</b> if you set them), in clear text. Keep it private and never share it.</div>
     <a class="btn alt" id="bk-dl" href="/api/backup" download="status-esp-backup.tar">Download backup</a>
     <p class="hint" id="bk-ap" style="display:none">Not available in rescue mode: the hotspot is open. Connect the device to your Wi-Fi first.</p>
     <p class="hint">One .tar file with every file stored on the device (settings, pictures, GIFs and the stock firmware's own files) and the Wi-Fi network. Plain tar: any archive tool opens it. The download takes a few seconds, during which the screen and the page wait.</p>
@@ -402,6 +436,16 @@ function weatherLine(s) {
   }
   return t;
 }
+function portalLine(s) {
+  if (!s.portal_on) return S.portal_url || S.portal_key_set ? "Not active yet: " + (S.portal_url ? "the API key is missing." : "the portal address is missing.") : "Not set up: enter the portal's address and key.";
+  var t = s.portal_ok ? "Connected. The portal reports " + s.portal_overall + ", updated " + ago(s.portal_age) + " ago." : (s.portal_age === undefined ? "No answer yet." : "The last answer is " + ago(s.portal_age) + " old, too old to show.");
+  if (s.portal_err) {
+    t += " " + (s.portal_try_age === undefined ? "Not asked: " : "Last attempt " + ago(s.portal_try_age) + " ago failed: ") + s.portal_err;
+    if (s.portal_fails > 1) t += " (" + s.portal_fails + " failures in a row)";
+    t += ".";
+  }
+  return t;
+}
 function fmtDuration(s) {
   s = Number(s) || 0;
   var d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60);
@@ -426,6 +470,7 @@ function fill() {
   $("#blinv").checked = !!Number(S.blinv);
   $("#night-val").textContent = S.night_brt;
   pwState();
+  portalKeyState();
   $("#curcity").textContent = S.city ? S.city + " (" + Number(S.lat).toFixed(2) + ", " + Number(S.lon).toFixed(2) + ")" : "none";
   syncTz();
 }
@@ -433,6 +478,11 @@ function fill() {
 function pwState() {
   $("#pw-state").textContent = S.pw_set ? "A password is set." + (ST.ap ? " It is not asked for in rescue mode." : "") : "No password is set: anyone on your network can use this page.";
   $("#pw-off").disabled = !S.pw_set;
+}
+
+function portalKeyState() {
+  $("#portal-key-state").textContent = S.portal_key_set ? "A key is set. It is never shown again; type a new one to replace it." : "No key yet: copy it from the portal's System \u2192 Display device page.";
+  $("#portal-key-clear").disabled = !S.portal_key_set;
 }
 
 function collect(form) {
@@ -478,6 +528,7 @@ function showTab(name) {
   $$(".tab").forEach(function (t) { t.classList.toggle("on", t.id === "t-" + name); });
   $$("#tabs button").forEach(function (b) { b.classList.toggle("on", b.dataset.tab === name); });
   if (location.hash !== "#" + name) history.replaceState(null, "", "#" + name);
+  if (name === "portal") loadStatus();
   if (name === "weather") { loadFiles("/gif"); loadStatus(); }
   if (name === "pictures") loadFiles("/image");
   if (name === "settings") loadStatus();
@@ -509,9 +560,11 @@ function loadStatus() {
       ["Space for /update", fmtBytes(s.free_ota)],
       ["Back to stock firmware", s.rollback_ok ? "possible" : "TOO BIG"],
       ["Storage (LittleFS)", s.fs_mounted ? fmtBytes(s.fs_total - s.fs_used) + " free of " + fmtBytes(s.fs_total) : "not mounted"],
-      ["Weather", weatherLine(s)]
+      ["Weather", weatherLine(s)],
+      ["Status-Portal", portalLine(s)]
     ];
     $("#w-status").textContent = weatherLine(s);
+    $("#portal-status").textContent = portalLine(s);
     var t = $("#status");
     t.textContent = "";
     rows.forEach(function (r) {
@@ -673,6 +726,39 @@ function init() {
     }).catch(function (e) { toast(e.message, false); });
   };
   $("#scan").onclick = scan;
+
+  // Status-Portal: the key has no name on purpose (collect() skips it): it is only sent when something
+  // was typed, so saving the other fields never blanks a key that is already set.
+  function portalBody() {
+    var o = collect($("#f-portal")), key = $("#portal_key").value.trim();
+    if (key) o.portal_key = key;
+    return o;
+  }
+  function portalSave() {
+    return save(portalBody(), "Saved").then(function (j) { $("#portal_key").value = ""; portalKeyState(); return j; });
+  }
+  $("#f-portal").onsubmit = function (ev) {
+    ev.preventDefault();
+    portalSave().then(function () { return sleep(2500); }).then(loadStatus, function () {});
+  };
+  $("#portal-test").onclick = function () {
+    var started = Date.now(), tries = 0;
+    $("#portal-status").textContent = "Testing...";
+    function poll() {
+      return sleep(1000).then(loadStatus).then(function () {
+        var asked = ST.portal_try_age !== undefined && ST.portal_try_age < (Date.now() - started) / 1000;
+        if (!asked && ++tries < 12) return poll();
+      });
+    }
+    portalSave().then(function () { return post("/api/portal/refresh"); }).then(poll).catch(function (e) {
+      toast(e.message, false);
+      loadStatus();
+    });
+  };
+  $("#portal-key-clear").onclick = function () {
+    if (!confirm("Remove the Status-Portal key? The device stops asking the portal until you enter a key again.")) return;
+    save({ portal_key: "" }, "Key removed").then(function () { setTimeout(loadStatus, 400); }, function () {});
+  };
 
   $("#f-city").onsubmit = searchCity;
   $("#w-check").onclick = function () {

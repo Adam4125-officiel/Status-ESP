@@ -51,4 +51,10 @@ constexpr size_t FS_RESERVE_BYTES = 16 * 1024;         // never fill LittleFS to
 // --- Limits ---------------------------------------------------------------
 constexpr size_t MAX_JSON_BODY = 2048;                 // largest accepted POST body
 
+// --- Memory ---------------------------------------------------------------
+// Heap a web request needs once its connection is set up (the settings JSON, a file list, an upload
+// buffer). A request that finds less free than this while a GIF plays closes the GIF first (web.cpp): the decoder
+// holds about 24.7 KB and the screen starts it again once the request is answered.
+constexpr uint32_t WEB_MIN_HEAP = 4096;
+
 }  // namespace config

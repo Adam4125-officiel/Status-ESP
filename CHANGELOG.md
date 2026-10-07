@@ -5,6 +5,120 @@ All notable changes to this project are documented in this file. The format foll
 changes the first, second and third number, and what a `-rc.N` pre-release is) is in
 [docs/releasing.md](docs/releasing.md).
 
+## [0.4.0-rc.5] - 2026-10-07
+
+### Added
+- **Jellyfin band on the Status-Portal screen.** While Jellyfin is transcoding or running a scheduled task
+  (trickplay generation, a library scan), the status banner is split: the status keeps the top half in a
+  smaller font and a blue band under it says "Jellyfin  2 transcodes", or the name of the task. It goes
+  back to the one big word when Jellyfin is idle. Needs Status-Portal **1.11.0-rc.4**.
+- The same band on the **Resources** screen: the header grows from 28 to 32 px and is split in two (the
+  site name or HIGH LOAD on top, the blue Jellyfin band under it) while Jellyfin is busy.
+
+### Changed
+- On the Status-Portal screen the latency now comes before the status word ("45ms OK", "1.8s SLOW").
+- Jellyfin's activity is no longer listed on the Resources screen (the lines were easy to miss). The
+  device now asks for it with `jellyfin=1` and reads it from the header of the answer, so it arrives
+  whichever sections are switched on. Needs Status-Portal **1.11.0-rc.4**.
+
+## [0.4.0-rc.4] - 2026-10-07
+
+### Fixed
+- **GIFs no longer fail with "not enough memory" when the heap has drifted a little.** The decoder
+  (about 24.3 KB) used to be refused unless 6 KB stayed free after it, which left half a kilobyte of
+  slack on an idle heap of about 31 KB: a web request, a backup download or a larger Status-Portal
+  answer was enough to make every GIF fail. It now needs 2 KB, and a web request that finds less than
+  4 KB free closes the GIF for as long as it takes, then the screen starts it again. `/update` is
+  unaffected (it was already served with a playing GIF; it still is).
+
+### Added
+- `/api/status` gains `req_heap` (free heap when the last request started), `gif` (0 no GIF, 1 playing
+  and kept, 2 closed to make room for that request) and `media_err` (the last picture error, when
+  there is one), so "why did my GIF stop" can be answered from the web interface.
+
+## [0.4.0-rc.3] - 2026-10-07
+
+### Changed
+- The Resources screen no longer cuts what does not fit. CPU, RAM, every GPU (its load, then its
+  video memory) and up to eight disks are split evenly over pages that change every `portal_page`
+  seconds, the same setting the Status-Portal screen uses (2 to 60, default 6), with "Page n/m" in the
+  footer next to the network rates. The disks and the GPUs come from Status-Portal **1.11.0-rc.2** or
+  newer (`resources=all`); an older portal still works and shows its four fullest disks and no GPU. The
+  answer may now be up to 8 KB.
+- The Status-Portal screen shows the latency of the last check beside a healthy or slow service
+  ("45ms OK", "1.2s SLOW"), as the portal measured it. Needs Status-Portal **1.11.0-rc.3**; with an older
+  one, or for a service that was never measured, the tag is just the word.
+
+### Added
+- **Jellyfin's activity on the Resources screen**: while Jellyfin is transcoding, or running a scheduled
+  task such as trickplay generation or a library scan, a line says so ("Jellyfin   2 transcodes", then the
+  name of each task) between the GPUs and the disks, and pages with the rest. Nothing is shown while it is
+  idle. The portal sends names only, so there is no progress bar. Needs Status-Portal **1.11.0-rc.3**,
+  and follows the existing "server's CPU, memory, GPUs, disks and Jellyfin activity" switch.
+
+## [0.4.0-rc.2] - 2026-10-06
+
+### Changed
+- The Status-Portal screen lists **every** service, OK ones included (worst first), then the open
+  incidents and the maintenance. When that does not fit the screen it is split into pages that change
+  every `portal_page` seconds (2 to 60, default 6, set in the Status-Portal tab), with a "Page n/m" line.
+  Needs Status-Portal **1.11.0** or newer for the OK services (`services=all`); an older portal still
+  works and shows only the services with a problem. The answer may now be up to 7 KB.
+
+### Removed
+- The big digits (stacked), simple weather clock and rings themes, to save flash. A saved choice of
+  one of them falls back to the default theme.
+
+## [0.4.0-rc.1] - 2026-10-06
+
+### Added
+- **Status-Portal client** (`portal.cpp`). The device asks a Status-Portal 1.10.0 or newer how its
+  services are doing (`GET /api/device/summary`, key in the `X-Api-Key` header, plain `http://` on the
+  local network: the ESP8266 has no TLS) and keeps the answer for the screens and the alert. It
+  asks only for the sections that are switched on, every 30 to 600 seconds (60 by default), checks
+  the status code before it reads anything (a 404 or 405 answers with a 2.4 KB HTML page that is
+  dropped unread), reads the body through `HTTPClient` into a String capped at 4 KB, and never
+  runs while a GIF decoder is alive or right after a weather request. Failures say why in words:
+  `bad key (HTTP 401)`, `HTTP 404: endpoint off or portal too old`, `connection failed`, `no answer
+  (timeout)`, `bad JSON: IncompleteInput (812 B)`, `answer cut short (700 of 1168 B)`... and the
+  retry gets later after each one (30 s, 60 s, ... at most the interval), so a portal that is down
+  does not stall the display every few seconds. `/api/status` gains `portal_on`, `portal_ok`,
+  `portal_age`, `portal_overall`, `portal_err`, `portal_try_age`, `portal_fails` and `portal_http`,
+  like the weather's.
+- **Status-Portal settings** (`portal_url`, `portal_key`, `portal_interval`, `portal_alert` and the
+  five section switches `portal_services`, `portal_incidents`, `portal_maintenance`,
+  `portal_resources`, `portal_announcements`). The address is checked when it is saved, with a
+  sentence for each way it can be wrong (`https://` cannot work, no path, no credentials, port 1 to
+  65535); a bare `192.0.2.10:5000` gets its `http://`. The key is write-only like the web
+  password: `GET /api/settings` only says whether one is set (`portal_key_set`), the export never
+  has it and an import never touches it.
+- **Two new themes**: `portal` (overall status in a coloured banner, counts, services down or
+  degraded, open incidents, maintenance in progress or upcoming, announcements as a ticker) and
+  `resources` (CPU, RAM and disk bars of the portal's server, with the high-load flag). Blocks that
+  are switched off or empty are hidden; "not configured" and "unreachable: <reason>" are said in
+  words. Both can be chosen or added to the auto-switch rotation.
+- **Alert mode** (`portal_alert`): `switch` shows the Status-Portal screen with a red or orange
+  banner as long as the portal reports a problem, then the normal rotation resumes; `indicator`
+  draws a small red or orange dot in the top-right corner of every other screen; `off` does
+  nothing.
+- `POST /api/portal/refresh` asks Status-Portal again at the next loop pass (for the "Test
+  connection" button).
+- **The Status-Portal tab** replaces the "Coming soon" placeholder: portal address, API key
+  (a password field that is never filled in again, with a "Remove the key" button), refresh
+  interval, the five switches for what to show, what to do when something is wrong (switch to the
+  screen, a dot in the corner, or nothing), a **Test connection** button that saves the form, asks
+  the portal at once and shows the answer within seconds, and a status line (also in the Status
+  table at the bottom of Settings) saying what the portal reports or why it does not answer.
+- **Host tests** (`tools/test_host.sh`, run by CI): the answer parser, the address checker and the
+  UTF-8 fold are built with the PC's g++ and the address and undefined-behaviour sanitizers, and
+  checked against the contract's example, a worst-case 2.7 KB answer made of quotes, backslashes,
+  accents and emoji, every truncation of the example, null and missing fields, a newer schema
+  version, the portal's HTML 404 page, and 20,000 randomly damaged answers.
+
+### Changed
+- The UTF-8 to ASCII fold moved out of `geocode.cpp` into `ascii.cpp`, and the capped String that
+  collects an HTTP answer into `http_body.h`, so the weather and Status-Portal clients share them.
+
 ## [0.3.0-rc.3] - 2026-10-06
 
 ### Fixed

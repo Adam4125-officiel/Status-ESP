@@ -11,12 +11,16 @@ Version numbers follow [docs/releasing.md](docs/releasing.md): new features bump
   TFT_eSPI fonts are all the firmware has today (the "Large" font is Font 8).
 - **Richer weather**: hourly forecast and more forecast days.
 
-## Status-Portal integration
-- Show the status of the services monitored by
-  [Status-Portal](https://github.com/Adam4125-officiel/Status-Portal) on the display: overall status,
-  services that are down, open incidents. Status-Portal already exposes a public JSON API (`/api/status`).
-- Fill the "Status-Portal" tab of the web interface (portal address, refresh interval, which services
-  to show, alert colours).
+
+## Memory
+- **GIFs and the heap.** A GIF now needs 26 KB free to open (it was 31 KB, with 0.5 KB of slack
+  at idle), and yields to web requests (see CLAUDE.md, rule 10). Still open: the decoder is one
+  24.3 KB block, so a GIF plays with about 6 KB of heap left, and a fetch (weather, portal)
+  closes it and restarts it. Lowering static RAM (42.6 KB, of which the Status-Portal cache is
+  2.4 KB and about 10 KB is string literals the toolchain keeps in RAM, 3.5 KB of them in
+  `web.cpp`) would give every GIF more room. Not seen on the device with the album's own pictures:
+  progressive JPEGs are skipped with a message, and the baseline ones all decode with the
+  decoder's 3.5 KB workspace (checked on a PC against every picture on the device).
 
 ## Updates
 - **On-device auto-updater**: the device reads

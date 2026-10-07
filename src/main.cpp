@@ -6,14 +6,16 @@
 // for long: every module is a small state machine called once per pass.
 //
 // Modules: settings (config + LittleFS), net (Wi-Fi), web (routes and API),
-// timekeeping (SNTP, offset, night window), weather (Open-Meteo cache), media
-// (JPG / GIF), display (screen manager) and the screen_*.cpp themes.
+// timekeeping (SNTP, offset, night window), weather (Open-Meteo cache), portal
+// (Status-Portal cache), media (JPG / GIF), display (screen manager) and the
+// screen_*.cpp themes.
 #include <Arduino.h>
 
 #include "config.h"
 #include "display.h"
 #include "mdns.h"
 #include "net.h"
+#include "portal.h"
 #include "settings.h"
 #include "timekeeping.h"
 #include "weather.h"
@@ -69,6 +71,7 @@ void setup() {
   settings::begin();   // mounts LittleFS WITHOUT formatting, loads /custom.json
   display::begin();    // backlight, TFT
   weather::begin();
+  portal::begin();
   net::begin();        // non-blocking: boot delay, then the connection attempts
   web::begin();        // routes only; listening starts once the Wi-Fi mode is settled
 
@@ -81,5 +84,6 @@ void loop() {
   updateBootScreen();
   timekeeping::loop();
   weather::loop();
+  portal::loop();
   display::loop();
 }

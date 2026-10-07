@@ -9,6 +9,7 @@
 #include <ESP8266WiFi.h>
 #include <WiFiClient.h>
 
+#include "http_body.h"
 #include "media.h"
 #include "net.h"
 #include "settings.h"
@@ -64,24 +65,6 @@ void notice(PGM_P msg) {
   strncpy_P(dg.error, msg, sizeof(dg.error) - 1);   // zero-padded, and the last byte is already 0
   dg.error[sizeof(dg.error) - 1] = '\0';
 }
-
-// Collects the answer (a ~1.1 KB document) in a String, refusing more than MAX_BODY bytes: the
-// request is plain HTTP, so whatever answers is not necessarily Open-Meteo.
-class BodySink : public Print {
- public:
-  String text;
-  bool overflow = false;
-  size_t write(uint8_t c) override { return write(&c, 1); }
-  size_t write(const uint8_t *data, size_t n) override {
-    if (text.length() + n > MAX_BODY) {
-      overflow = true;
-      return 0;
-    }
-    text.concat((const char *)data, (unsigned int)n);
-    return n;
-  }
-  int availableForWrite() override { return (int)(MAX_BODY - text.length()); }
-};
 
 // Day of the week (0 = Sunday) of an ISO date "YYYY-MM-DD", -1 if it is not one.
 int8_t weekdayOf(const char *iso) {
@@ -227,7 +210,7 @@ Outcome fetchOnce() {
   // loop over getStreamPtr(): on the real device that one saw the transfer end after one or two
   // TCP segments (414 or 950 body bytes of ~1120, "IncompleteInput"), while this call gets it all.
   // The cause was never pinned down (see "Known pitfalls" in CLAUDE.md).
-  BodySink sink;
+  BodySink sink(MAX_BODY);
   sink.text.reserve(1280);
   http.writeToPrint(&sink);
   http.end();

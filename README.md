@@ -8,8 +8,9 @@ stock firmware** at any time the same way.
 > Status: **0.3.0 release candidate**: a clock, weather, forecast and photo-album display with a
 > web interface to configure it. It builds and passes the automated checks and has been tested
 > only in part on a real device (see [ROADMAP.md](ROADMAP.md)). The long-term goal is to show status information from
-> [Status-Portal](https://github.com/Adam4125-officiel/Status-Portal), a sibling project; that
-> integration does not exist yet (the "Status-Portal" tab of the web interface is a placeholder).
+> [Status-Portal](https://github.com/Adam4125-officiel/Status-Portal), a sibling project: since
+> 0.4.0 the display can show its service status, incidents, maintenance, server resources and
+> announcements (see [Status-Portal](#status-portal) below).
 > See [ROADMAP.md](ROADMAP.md) for what is planned and what is still missing.
 
 ## Installation
@@ -73,7 +74,7 @@ Version numbering and the release process are described in
   polarity, and a delay before connecting to Wi-Fi at boot for routers that start slowly.
 - **Web interface** at `http://<device-ip>/` or `http://status-esp.local/` (the device answers
   to that name over mDNS once it is on your Wi-Fi), a single page with six
-  tabs: Status-Portal (placeholder), Network, Weather, Time, Pictures and Settings. It needs no
+  tabs: Status-Portal, Network, Weather, Time, Pictures and Settings. It needs no
   internet access. The Settings tab also shows the device status (memory, sizes, whether going
   back to the stock firmware is still possible) and has a factory reset and a reboot.
   You can export your settings to a file and import them again, make a **full backup** (one
@@ -93,6 +94,16 @@ after an update. Besides that file, the firmware only ever writes to, or deletes
 two picture folders `/image` and `/gif`; the other files of the stock firmware are left alone,
 except when you restore a backup you made yourself (which writes back what it contains, and
 deletes nothing).
+
+## Status-Portal
+The display can show information from a [Status-Portal](https://github.com/Adam4125-officiel/Status-Portal)
+server on your local network:
+1. Update Status-Portal to **1.10.0 or newer**, open its admin panel, **System → Display device**,
+   enable it and copy the key.
+2. In the device's web interface, **Status-Portal** tab: enter the portal's local address with
+   `http://` (for example `http://192.0.2.10:5000`; the ESP8266 cannot do `https://`) and the key,
+   choose what to show and the alert mode, then **Test connection**.
+3. Add the `portal` and `resources` themes to the rotation, or let the alert mode switch to them.
 
 ## Going back to the stock firmware
 Upload the official GeekMagic `.bin` to `/update`. See [docs/recovery.md](docs/recovery.md).

@@ -1,0 +1,573 @@
+// Theme "portal" (Status-Portal): how the services are doing, at a glance.
+//
+//   y   0..35   banner: the overall status as a coloured band (red DOWN, orange DEGRADED, blue
+//               MAINTENANCE, yellow SLOW, green OPERATIONAL)
+//   y  41..57   counts per state: OK 5  SLOW 1  DEGR 1  DOWN 2 (only the states that have any)
+//   y  62..     rows of 20 px, eight of them (seven when there is a ticker): the services that are not
+//               operational, then the open incidents, then the maintenance in progress or coming up.
+//               Each group gets rows in turn until they run out; a group that does not fit ends in a
+//               "+N more" row
+//   y 220..236  announcements: one line, or a slow ticker when it does not fit
+//
+// Every block is left out when its switch is off in the web interface or when there is nothing in it.
+// With no fresh answer the screen shows a notice instead (portal_ui.h): not set up, no network,
+// contacting, or why the portal does not answer.
+//
+// Flicker: nothing is cleared to repaint it. A row is redrawn only when its text, colour or tag
+// changed, with the text padded so the old one is covered; the banner and the counts redraw only when the
+// overall status or the counts change. Update(false) does nothing at all while nothing changed.
+#include "config.h"
+#include "display.h"
+#include "portal.h"
+#include "portal_ui.h"
+#include "settings.h"
+
+namespace {
+
+using portal::Summary;
+
+const int16_t BANNER_H = 36;
+const int16_t COUNTS_Y = 41, COUNTS_H = 18;
+const int16_t ROWS_Y = 62, ROW_H = 20;
+const uint8_t ROWS_MAX = 8;
+const uint8_t ROWS_WITH_TICKER = 7;
+const int16_t TICKER_Y = 220;
+const int16_t GLYPH_W = 16;                // the cell left of the text: a dot, "!" or "M"
+const int16_t TEXT_X = 18, TEXT_W = 152;
+const int16_t TAG_RIGHT = 238, TAG_W = 66;
+
+enum Glyph : uint8_t { G_NONE = 0, G_DOT, G_BANG, G_MAINT };
+
+struct Row {
+  char text[28];
+  char tag[14];
+  uint16_t color;      // dot / glyph
+  uint16_t tagColor;
+  uint8_t glyph;
+};
+
+Row rows[ROWS_MAX];                        // what the screen should show now
+uint8_t rowCount;
+uint32_t shownSig[ROWS_MAX];               // what is on the screen, row by row
+uint8_t shownRows;
+
+int8_t shownNoticeKind;                    // portal_ui::Kind on the screen, -1 = content (or nothing yet)
+uint32_t shownNoticeKey;
+int32_t shownBanner;                       // bannerSignature() of what the banner shows, -1 = nothing
+uint32_t shownCounts;                      // signature of the counts line, 0 = nothing
+uint32_t shownUpdated;                     // portal::updatedAtMs() the rows were built from
+uint32_t shownMinute;                      // the portal minute they were built in (ages and countdowns)
+bool shownTicker;
+bool emptyMessageShown;                    // "All clear" is on the screen
+
+// The ticker. `tickerText` holds the announcements joined on one line; it scrolls when it is wider than the
+// band, one character at a time (a smooth pixel scroll would mean redrawing the band 25 times a second).
+char tickerText[200];
+bool tickerHas;                            // there is something to show in the band
+uint32_t tickerHash;                       // of the text and its colour: the scroll goes on across refreshes
+uint16_t tickerLen;
+int16_t tickerWidth;
+uint16_t tickerColor;
+bool tickerScrolls;
+uint16_t tickerPos;
+int32_t tickerShownPos;                    // -1 = nothing drawn yet
+uint32_t tickerStepAt;
+const uint32_t TICKER_HOLD_MS = 3000;      // at the start of every pass
+const uint32_t TICKER_STEP_MS = 230;
+const int16_t TICKER_MAX_W = 236;
+
+void resetContent() {
+  emptyMessageShown = false;
+  tickerHas = false;
+  tickerHash = 0;
+  shownRows = 0;
+  memset(shownSig, 0, sizeof(shownSig));
+  shownBanner = -1;
+  shownCounts = 0;
+  shownUpdated = 0;
+  shownMinute = 0;
+  shownTicker = false;
+  tickerShownPos = -1;
+}
+
+void resetShown() {
+  shownNoticeKind = -1;
+  shownNoticeKey = 0;
+  resetContent();
+}
+
+uint32_t hashBytes(uint32_t h, const void *data, size_t n) {
+  const uint8_t *p = (const uint8_t *)data;
+  while (n--) h = (h ^ *p++) * 16777619u;
+  return h;
+}
+
+uint32_t rowSignature(const Row &r) {
+  uint32_t h = 2166136261u;
+  h = hashBytes(h, r.text, strlen(r.text) + 1);
+  h = hashBytes(h, r.tag, strlen(r.tag) + 1);
+  h = hashBytes(h, &r.color, sizeof(r.color));
+  h = hashBytes(h, &r.tagColor, sizeof(r.tagColor));
+  h = hashBytes(h, &r.glyph, sizeof(r.glyph));
+  return h ? h : 1;
+}
+
+// --- Banner and counts ---------------------------------------------------------------------------------
+
+const char *bannerWord(uint8_t status) {
+  switch (status) {
+    case portal::ST_DOWN: return "DOWN";
+    case portal::ST_DEGRADED: return "DEGRADED";
+    case portal::ST_MAINTENANCE: return "MAINTENANCE";
+    case portal::ST_SLOW: return "SLOW";
+    default: return "OPERATIONAL";
+  }
+}
+
+// The banner is the overall status, 36 px high. While Jellyfin is busy it is split in two so that the
+// status keeps the top (smaller, in font 2) and a blue band under it says what Jellyfin is doing.
+const int16_t BANNER_STATUS_H = 19;   // the status half; a black line follows it, then the 16 px Jellyfin band
+
+void drawBanner(const Summary &d) {
+  const uint8_t status = d.overall;
+  uint16_t fill = status == portal::ST_DOWN ? portal_ui::RED
+                : status == portal::ST_DEGRADED ? portal_ui::ORANGE
+                : status == portal::ST_MAINTENANCE ? portal_ui::BLUE
+                : status == portal::ST_SLOW ? portal_ui::YELLOW
+                                            : (uint16_t)0x0400;   // dark green
+  uint16_t ink = (status == portal::ST_DEGRADED || status == portal::ST_SLOW) ? (uint16_t)TFT_BLACK : (uint16_t)TFT_WHITE;
+  char jellyfin[48];
+  portal_ui::jellyfinLine(d, jellyfin, sizeof(jellyfin));
+  if (!jellyfin[0]) {
+    tft.fillRect(0, 0, config::SCREEN_W, BANNER_H, fill);
+    display::drawFit(bannerWord(status), 5, ink, fill);
+    return;
+  }
+  portal_ui::drawBand(0, BANNER_STATUS_H, fill, ink, bannerWord(status));
+  tft.fillRect(0, BANNER_STATUS_H, config::SCREEN_W, 1, TFT_BLACK);
+  portal_ui::drawBand(BANNER_STATUS_H + 1, BANNER_H - BANNER_STATUS_H - 1, portal_ui::BLUE, TFT_WHITE, jellyfin);
+}
+
+// Changes when what drawBanner() would draw changes: the overall status and Jellyfin's line.
+int32_t bannerSignature(const Summary &d) {
+  char jellyfin[48];
+  portal_ui::jellyfinLine(d, jellyfin, sizeof(jellyfin));
+  uint32_t h = 2166136261u;
+  h = hashBytes(h, jellyfin, strlen(jellyfin) + 1);
+  h = hashBytes(h, &d.overall, sizeof(d.overall));
+  return (int32_t)(h & 0x7FFFFFFF);
+}
+
+struct Segment {
+  char text[14];
+  uint16_t color;
+};
+
+// The states that have any service in them, as "OK 5", "SLOW 1", ... Returns how many were written.
+// When the words do not fit the width of the screen (hundreds of services, all five states in use) only the
+// numbers are written, still in their colours. `gap` is the space to leave between two of them.
+uint8_t countSegments(const Summary &d, Segment *out, int16_t &gap) {
+  struct Entry {
+    const char *word;
+    uint16_t n;
+    uint16_t color;
+  } entries[] = {{"OK", d.services.operational, portal_ui::GREEN},
+                 {"SLOW", d.services.slow, portal_ui::YELLOW},
+                 {"MAINT", d.services.maintenance, portal_ui::LIGHT_BLUE},
+                 {"DEGR", d.services.degraded, portal_ui::ORANGE},
+                 {"DOWN", d.services.down, portal_ui::RED}};
+  uint8_t n = 0;
+  for (bool words = true;; words = false) {
+    n = 0;
+    int16_t total = 0;
+    for (const Entry &e : entries) {
+      if (e.n == 0) continue;
+      if (words) snprintf(out[n].text, sizeof(out[n].text), "%s %u", e.word, (unsigned)e.n);
+      else snprintf(out[n].text, sizeof(out[n].text), "%u", (unsigned)e.n);
+      out[n].color = e.color;
+      total += tft.textWidth(out[n].text, 2);
+      n++;
+    }
+    gap = 12;
+    if (n > 1 && total + gap * (n - 1) > TICKER_MAX_W) gap = words ? 5 : 10;
+    if (!words || n <= 1 || total + gap * (n - 1) <= TICKER_MAX_W) break;
+  }
+  return n;
+}
+
+void drawCounts(const Summary &d) {
+  tft.fillRect(0, COUNTS_Y, config::SCREEN_W, COUNTS_H, TFT_BLACK);
+  if (!d.services.present) return;
+  Segment seg[5];
+  int16_t gap;
+  uint8_t n = countSegments(d, seg, gap);
+  int16_t total = gap * (n > 0 ? n - 1 : 0);
+  for (uint8_t i = 0; i < n; i++) total += tft.textWidth(seg[i].text, 2);
+  int16_t x = (config::SCREEN_W - total) / 2;
+  if (x < 2) x = 2;
+  tft.setTextDatum(TL_DATUM);
+  tft.setTextPadding(0);
+  for (uint8_t i = 0; i < n; i++) {
+    tft.setTextColor(seg[i].color, TFT_BLACK);
+    x += tft.drawString(seg[i].text, x, COUNTS_Y + 1, 2) + gap;
+  }
+}
+
+uint32_t countsSignature(const Summary &d) {
+  if (!d.services.present) return 1;
+  Segment seg[5];
+  int16_t gap;
+  uint8_t n = countSegments(d, seg, gap);
+  uint32_t h = 2166136261u;
+  for (uint8_t i = 0; i < n; i++) h = hashBytes(h, seg[i].text, strlen(seg[i].text) + 1);
+  return h ? h : 2;
+}
+
+// --- Rows --------------------------------------------------------------------------------------------------
+
+// Paging: every row is "added" in order, but only the ones of the current page are kept. When the list is
+// longer than the screen, the page changes every portal_page seconds and the last row says "Page 2/3".
+uint16_t rowSeen;     // rows offered by buildRows() so far, on every page
+uint16_t rowSkip;     // rows that belong to the pages before the current one
+uint8_t pageIndex, pageCount = 1;
+uint32_t pageAt;      // millis() when the current page went up
+
+// "45ms", "1.2s", "12s": the latency of the last check in the width a tag has.
+void formatLatency(char *out, size_t cap, uint16_t ms) {
+  if (ms < 1000) snprintf(out, cap, "%ums", (unsigned)ms);
+  else if (ms < 10000) snprintf(out, cap, "%u.%us", (unsigned)(ms / 1000), (unsigned)(ms % 1000 / 100));
+  else snprintf(out, cap, "%us", (unsigned)(ms / 1000));
+}
+
+// The latency the portal measured and then the status word, for a healthy or slow service ("45ms OK",
+// "1.8s SLOW"): the number first, so the word the eye is looking for stays at the right edge. Nothing
+// is added when the portal sent none (older portal, or never measured).
+void serviceTag(char *out, size_t cap, const portal::Service &s) {
+  const char *word = portal_ui::statusTag(s.status);
+  if (!s.ms || (s.status != portal::ST_OPERATIONAL && s.status != portal::ST_SLOW)) {
+    strlcpy(out, word, cap);
+    return;
+  }
+  char latency[8];
+  formatLatency(latency, sizeof(latency), s.ms);
+  snprintf(out, cap, "%s %s", latency, word);
+}
+
+// Adds a row, if it belongs to the current page and there is room.
+Row *addRow(uint8_t capacity, uint8_t glyph, uint16_t color, const char *text, const char *tag, uint16_t tagColor) {
+  uint16_t index = rowSeen++;
+  if (index < rowSkip || rowCount >= capacity) return nullptr;
+  Row &r = rows[rowCount++];
+  memset(&r, 0, sizeof(r));
+  portal_ui::fitText(r.text, sizeof(r.text), text, TEXT_W, 2);
+  strlcpy(r.tag, tag, sizeof(r.tag));
+  r.color = color;
+  r.tagColor = tagColor;
+  r.glyph = glyph;
+  return &r;
+}
+
+void addMore(uint8_t capacity, uint16_t n, const char *what) {
+  char text[24];
+  snprintf(text, sizeof(text), "+%u more %s", (unsigned)n, what);
+  addRow(capacity, G_NONE, 0, text, "", 0);
+}
+
+// Every service (OK ones included, worst first), then the open incidents, then the maintenance, split
+// into pages of `capacity` rows. "+N more" only stands for what the portal itself left out.
+void buildPage(const Summary &d, uint8_t capacity, uint32_t now) {
+  rowCount = 0;
+  rowSeen = 0;
+  rowSkip = (uint16_t)pageIndex * capacity;
+  char tag[14];
+
+  if (d.services.present) {
+    uint16_t listedNotOk = 0;
+    for (uint8_t i = 0; i < d.services.n; i++) {
+      const portal::Service &s = d.services.items[i];
+      if (s.status != portal::ST_OPERATIONAL) listedNotOk++;
+      serviceTag(tag, sizeof(tag), s);
+      addRow(capacity, G_DOT, portal_ui::statusColor(s.status), s.name, tag, portal_ui::statusColor(s.status));
+    }
+    // Only unhealthy services the portal left out are worth a "+N more" (a portal older than 1.11.0
+    // never sends the OK ones).
+    uint16_t notOk = d.services.total > d.services.operational ? d.services.total - d.services.operational : 0;
+    if (notOk > listedNotOk) addMore(capacity, notOk - listedNotOk, "services");
+  }
+
+  // Open incidents: the time since they started on the right, coloured by how far along they are.
+  if (d.incidents.present) {
+    for (uint8_t i = 0; i < d.incidents.n; i++) {
+      const portal::Incident &inc = d.incidents.items[i];
+      tag[0] = '\0';
+      if (now && inc.since && now >= inc.since) portal_ui::formatSpan(tag, sizeof(tag), now - inc.since);
+      uint16_t color = inc.status == portal::INC_MONITORING ? portal_ui::YELLOW
+                     : inc.status == portal::INC_IDENTIFIED ? portal_ui::ORANGE
+                                                            : portal_ui::RED;
+      addRow(capacity, G_BANG, color, inc.title, tag, color);
+    }
+    if (d.incidents.open > d.incidents.n) addMore(capacity, d.incidents.open - d.incidents.n, "incidents");
+  }
+
+  // Maintenance: "38m left" while it runs, "in 2d" before it starts.
+  if (d.maintenance.present) {
+    uint16_t maintTotal = d.maintenance.active + d.maintenance.upcoming;
+    for (uint8_t i = 0; i < d.maintenance.n; i++) {
+      const portal::Maintenance &m = d.maintenance.items[i];
+      char span[10];
+      span[0] = '\0';
+      if (m.active) {
+        if (now && m.ends > now) {
+          portal_ui::formatSpan(span, sizeof(span), m.ends - now);
+          snprintf(tag, sizeof(tag), "%s left", span);
+        } else {
+          strlcpy(tag, "now", sizeof(tag));
+        }
+      } else {
+        if (now && m.starts > now) {
+          portal_ui::formatSpan(span, sizeof(span), m.starts - now);
+          snprintf(tag, sizeof(tag), "in %s", span);
+        } else {
+          strlcpy(tag, "soon", sizeof(tag));
+        }
+      }
+      addRow(capacity, G_MAINT, m.active ? portal_ui::LIGHT_BLUE : portal_ui::GREY, m.title, tag,
+             m.active ? portal_ui::LIGHT_BLUE : portal_ui::GREY);
+    }
+    if (maintTotal > d.maintenance.n) addMore(capacity, maintTotal - d.maintenance.n, "maintenance");
+  }
+}
+
+void buildRows(const Summary &d, uint8_t capacity, uint32_t now) {
+  buildPage(d, capacity, now);
+  if (rowSeen <= capacity) {   // everything fits: one page, no page line
+    pageIndex = 0;
+    pageCount = 1;
+    if (rowSkip) buildPage(d, capacity, now);
+    return;
+  }
+  // Several pages: one row is the "Page n/m" line.
+  const uint8_t perPage = capacity - 1;
+  buildPage(d, perPage, now);
+  pageCount = (uint8_t)((rowSeen + perPage - 1) / perPage);
+  if (pageIndex >= pageCount) {
+    pageIndex = 0;
+    buildPage(d, perPage, now);
+  }
+  char text[20];
+  snprintf(text, sizeof(text), "Page %u/%u", (unsigned)pageIndex + 1, (unsigned)pageCount);
+  Row &r = rows[rowCount++];
+  memset(&r, 0, sizeof(r));
+  strlcpy(r.text, text, sizeof(r.text));
+  r.color = portal_ui::GREY;
+}
+
+void drawRow(uint8_t index) {
+  const Row &r = rows[index];
+  int16_t y = ROWS_Y + index * ROW_H;
+  tft.fillRect(0, y, GLYPH_W, ROW_H, TFT_BLACK);   // the glyph cell: the old row may have had another kind
+  tft.setTextDatum(TC_DATUM);
+  tft.setTextPadding(0);
+  tft.setTextColor(r.color, TFT_BLACK);
+  if (r.glyph == G_DOT) tft.fillCircle(7, y + 10, 4, r.color);
+  else if (r.glyph == G_BANG) tft.drawString("!", 7, y + 2, 2);
+  else if (r.glyph == G_MAINT) tft.drawString("M", 7, y + 2, 2);
+
+  tft.setTextDatum(TL_DATUM);
+  tft.setTextPadding(TEXT_W);
+  tft.setTextColor(TFT_WHITE, TFT_BLACK);
+  tft.drawString(r.text, TEXT_X, y + 2, 2);
+  tft.setTextDatum(TR_DATUM);
+  tft.setTextPadding(TAG_W);
+  tft.setTextColor(r.tagColor, TFT_BLACK);
+  tft.drawString(r.tag, TAG_RIGHT, y + 2, 2);
+  tft.setTextPadding(0);
+}
+
+// Draws the rows that differ from what is on the screen, and blanks the ones that are gone.
+void drawRows() {
+  for (uint8_t i = 0; i < rowCount; i++) {
+    uint32_t sig = rowSignature(rows[i]);
+    if (i < shownRows && shownSig[i] == sig) continue;
+    drawRow(i);
+    shownSig[i] = sig;
+  }
+  if (shownRows > rowCount) {
+    tft.fillRect(0, ROWS_Y + rowCount * ROW_H, config::SCREEN_W, (shownRows - rowCount) * ROW_H, TFT_BLACK);
+  }
+  shownRows = rowCount;
+}
+
+// Nothing to list while everything is fine: say so, instead of leaving a black hole under the counts.
+// The words are drawn once, and removed by the first row that appears.
+void drawEmptyMessage(bool show) {
+  if (show == emptyMessageShown) return;
+  emptyMessageShown = show;
+  if (show) {
+    display::drawFit("All clear", 112, portal_ui::GREEN);
+    display::drawFit("Nothing to report", 146, portal_ui::GREY);
+  } else {
+    tft.fillRect(0, 100, config::SCREEN_W, 70, TFT_BLACK);
+  }
+}
+
+// --- Announcements ------------------------------------------------------------------------------------------
+
+// Joins the announcements on one line ("Title: text  |  Title: text") and finds the colour of the
+// most serious one. The scroll starts over only when the words or the colour are not the ones that were
+// already on their way: a refresh every minute must not send the ticker back to its beginning.
+bool buildTicker(const Summary &d) {
+  tickerText[0] = '\0';
+  uint16_t color = portal_ui::LIGHT_GREY;
+  if (d.announcements.present && d.announcements.n > 0) {
+    uint8_t worst = portal::ANN_INFO;
+    for (uint8_t i = 0; i < d.announcements.n; i++) {
+      const portal::Announcement &a = d.announcements.items[i];
+      if (i) strlcat(tickerText, "  |  ", sizeof(tickerText));
+      if (a.title[0]) {
+        strlcat(tickerText, a.title, sizeof(tickerText));
+        if (a.text[0]) strlcat(tickerText, ": ", sizeof(tickerText));
+      }
+      strlcat(tickerText, a.text, sizeof(tickerText));
+      if (a.type == portal::ANN_CRITICAL) worst = portal::ANN_CRITICAL;
+      else if (a.type == portal::ANN_WARNING && worst != portal::ANN_CRITICAL) worst = portal::ANN_WARNING;
+      else if (a.type == portal::ANN_SUCCESS && worst == portal::ANN_INFO) worst = portal::ANN_SUCCESS;
+    }
+    color = worst == portal::ANN_CRITICAL ? portal_ui::RED
+          : worst == portal::ANN_WARNING ? portal_ui::ORANGE
+          : worst == portal::ANN_SUCCESS ? portal_ui::GREEN
+                                         : portal_ui::LIGHT_GREY;
+  }
+  tickerLen = (uint16_t)strlen(tickerText);
+  if (tickerLen == 0) return false;
+
+  uint32_t h = hashBytes(2166136261u, tickerText, tickerLen);
+  h = hashBytes(h, &color, sizeof(color));
+  tickerColor = color;
+  tickerWidth = tft.textWidth(tickerText, 2);
+  tickerScrolls = tickerWidth > TICKER_MAX_W;
+  if (h != tickerHash || !tickerHas) {
+    tickerHash = h;
+    tickerPos = 0;
+    tickerShownPos = -1;
+    tickerStepAt = millis() + TICKER_HOLD_MS;
+  }
+  return true;
+}
+
+// The window of the scrolling text that starts at character `pos`: the text goes round, with a gap.
+void tickerWindow(char *out, size_t cap, uint16_t pos) {
+  const uint16_t cycle = tickerLen + 5;
+  size_t n = 0;
+  while (n + 1 < cap) {
+    uint16_t at = (pos + n) % cycle;
+    out[n] = at < tickerLen ? tickerText[at] : ' ';
+    out[n + 1] = '\0';
+    if (tft.textWidth(out, 2) > TICKER_MAX_W) break;
+    n++;
+  }
+  out[n] = '\0';
+}
+
+// Draws the band when it is not on the screen yet, and steps the scroll when it is time.
+void drawTicker() {
+  const bool first = tickerShownPos < 0;
+  if (!tickerScrolls && !first) return;
+  tft.setTextColor(tickerColor, TFT_BLACK);
+  tft.setTextPadding(config::SCREEN_W - 2);
+  if (!tickerScrolls) {
+    tft.setTextDatum(TC_DATUM);
+    tft.drawString(tickerText, config::SCREEN_W / 2, TICKER_Y, 2);
+    tickerShownPos = 0;
+  } else {
+    uint32_t now = millis();
+    if (!first && (int32_t)(now - tickerStepAt) < 0) {
+      tft.setTextPadding(0);
+      return;
+    }
+    if (!first) {
+      tickerPos = (uint16_t)((tickerPos + 1) % (tickerLen + 5));
+      tickerStepAt = now + (tickerPos == 0 ? TICKER_HOLD_MS : TICKER_STEP_MS);
+    }
+    char window[80];
+    tickerWindow(window, sizeof(window), tickerPos);
+    tft.setTextDatum(TL_DATUM);
+    tft.drawString(window, 1, TICKER_Y, 2);
+    tickerShownPos = tickerPos;
+  }
+  tft.setTextPadding(0);
+}
+
+void clearTicker() { tft.fillRect(0, TICKER_Y - 2, config::SCREEN_W, 20, TFT_BLACK); }
+
+void updateContent(bool leftNotice) {
+  const Summary &d = portal::data();
+  const uint32_t now = portal::nowEpoch();
+
+  if (leftNotice) tft.fillScreen(TFT_BLACK);   // the notice's words are still there
+  const int32_t banner = bannerSignature(d);
+  if (shownBanner != banner) {
+    drawBanner(d);
+    shownBanner = banner;
+  }
+  uint32_t counts = countsSignature(d);
+  if (counts != shownCounts) {
+    drawCounts(d);
+    shownCounts = counts;
+  }
+
+  const uint32_t updated = portal::updatedAtMs();
+  const uint32_t minute = now / 60;
+  const bool newData = updated != shownUpdated;
+  if (newData) tickerHas = buildTicker(d);   // every answer: the words may have changed
+  bool turnPage = false;
+  if (pageCount > 1 && millis() - pageAt >= (uint32_t)settings::get().portalPage * 1000UL) {
+    pageIndex = (uint8_t)((pageIndex + 1) % pageCount);
+    turnPage = true;
+  }
+  if (turnPage || newData || minute != shownMinute || tickerHas != shownTicker) {
+    if (turnPage) pageAt = millis();
+    buildRows(d, tickerHas ? ROWS_WITH_TICKER : ROWS_MAX, now);
+    const bool empty = rowCount == 0 && d.overall <= portal::ST_SLOW && d.services.present;
+    if (!empty) drawEmptyMessage(false);   // before the rows: it clears a band they may be about to use
+    drawRows();
+    if (empty) drawEmptyMessage(true);
+    if (!tickerHas && shownTicker) clearTicker();
+    shownUpdated = updated;
+    shownMinute = minute;
+    shownTicker = tickerHas;
+  }
+  if (tickerHas) drawTicker();
+}
+
+}  // namespace
+
+void screenPortalEnter() {
+  resetShown();
+  pageIndex = 0;
+  pageAt = millis();
+}
+
+void screenPortalUpdate(bool full) {
+  if (full) resetShown();
+  portal_ui::Kind kind = portal_ui::notice();
+  if (kind != portal_ui::NONE) {
+    uint32_t key = portal_ui::noticeKey(kind);
+    if (shownNoticeKind != (int8_t)kind || shownNoticeKey != key) {
+      tft.fillScreen(TFT_BLACK);
+      portal_ui::drawNotice(kind);
+      resetContent();
+      shownNoticeKind = (int8_t)kind;
+      shownNoticeKey = key;
+    }
+    return;
+  }
+  bool leftNotice = shownNoticeKind >= 0;
+  if (leftNotice) {
+    resetContent();
+    shownNoticeKind = -1;
+  }
+  updateContent(leftNotice);
+}
+
+void screenPortalLeave() {}

@@ -30,7 +30,24 @@ Founding constraints:
   interface, `/update`), then **0.3.0-rc.2**, and has since taken a few rc.3 test builds. It was
   built before the rename, so 0.1.0 identified itself as `Custom-0.1.0`, with the rescue access
   point `SmallTV-Custom`.
-- The repository is at **0.3.0-rc.3**, on branch `0.3.0`. **rc.1 and rc.2 are published** (as
+- **0.4.0-rc.1 (branch `0.4.0`, from `0.3.0`)** adds the Status-Portal client (`portal.cpp`, contract:
+  Status-Portal's `GET /api/device/summary` with `X-Api-Key`, Status-Portal >= 1.10.0), the
+  Status-Portal tab, the `portal` and `resources` themes and the alert modes (`switch` / `indicator`
+  / `off`). `firmware.bin` is 510,304 bytes, static RAM 41,260: **the flash budget is nearly spent**
+  (limit 520,000), so any further feature must first find savings. Verified on the device: the tab
+  saves, a bad address gives `connection failed` without a crash, heap stayed ~32 KB. Not verified:
+  real portal data (the owner's portal was still on 1.9.1).
+  **0.4.0-rc.3** pages the Resources screen (CPU, RAM, GPUs, up to eight disks, Jellyfin's activity,
+  split evenly over pages that turn every `portal_page` seconds), and writes the portal's latency beside
+  OK/SLOW on the Status-Portal screen. It asks for `services=all&resources=all` (Status-Portal >=
+  1.11.0-rc.3; an older portal just sends less) and the answer bound is 8 KB. `firmware.bin` is
+  508,096 bytes, static RAM 42,612: about 12 KB of flash left.
+  **0.4.0-rc.5** adds Jellyfin's activity as a blue band: the Status-Portal banner (36 px) and the
+  Resources header (28 px, 32 while busy) are split in two while Jellyfin transcodes or runs a task
+  (`portal_ui::jellyfinLine()` / `drawBand()`). It asks for `jellyfin=1` and reads the answer's
+  top-level `jellyfin` object (Status-Portal >= 1.11.0-rc.4), which arrives whichever sections are on.
+  The latency reads before the status word ("45ms OK"). `firmware.bin` is 509,456 bytes.
+- The 0.3.0 line: the repository was at **0.3.0-rc.3**, on branch `0.3.0`. **rc.1 and rc.2 are published** (as
   pre-releases); rc.3 is published by the release step of the session that made it. The
   firmware has a six-tab web interface and JSON API, Open-Meteo weather (with diagnostics), NTP
   time with automatic or manual time zone (default server `time.cloudflare.com`), JPG and
@@ -107,6 +124,14 @@ Founding constraints:
     closes it before it opens a connection and the weather screen reopens it afterwards. Do
     not allocate it statically, do not keep it open off screen, and do not add another network
     call that can run while a GIF plays without closing it first.
+    **A GIF yields to the web server instead of reserving room for it.** The decoder takes about
+    24.3 KB of an idle heap of about 31 KB. It used to need 6 KB to remain after it (the old
+    `HEAP_LEFT_AFTER_GIF`), which left 0.5 KB of slack and refused every GIF ("not enough memory")
+    as soon as the idle heap drifted. Now it needs 2 KB (`media.cpp`), and a hook in `web::begin()`
+    closes the GIF when a request finds less than `config::WEB_MIN_HEAP` (4 KB) free; the screen
+    reopens it afterwards (the album and the weather screen already restart a GIF that was closed
+    under them). The hook never refuses a request, `/update` included. `/api/status` shows what it
+    saw: `req_heap`, `gif` (0 none, 1 playing and kept, 2 closed for this request) and `media_err`.
 11. **The web password (setting `pw`, HTTP Basic, user `admin`) is never enforced in rescue
     access-point mode** (`web.cpp`: `authEnforced()` is `password set && !net::isAp()`), and it
     must keep covering **every** route except `/v.json`, the 404 / captive-portal answers and

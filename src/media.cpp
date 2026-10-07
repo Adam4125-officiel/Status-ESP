@@ -34,9 +34,14 @@ namespace {
 
 const char *errorText = "";
 
-// Heap that must still be free once the GIF decoder is allocated, so that the web server
-// (requests, uploads, the settings JSON) keeps working while a GIF plays.
-const uint32_t HEAP_LEFT_AFTER_GIF = 6144;
+// Heap that must still be free once the GIF decoder is allocated, so that the rest of the firmware
+// (the Wi-Fi stack, the next weather or portal fetch) is not starved. It is small on purpose: the
+// web server does not rely on it, because a request that arrives while less than
+// config::WEB_MIN_HEAP is free closes the GIF first (web.cpp, the hook in begin()). It was 6144,
+// the whole of a request's needs, and the idle heap is about 30.9 KB against a decoder of about
+// 24.7 KB: that left a few hundred bytes of slack, so a GIF was refused ("not enough memory")
+// whenever the heap had drifted a little, which is the report this fixes.
+const uint32_t HEAP_LEFT_AFTER_GIF = 2048;
 // Browsers treat a frame delay of 10 ms or less as 100 ms; so does this.
 const uint32_t MIN_FRAME_DELAY_MS = 10;
 const uint32_t DEFAULT_FRAME_DELAY_MS = 100;

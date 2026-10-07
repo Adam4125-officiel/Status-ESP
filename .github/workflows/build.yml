@@ -44,6 +44,11 @@ jobs:
       - name: Build the firmware
         run: bash tools/build.sh
 
+      # The parts that need no device (the Status-Portal answer parser, the address checker, the
+      # UTF-8 fold), built with g++ and the sanitizers. Needs the libraries the build just fetched.
+      - name: Run the host tests
+        run: bash tools/test_host.sh
+
       # Validates the image (Arduino CRC, no trailing data, size limit, version
       # string embedded) and writes dist/v<version>/ (bin, version.json, checksums.txt).
       - name: Validate the image and prepare the release assets
