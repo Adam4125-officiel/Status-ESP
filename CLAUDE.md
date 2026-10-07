@@ -42,6 +42,11 @@ Founding constraints:
   OK/SLOW on the Status-Portal screen. It asks for `services=all&resources=all` (Status-Portal >=
   1.11.0-rc.3; an older portal just sends less) and the answer bound is 8 KB. `firmware.bin` is
   508,096 bytes, static RAM 42,612: about 12 KB of flash left.
+  **0.4.0-rc.5** adds Jellyfin's activity as a blue band: the Status-Portal banner (36 px) and the
+  Resources header (28 px, 32 while busy) are split in two while Jellyfin transcodes or runs a task
+  (`portal_ui::jellyfinLine()` / `drawBand()`). It asks for `jellyfin=1` and reads the answer's
+  top-level `jellyfin` object (Status-Portal >= 1.11.0-rc.4), which arrives whichever sections are on.
+  The latency reads before the status word ("45ms OK"). `firmware.bin` is 509,456 bytes.
 - The 0.3.0 line: the repository was at **0.3.0-rc.3**, on branch `0.3.0`. **rc.1 and rc.2 are published** (as
   pre-releases); rc.3 is published by the release step of the session that made it. The
   firmware has a six-tab web interface and JSON API, Open-Meteo weather (with diagnostics), NTP
