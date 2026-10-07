@@ -61,6 +61,7 @@ const size_t MAX_INCIDENT_ITEMS = 3, MAX_INCIDENT_TITLE = 40, MAX_AFFECTED = 32;
 const size_t MAX_MAINT_ITEMS = 3, MAX_MAINT_TITLE = 32;
 const size_t MAX_DISK_ITEMS = 8, MAX_DISK_NAME = 16;     // with resources=all (portal >= 1.11.0-rc.2); 4 without
 const size_t MAX_GPU_ITEMS = 4, MAX_GPU_NAME = 20;
+const size_t MAX_JF_TASKS = 3, MAX_JF_TASK_NAME = 28;
 const size_t MAX_ANN_ITEMS = 3, MAX_ANN_TITLE = 32, MAX_ANN_TEXT = 80;
 
 const int16_t NA = -32768;   // "no value" for the integer readings below (the portal sends null)
@@ -68,6 +69,7 @@ const int16_t NA = -32768;   // "no value" for the integer readings below (the p
 struct Service {
   char name[MAX_SERVICE_NAME + 1];
   uint8_t status;               // ST_*; ST_OPERATIONAL only with services=all (portal >= 1.11.0)
+  uint16_t ms;                  // latency of the last check, in ms; 0 = not measured (portal >= 1.11.0-rc.3)
 };
 
 struct Incident {
@@ -150,6 +152,9 @@ struct Summary {
     uint8_t gpuCount;           // how many GPUs the portal sees (only sent with resources=all)
     uint8_t gpuN;
     Gpu gpus[MAX_GPU_ITEMS];
+    uint8_t jfTranscodes;       // Jellyfin transcodes running now (portal >= 1.11.0-rc.3, resources=all)
+    uint8_t jfTaskN;            // names of the scheduled tasks it is running (trickplay, scans...)
+    char jfTask[MAX_JF_TASKS][MAX_JF_TASK_NAME + 1];
   } resources;
 
   struct {

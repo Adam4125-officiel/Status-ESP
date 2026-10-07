@@ -14,6 +14,16 @@ changes the first, second and third number, and what a `-rc.N` pre-release is) i
   footer next to the network rates. The disks and the GPUs come from Status-Portal **1.11.0-rc.2** or
   newer (`resources=all`); an older portal still works and shows its four fullest disks and no GPU. The
   answer may now be up to 8 KB.
+- The Status-Portal screen shows the latency of the last check beside a healthy or slow service
+  ("OK 45ms", "SLOW 1.2s"), as the portal measured it. Needs Status-Portal **1.11.0-rc.3**; with an older
+  one, or for a service that was never measured, the tag is just the word.
+
+### Added
+- **Jellyfin's activity on the Resources screen**: while Jellyfin is transcoding, or running a scheduled
+  task such as trickplay generation or a library scan, a line says so ("Jellyfin   2 transcodes", then the
+  name of each task) between the GPUs and the disks, and pages with the rest. Nothing is shown while it is
+  idle. The portal sends names only, so there is no progress bar. Needs Status-Portal **1.11.0-rc.3**,
+  and follows the existing "server's CPU, memory, GPUs, disks and Jellyfin activity" switch.
 
 ## [0.4.0-rc.2] - 2026-10-06
 

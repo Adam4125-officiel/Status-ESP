@@ -725,6 +725,105 @@ static void testResourcesPaging() {
   expectClean("resources, worst case, round again");
 }
 
+
+// ---- Latency beside the status, and Jellyfin's activity ---------------------------------------------------
+
+static void testLatencyAndJellyfin() {
+  // services=all with the latency of the last check (portal >= 1.11.0-rc.3): "OK 45ms", "SLOW 1.2s".
+  defaults();
+  beginFrame("portal_latency");
+  install("{\"v\":1,\"now\":\"2026-10-06T12:00:00Z\",\"site\":\"H\",\"overall\":\"down\","
+          "\"services\":{\"total\":5,\"operational\":3,\"slow\":1,\"down\":1,\"items\":["
+          "{\"name\":\"Nextcloud\",\"status\":\"down\"},{\"name\":\"Radarr\",\"status\":\"slow\",\"ms\":1850},"
+          "{\"name\":\"Jellyfin\",\"status\":\"operational\",\"ms\":45},{\"name\":\"Seerr\",\"status\":\"operational\",\"ms\":12400},"
+          "{\"name\":\"Manual\",\"status\":\"operational\"}]}}", SEC_SERVICES);
+  tft.resetStats();
+  show(screenPortalEnter, screenPortalUpdate);
+  CHECK(drew("OK 45ms") && drew("SLOW 1.8s") && drew("OK 12s"));
+  CHECK(drew("OK"));            // nothing measured: just the word
+  CHECK(drew("DOWN"));          // a down service shows no latency
+  expectClean("portal, latency");
+
+  // The widest of them still fits the tag.
+  defaults();
+  install("{\"v\":1,\"now\":\"2026-10-06T12:00:00Z\",\"site\":\"H\",\"overall\":\"slow\","
+          "\"services\":{\"total\":1,\"slow\":1,\"items\":[{\"name\":\"WWWWWWWWWWWWWWWWWWWWWWWW\",\"status\":\"slow\",\"ms\":65535}]}}", SEC_SERVICES);
+  tft.resetStats();
+  show(screenPortalEnter, screenPortalUpdate);
+  CHECK(drew("SLOW 65s"));
+  expectClean("portal, widest latency");
+}
+
+static std::string withJellyfin(const char *jellyfin) {
+  std::string j = pagedAnswer(0, 2);
+  size_t at = j.find("\"gpus\":[]");
+  j.insert(at + 9, std::string(",\"jellyfin\":") + jellyfin);
+  return j;
+}
+
+static void testJellyfinActivity() {
+  // Idle: nothing about Jellyfin on the screen.
+  defaults();
+  beginFrame("resources_jellyfin_idle");
+  install(withJellyfin("{\"transcodes\":0,\"tasks\":[]}"));
+  tft.resetStats();
+  show(screenResourcesEnter, screenResourcesUpdate);
+  CHECK(!drewContaining("Jellyfin") && drewContaining("Disk1"));
+  expectClean("resources, Jellyfin idle");
+
+  // Two transcodes and a task: three text-only blocks between the GPUs and the disks, over two pages
+  // (CPU, RAM and the three Jellyfin lines, then the two disks).
+  defaults();
+  beginFrame("resources_jellyfin_busy");
+  install(withJellyfin("{\"transcodes\":2,\"tasks\":[\"Generate Trickplay Images\"]}"));
+  tft.resetStats();
+  show(screenResourcesEnter, screenResourcesUpdate);
+  CHECK(drew("Jellyfin   2 transcodes") && drewContaining("Generate Trickplay"));
+  CHECK(drew("Page 1/2") || !drewContaining("Page "));   // six blocks or fewer: either way it fits the layout
+  expectClean("resources, Jellyfin busy");
+
+  // One transcode reads in the singular; tasks alone have no transcode line.
+  defaults();
+  install(withJellyfin("{\"transcodes\":1,\"tasks\":[]}"));
+  tft.resetStats();
+  show(screenResourcesEnter, screenResourcesUpdate);
+  CHECK(drew("Jellyfin   1 transcode"));
+  defaults();
+  install(withJellyfin("{\"transcodes\":0,\"tasks\":[\"Scan Media Library\",\"Generate Trickplay Images\",\"Extract Chapter Images\"]}"));
+  tft.resetStats();
+  show(screenResourcesEnter, screenResourcesUpdate);
+  CHECK(!drewContaining("transcode") && drew("Scan Media Library") && drewContaining("Generate Trickplay"));
+  expectClean("resources, Jellyfin tasks only");
+
+  // The tasks end while the screen shows them: their lines go, the disks come back in their place.
+  g_ms += 60000;
+  install(withJellyfin("{\"transcodes\":0,\"tasks\":[]}"));
+  tft.resetStats();
+  screenResourcesUpdate(false);
+  CHECK(!drew("Scan Media Library") && drewContaining("Disk1"));
+  expectClean("resources, Jellyfin done");
+
+  // The most it can send, with the widest letters, next to four GPUs and eight disks: every page fits.
+  defaults();
+  beginFrame("resources_jellyfin_worst");
+  std::string w = pagedAnswer(4, 8, repeat('W', 20).c_str(), 16);
+  size_t at = w.find("]},\"announcements\"");
+  w.insert(at + 1, std::string(",\"jellyfin\":{\"transcodes\":255,\"tasks\":[\"") + repeat('W', 28) + "\",\"" + repeat('W', 28) + "\",\"" + repeat('W', 28) + "\"]}");
+  install(w);
+  tft.resetStats();
+  show(screenResourcesEnter, screenResourcesUpdate);
+  expectClean("resources, Jellyfin worst, page 1");
+  for (int page = 2; page <= 4; page++) {
+    g_ms += 6000;
+    tft.resetStats();
+    screenResourcesUpdate(false);
+    char want[12];
+    snprintf(want, sizeof(want), "Page %d/4", page);
+    CHECK(drew(want));
+    expectClean("resources, Jellyfin worst, later page");
+  }
+}
+
 // An answer with a section the firmware does not know, or fields it does not use, changes nothing.
 static void testNewerPortal() {
   defaults();
@@ -745,6 +844,8 @@ int main() {
   testWorstCase();
   testResources();
   testResourcesPaging();
+  testLatencyAndJellyfin();
+  testJellyfinActivity();
   testNewerPortal();
   beginFrame("");
   printf("%d checks, %d failed\n", checks, failures);

@@ -111,6 +111,7 @@ void readServices(JsonVariantConst o, Summary &out) {
     copyText(it, "name", s.name, sizeof(s.name));
     s.status = statusOf(it, "status");
     if (s.status == ST_UNKNOWN) continue;   // operational ones come with services=all (portal >= 1.11.0)
+    s.ms = count(it, "ms");
     out.services.n++;
   }
 }
@@ -179,6 +180,17 @@ void readResources(JsonVariantConst o, Summary &out) {
     g.tempC = whole(it, "temp_c");
   }
   if (out.resources.gpuCount < out.resources.gpuN) out.resources.gpuCount = out.resources.gpuN;
+  // Jellyfin's activity (portal >= 1.11.0-rc.3, resources=all): transcodes now, and the tasks it is running.
+  JsonVariantConst jf = member(o, "jellyfin");
+  uint16_t tc = count(jf, "transcodes");
+  out.resources.jfTranscodes = (uint8_t)(tc > 255 ? 255 : tc);
+  for (JsonVariantConst t : member(jf, "tasks").as<JsonArrayConst>()) {
+    if (out.resources.jfTaskN >= MAX_JF_TASKS) break;
+    if (!t.is<const char *>()) continue;
+    char *dst = out.resources.jfTask[out.resources.jfTaskN++];
+    ascii::fold(t.as<const char *>(), dst, MAX_JF_TASK_NAME + 1);
+    if (!dst[0]) strlcpy(dst, "task", MAX_JF_TASK_NAME + 1);
+  }
 }
 
 void readAnnouncements(JsonVariantConst o, Summary &out) {

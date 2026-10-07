@@ -40,7 +40,7 @@ enum Glyph : uint8_t { G_NONE = 0, G_DOT, G_BANG, G_MAINT };
 
 struct Row {
   char text[28];
-  char tag[10];
+  char tag[14];
   uint16_t color;      // dot / glyph
   uint16_t tagColor;
   uint8_t glyph;
@@ -209,6 +209,24 @@ uint16_t rowSkip;     // rows that belong to the pages before the current one
 uint8_t pageIndex, pageCount = 1;
 uint32_t pageAt;      // millis() when the current page went up
 
+// "45ms", "1.2s", "12s": the latency of the last check in the width a tag has.
+void formatLatency(char *out, size_t cap, uint16_t ms) {
+  if (ms < 1000) snprintf(out, cap, "%ums", (unsigned)ms);
+  else if (ms < 10000) snprintf(out, cap, "%u.%us", (unsigned)(ms / 1000), (unsigned)(ms % 1000 / 100));
+  else snprintf(out, cap, "%us", (unsigned)(ms / 1000));
+}
+
+// The status word, and for a healthy or slow service the latency the portal measured beside it
+// ("OK 45ms", "SLOW 1.2s"). Nothing is added when the portal sent none (older portal, or never measured).
+void serviceTag(char *out, size_t cap, const portal::Service &s) {
+  strlcpy(out, portal_ui::statusTag(s.status), cap);
+  if (!s.ms || (s.status != portal::ST_OPERATIONAL && s.status != portal::ST_SLOW)) return;
+  char latency[8];
+  formatLatency(latency, sizeof(latency), s.ms);
+  size_t used = strlen(out);
+  snprintf(out + used, cap - used, " %s", latency);
+}
+
 // Adds a row, if it belongs to the current page and there is room.
 Row *addRow(uint8_t capacity, uint8_t glyph, uint16_t color, const char *text, const char *tag, uint16_t tagColor) {
   uint16_t index = rowSeen++;
@@ -235,14 +253,15 @@ void buildPage(const Summary &d, uint8_t capacity, uint32_t now) {
   rowCount = 0;
   rowSeen = 0;
   rowSkip = (uint16_t)pageIndex * capacity;
-  char tag[10];
+  char tag[14];
 
   if (d.services.present) {
     uint16_t listedNotOk = 0;
     for (uint8_t i = 0; i < d.services.n; i++) {
       const portal::Service &s = d.services.items[i];
       if (s.status != portal::ST_OPERATIONAL) listedNotOk++;
-      addRow(capacity, G_DOT, portal_ui::statusColor(s.status), s.name, portal_ui::statusTag(s.status), portal_ui::statusColor(s.status));
+      serviceTag(tag, sizeof(tag), s);
+      addRow(capacity, G_DOT, portal_ui::statusColor(s.status), s.name, tag, portal_ui::statusColor(s.status));
     }
     // Only unhealthy services the portal left out are worth a "+N more" (a portal older than 1.11.0
     // never sends the OK ones).
