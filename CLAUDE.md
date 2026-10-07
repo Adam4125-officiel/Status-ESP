@@ -8,8 +8,9 @@ language of the conversation and the language of the repository are two separate
 Status-ESP is an alternative firmware for a **GeekMagic SmallTV-Ultra**: a small connected
 display (ESP8266 + 240x240 ST7789 screen). The owner eventually wants their own firmware
 ("their own OS") with their own display features, and meant to work together with
-[Status-Portal](https://github.com/Adam4125-officiel/Status-Portal), a sibling project. No
-integration with it exists yet.
+[Status-Portal](https://github.com/Adam4125-officiel/Status-Portal), a sibling project (a Flask
+status page for the owner's home server). Since 1.0.0 the display shows its service status, incidents,
+maintenance, announcements and server resources (section 11, "Status-Portal client").
 
 What the repository provides:
 - the **source code**;
@@ -26,57 +27,49 @@ Founding constraints:
 - The stock files on the device (images, settings, Wi-Fi) stay untouched.
 
 ## 2. Current state (handover)
-- The owner's device ran **0.1.0** at first (validated: display, colours, backlight, Wi-Fi, web
-  interface, `/update`), then **0.3.0-rc.2**, and has since taken a few rc.3 test builds. It was
-  built before the rename, so 0.1.0 identified itself as `Custom-0.1.0`, with the rescue access
-  point `SmallTV-Custom`.
-- **0.4.0-rc.1 (branch `0.4.0`, from `0.3.0`)** adds the Status-Portal client (`portal.cpp`, contract:
-  Status-Portal's `GET /api/device/summary` with `X-Api-Key`, Status-Portal >= 1.10.0), the
-  Status-Portal tab, the `portal` and `resources` themes and the alert modes (`switch` / `indicator`
-  / `off`). `firmware.bin` is 510,304 bytes, static RAM 41,260: **the flash budget is nearly spent**
-  (limit 520,000), so any further feature must first find savings. Verified on the device: the tab
-  saves, a bad address gives `connection failed` without a crash, heap stayed ~32 KB. Not verified:
-  real portal data (the owner's portal was still on 1.9.1).
-  **0.4.0-rc.3** pages the Resources screen (CPU, RAM, GPUs, up to eight disks, Jellyfin's activity,
-  split evenly over pages that turn every `portal_page` seconds), and writes the portal's latency beside
-  OK/SLOW on the Status-Portal screen. It asks for `services=all&resources=all` (Status-Portal >=
-  1.11.0-rc.3; an older portal just sends less) and the answer bound is 8 KB. `firmware.bin` is
-  508,096 bytes, static RAM 42,612: about 12 KB of flash left.
-  **0.4.0-rc.5** adds Jellyfin's activity as a blue band: the Status-Portal banner (36 px) and the
-  Resources header (28 px, 32 while busy) are split in two while Jellyfin transcodes or runs a task
-  (`portal_ui::jellyfinLine()` / `drawBand()`). It asks for `jellyfin=1` and reads the answer's
-  top-level `jellyfin` object (Status-Portal >= 1.11.0-rc.4), which arrives whichever sections are on.
-  The latency reads before the status word ("45ms OK"). `firmware.bin` is 509,456 bytes.
-- The 0.3.0 line: the repository was at **0.3.0-rc.3**, on branch `0.3.0`. **rc.1 and rc.2 are published** (as
-  pre-releases); rc.3 is published by the release step of the session that made it. The
-  firmware has a six-tab web interface and JSON API, Open-Meteo weather (with diagnostics), NTP
-  time with automatic or manual time zone (default server `time.cloudflare.com`), JPG and
-  animated GIF playback from `/image` and `/gif`, night mode, a Wi-Fi boot delay, a factory
-  reset, the `status-esp.local` mDNS name, settings export and import, an optional web password,
-  a Large clock font, sunrise/sunset on the weather screen, and, new in rc.3, a **full backup
-  and restore** of the file system (`backup.cpp`) and three more themes.
-  **Eleven themes**, chosen manually or rotated: weather clock (`weather_clock`), simple weather
-  clock (`simple_weather`), forecast, photo album, clock, analog clock (`analog`), big digits
-  (`digital2`), countdown, word clock (`words`), rings (`rings`) and binary clock (`binary`).
-  `firmware.bin` is 489,488 bytes (limit 520,000; the working target for the next feature, the
-  Status-Portal client, is to stay under 500,000), static RAM 37,724 of 81,920 bytes.
-- **Verified on the real device (rc.3 test builds, 2026-10-06)**: the weather fetch (`weather_ok`
-  and the Auto time-zone offset arrive about 8 s after boot), the backup download (a valid tar,
-  `Content-Length` exact, 1.8 MB in 15 s, listed and extracted with `tar`), the restore (refusals
-  of junk / non-Status-ESP / truncated archives, a crafted archive with unsafe names, an empty
-  file, the Wi-Fi entry with the device's own credentials followed by the reboot), saving and
-  rotating the new themes through `/api/settings` without a crash, and the web interface loading
-  in a headless Chromium with no script error. **Not verified, because nobody can see the
-  screen from here**: how the three new themes look on the real display (they were rendered on a
-  PC against a mock `TFT_eSPI` and the pictures looked at), and the earlier list: the real SPI
-  output of `pushImage`, GIF decoding speed, `status-esp.local` resolving on a real network, and
-  the password prompt in a real browser. The Status-Portal tab is a placeholder.
-- Installing it changes the device's visible identity (rescue access point `Status-ESP`,
-  hostname `status-esp`, `/v.json` reports `Status-ESP-<version>`).
-- **v0.2.0 is a tag only**: it was never published as a release and never installed.
-- The repository is going public. See section 4.
-- The CI workflow (`.github/workflows/build.yml`) is new in 0.3.0: every run so far (the rc.1
-  and rc.2 pushes and pull-request builds) was green; look at the run after each push anyway.
+- **1.0.0 is the first stable release (2026-10-07).** The owner picked that number for the first
+  stable; the policy table in section 5 is unchanged. It rolls up the 0.3.0 and 0.4.0 lines (PRs
+  #1 and #2, merged into `main` with merge commits) and is the `0.4.0-rc.5` build with a new
+  version string. `main` is the only long-lived branch; the next version gets a branch of its
+  own (section 6).
+- **Size: `firmware.bin` is about 509,456 bytes against the 520,000 limit (about 10 KB of flash
+  left), static RAM 42,648 of 81,920, idle free heap about 31 KB (largest block about 30 KB).**
+  Flash and RAM are both nearly spent: a feature has to find savings first (ROADMAP, "Memory").
+  Read `heap`, `max_block` and `req_heap` in `/api/status` after any change that allocates.
+- **What the firmware has**: a six-tab web interface and JSON API; Open-Meteo weather with
+  diagnostics; NTP time with automatic or manual time zone; JPG and animated GIF playback from
+  `/image` and `/gif`; night mode; a Wi-Fi boot delay; factory reset; the `status-esp.local`
+  mDNS name; settings export and import; an optional web password; a full backup and restore of
+  the file system; and **ten themes**, chosen manually or rotated: weather clock
+  (`weather_clock`), forecast, photo album, clock, analog clock (`analog`), countdown, word
+  clock (`words`), binary clock (`binary`), and the two Status-Portal screens `portal` and
+  `resources`. (The big-digits, simple-weather and rings themes of 0.3.0 were removed in 0.4.0 to
+  save flash; a saved choice of one of them falls back to the default theme.)
+- **The Status-Portal client** (0.4.0): section 11. It talks to Status-Portal **1.11.0** for
+  everything (1.10.0 for the basics: an older portal ignores the extra parameters and the display
+  just shows less). Both repositories were released together: Status-Portal 1.11.0 and
+  Status-ESP 1.0.0.
+- **GIF memory** (0.4.0-rc.4): the decoder takes about 24 KB of a 31 KB idle heap; it used to be
+  refused ("not enough memory") as soon as the heap drifted by half a kilobyte. A GIF now needs
+  2 KB to remain free after it and **yields to web requests** (rule 10 in section 3).
+- **Verified on the real device**, over the whole 0.3.0 / 0.4.0 work: boot, Wi-Fi, the weather
+  fetch, the backup download and restore, saving and rotating themes through `/api/settings`, the
+  Status-Portal link (`portal_ok`) against a portal that did not yet know the newest parameters,
+  `/update` with a GIF playing, a GIF opening and staying open, the web interface in a headless
+  browser, and every upload of a candidate through `/update` (about 25 s each, all successful).
+- **NOT verified on the real device**, because nobody can see the screen from here: how any of
+  the themes actually *looks* (they were rendered on a PC against a mock `TFT_eSPI` in
+  `tests/host/` and the pictures looked at), and, above all, **the newest data on a real screen**:
+  the paged Resources screen with GPUs and Jellyfin's band, and the latency beside the status,
+  because the owner's portal was still on 1.11.0-rc.1 when this was released. Also never seen:
+  GIF decoding speed, `status-esp.local` on a real network, the password prompt in a real browser,
+  and the progressive-JPEG message. If the owner reports something odd on the screen, start from
+  that list.
+- Installing the firmware changes the device's visible identity (rescue access point
+  `Status-ESP`, hostname `status-esp`, `/v.json` reports `Status-ESP-<version>`); the settings
+  file is still `/custom.json` (section 5). **v0.2.0 is a tag only**: it was never published.
+- The CI workflow (`.github/workflows/build.yml`) builds and validates on every push and pull
+  request and has been green on every run; look at the run after each push anyway.
 - What is **not** done, and the known limitations, are in [ROADMAP.md](ROADMAP.md).
 
 ## 3. Absolute rules (never break these)
@@ -159,6 +152,9 @@ The full description is in [docs/releasing.md](docs/releasing.md); the essential
 - **Policy (`vX.Y.Z`)**: **X** is a complete change of system (very rare, not expected);
   **Y** adds features (frequent, especially early on); **Z** is only bug fixes, security fixes
   and performance fixes, with no features.
+- **1.0.0 is the first stable release**, chosen by the owner on 2026-10-07 even though X is "a
+  complete change of system": the policy above is unchanged and applies from here on (1.1.0 for
+  the next features, 1.0.1 for fixes only).
 - **`VERSION`** (repository root) is the single source of truth: one line, no leading `v`,
   `MAJOR.MINOR.PATCH` or `MAJOR.MINOR.PATCH-rc.N`. `tools/version.py` reads it at build time and
   defines `FW_VERSION`. Never hard-code a version elsewhere. The git tag is `v` + `VERSION`.
@@ -233,10 +229,19 @@ src/backup.{h,cpp}           full file-system backup / restore as a tar stream (
 src/media.{h,cpp}            JPG (tjpgd) and animated GIF (AnimatedGIF) from LittleFS to the screen
 src/icons.{h,cpp}            weather icons drawn with graphics primitives, WMO code descriptions
 src/display.{h,cpp}          screen manager: themes, rotation, backlight / night mode, drawing helpers
-src/screen_*.cpp             one theme each: clock, weather (weather_clock), simple_weather, forecast,
-                             album, analog, digital2 (big digits), countdown, words, rings, binary
+src/screen_*.cpp             one theme each: clock, weather (weather_clock), forecast, album, analog,
+                             countdown, words, binary, portal, resources
 src/bigfont.h                helpers for the Font 8 (75 px digits) themes
 src/countdown_calc.h         date arithmetic for the countdown (pure, testable on a PC)
+src/portal.{h,cpp}           Status-Portal client: fetch every portal_interval seconds, cache, back-off, diagnostics
+src/portal_data.h            the contract's caps and the Summary struct, the parse() declaration, jellyfinBusy()
+src/portal_parse.cpp         parse() the answer defensively (pure: no network, no Arduino: runs on the PC)
+src/portal_url.{h,cpp}       checks the address typed in the web interface (http only, no path, no credentials)
+src/portal_ui.{h,cpp}        what the two portal screens share: colours, notices, jellyfinLine(), drawBand(), fitText()
+src/screen_portal.cpp        the Status-Portal screen (status banner, counts, paged rows, ticker)
+src/screen_resources.cpp     the Resources screen (CPU, RAM, GPUs, disks on pages; network and page in the footer)
+src/ascii.{h,cpp}            folds UTF-8 from the portal to the ASCII the built-in fonts can draw
+src/http_body.h              BodySink: reads an HTTP body into a capped String
 src/mdns.{h,cpp}, mdns_dns.* the tiny mDNS responder for status-esp.local (address questions only)
 src/generated/               web_index.h, built from web/index.html (git-ignored)
 web/index.html               the whole web interface: one page, six tabs, vanilla JS
@@ -247,6 +252,8 @@ tools/build.ps1 | build.sh   build + enforce the size limit
 tools/make_release.py        makes dist/v<version>/ : Status-ESP-<version>.bin, version.json, checksums.txt
 tools/release.sh             Linux: build + assets + tag + GitHub release (--dry-run supported)
 tools/upload.ps1 | upload.sh upload a .bin through /update, checking /v.json before and after
+tools/test_host.sh           builds and runs tests/host/ with the PC's g++ (needs one firmware build first)
+tests/host/                  parser and screen tests against a recording stand-in for TFT_eSPI (see section 15)
 tools/check_firmware.py      checks the Arduino CRC of a .bin (and extracts a firmware from a flash image)
 tools/analyze_firmware.py    analyses a firmware binary (segments, gzip pages, strings)
 docs/hardware.md             hardware, pinout, flash layout, size constraint
@@ -351,6 +358,44 @@ AnimatedGIF, one frame per `gifPlayFrame()` call, honouring the frame delays. Ru
 section 3 is the memory rule. `drawJpgFit()` and `gifOpenCentered()` are what the album uses to
 fit and centre pictures that are not exactly 240x240.
 
+Status-Portal client (0.4.0, `portal*.{h,cpp}`, `screen_portal.cpp`, `screen_resources.cpp`):
+- **Contract.** `GET http://<portal>/api/device/summary?sections=<on ones>&services=all&resources=all&jellyfin=1`
+  with the key in the `X-Api-Key` header (never in the URL), plain `http://` on the LAN. The shape is
+  defined by Status-Portal's `device_api.py` (and the "Display device API" section of that
+  repository's CLAUDE.md, which has precise conventions): `v`, `now`, `site`, `overall`, an optional
+  top-level `jellyfin` (`transcodes`, `tasks[]`), then the sections `services` (counts and `items`
+  with `name`, `status`, `ms`), `incidents`, `maintenance`, `resources` (cpu, mem, net, `disks[]`,
+  `gpus[]`), `announcements`. Every list has a cap and every string a cap in bytes; the caps are the
+  `MAX_*` constants of `portal_data.h` and must follow the portal's.
+- **The three parameters are opt-in on the portal's side**: without them the portal sends exactly what
+  1.10.0 sent. The firmware always asks for all three; a portal that does not know them ignores them and
+  the screens show less (four disks, no GPU, no latency, no Jellyfin band, services that are not
+  operational only). A new field therefore never needs a firmware release to stay compatible, but a firmware
+  that wants one needs the portal released first.
+- **Size.** The answer is read whole into a String (`BodySink`, capped at `MAX_BODY` = 8 KB, the portal's
+  worst case with all three parameters is about 7.7 KB), then parsed by ArduinoJson without a filter into
+  `Summary` (about 2.6 KB static, `portal::cache`). The request needs the GIF decoder to be closed (it is,
+  `portal.cpp`) and about 15 KB of heap at the peak; with less it is skipped and retried in 10 s.
+- **`portal_parse.cpp` is pure** (no Arduino, no network): it is built on the PC by `tools/test_host.sh`
+  with the sanitizers on, against hand-written answers, the contract's example, the largest possible
+  answer and a fuzzer. **Every number and string is read defensively** (null, wrong type, too long:
+  never a crash, never a write past a buffer). Keep it that way: it reads what another machine sends.
+- **The two screens redraw only what changed** (signatures per block, row or band) and never clear the
+  screen to repaint it: `Update(false)` with unchanged data must make zero drawing calls (the tests
+  assert it). The Resources screen splits its blocks (CPU, RAM, two per GPU, one per disk) evenly over
+  pages of at most six, turning every `portal_page` seconds, with "Page n/m" in the footer. While Jellyfin
+  is busy, `portal_ui::jellyfinLine()` / `drawBand()` split the Status-Portal banner (36 px) and the
+  Resources header (28 px, 32 while busy) into a status half and a blue Jellyfin band.
+- **Alerts** (`portal_alert`): `switch` makes the Status-Portal screen take over while the portal
+  reports a problem and give the screen back afterwards; `indicator` draws a red or orange dot in the
+  corner of every other theme; `off` does neither (`display.cpp`, `updateAlertSwitch()` / `updateAlertDot()`).
+- **Diagnostics** are shown in the web interface's Status-Portal tab and in `/api/status`
+  (`portal_on`, `portal_ok`, `portal_age`, `portal_overall`, `portal_err`, `portal_try_age`,
+  `portal_fails`, `portal_http`): when the screens say "unreachable", read those first.
+- **`/api/status` also carries `req_heap`, `gif` and `media_err`** (GIF yielding, rule 10): the free heap
+  when the last request started, whether a GIF was playing (0 no, 1 kept, 2 closed for that request) and
+  the last picture error. They are how to see the album from the dev machine.
+
 HTTP routes:
 | Route | Purpose |
 |---|---|
@@ -436,8 +481,39 @@ HTTP routes:
   owner's settings.
 
 ## 14. What is left
-Planned features and known limitations are in [ROADMAP.md](ROADMAP.md): smooth
-fonts, the Status-Portal integration (the Status-Portal tab is only a placeholder), the
-on-device auto-updater (blocked by the size of HTTPS/BearSSL), and so on. Add an idea there, not
-here; when something ships, remove it from `ROADMAP.md` (the changelog is the record of what
+Planned features and known limitations are in [ROADMAP.md](ROADMAP.md): smooth fonts, a richer weather
+screen, the on-device auto-updater (blocked by the size of HTTPS/BearSSL), more heap for the GIFs, a
+progress bar for Jellyfin's tasks (needs Status-Portal to keep the progress first), and so on. Add an idea
+there, not here; when something ships, remove it from `ROADMAP.md` (the changelog is the record of what
 exists). Check every idea against the 520,000-byte limit and the memory rule first.
+
+## 15. Resuming work (read this first if you are a new session)
+1. **State.** `main` holds 1.0.0 (section 2). Read section 2, then `git log --oneline -15`,
+   `CHANGELOG.md` and `ROADMAP.md`. Nothing is half-done on a branch unless `git branch -a` says so.
+2. **Toolchain** (project-local, created by `bash tools/setup.sh`, git-ignored): build with
+   `PLATFORMIO_CORE_DIR=$PWD/.pio-core .venv/bin/pio run`, check the image with
+   `.venv/bin/python tools/check_firmware.py .pio/build/smalltv-ultra/firmware.bin`, run the PC
+   tests with `bash tools/test_host.sh` (it needs one firmware build first: it borrows ArduinoJson from
+   `.pio/libdeps`). Run the tests after every change to `portal_*`, `screen_portal.cpp` or
+   `screen_resources.cpp`; they take seconds and catch layout overflows (the stand-in knows font 2 and 4
+   only: do not use another font in a portal screen without teaching it to `tests/host/TFT_eSPI.h`).
+3. **Seeing a screen without eyes.** Set `PORTAL_OPS_DIR=<dir>` when running the screen tests: every
+   scenario writes its drawing calls as JSON lines (`{"op":"rect"|"text"|...}`), and a throw-away script
+   that replays them with Pillow gives a picture. The font metrics are approximate, the layout is real.
+4. **The device.** It can only be driven over the network (section 10). Ask the owner for its address
+   and for permission before uploading anything (rule 5). `bash tools/upload.sh <ip> <bin>` checks
+   `/v.json` before and after. To look at one theme without writing flash: `POST /api/settings?save=0`
+   with `{"theme":"<name>","auto_switch":0}` (the rotation must be off or a theme outside it is skipped),
+   read `/api/status`, then post the owner's own values back. A reboot restores the saved settings.
+   `GET /api/backup` holds the Wi-Fi password: keep it out of the repository and delete it after use.
+5. **Releasing**: section 5 and `docs/releasing.md`. A branch per version, one commit per change with
+   its tests and `CHANGELOG.md` entry, `bash tools/release.sh --dry-run` then `bash tools/release.sh`,
+   wait for the CI run on the exact `HEAD` first (`gh run list --branch <b> --json headSha,conclusion`).
+   Status-Portal is released first when a change needs a new portal field.
+6. **Do not guess what the screen looks like.** Say what was run (PC tests, build, device status) and what
+   was not (how it looks, anything needing a real portal answer). The owner tests on the device and finds
+   what the tests missed; several rules in this file come from that.
+7. **Sensible next steps**, in the order the owner would probably ask: whatever they report after looking at
+   1.0.0 on the screen; more room for the GIFs (static RAM: 3.5 KB of string literals sit in RAM in `web.cpp`
+   and about 10 KB in all, see ROADMAP "Memory"); Jellyfin task progress (portal first); the auto-updater
+   only if flash is found first.

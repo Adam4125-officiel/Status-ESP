@@ -1,7 +1,8 @@
 // Status-Portal client: asks a Status-Portal (1.10.0 or newer) how the services are doing and caches
 // the answer for the two screens (screen_portal.cpp, screen_resources.cpp) and the alert.
 //
-//   GET http://<portal>/api/device/summary?sections=<the switched-on ones>      X-Api-Key: <key>
+//   GET http://<portal>/api/device/summary?sections=<the switched-on ones>&services=all&resources=all&jellyfin=1
+//                                                                              X-Api-Key: <key>
 //
 // The answer is compact JSON of at most 8 KB (portal_data.h has the contract and the parser).
 //
