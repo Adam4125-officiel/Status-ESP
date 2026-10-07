@@ -9,6 +9,9 @@ changes the first, second and third number, and what a `-rc.N` pre-release is) i
 
 ### Changed
 - On the Status-Portal screen the latency now comes before the status word ("45ms OK", "1.8s SLOW").
+- Jellyfin's activity is no longer listed on the Resources screen (the lines were easy to miss). The
+  device now asks for it with `jellyfin=1` and reads it from the header of the answer, so it arrives
+  whichever sections are switched on. Needs Status-Portal **1.11.0-rc.4**.
 
 ## [0.4.0-rc.4] - 2026-10-07
 

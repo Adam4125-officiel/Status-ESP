@@ -314,7 +314,9 @@ static void testLargest() {
 // resources=all (portal >= 1.11.0-rc.2): eight disks and up to four GPUs, with the nastiest strings.
 static void testGpusAndTheLargestRequest() {
   const char *nasty = "\"A\\\xC3\xA9\xC3\x86\xF0\x9F\x98\x80z/";
-  std::string j = "{\"v\":1,\"now\":\"2026-10-06T12:00:00Z\",\"site\":\"H\",\"overall\":\"down\",";
+  std::string j = "{\"v\":1,\"now\":\"2026-10-06T12:00:00Z\",\"site\":\"H\",\"overall\":\"down\",\"jellyfin\":{\"transcodes\":99,\"tasks\":[";
+  for (int i = 0; i < 3; i++) j += std::string(i ? "," : "") + "\"" + esc(capped(nasty, 28)) + "\"";
+  j += "]},";
   j += "\"services\":{\"total\":65535,\"operational\":1,\"slow\":2,\"degraded\":3,\"maintenance\":4,\"down\":5,\"items\":[";
   for (int i = 0; i < 40; i++) j += std::string(i ? "," : "") + "{\"name\":\"" + esc(capped(nasty, 24)) + "\",\"status\":\"slow\",\"ms\":65535}";
   j += "]},\"incidents\":{\"open\":9,\"items\":[";
@@ -332,9 +334,7 @@ static void testGpusAndTheLargestRequest() {
   j += "],\"gpu_count\":9,\"gpus\":[";
   for (int i = 0; i < 4; i++)
     j += std::string(i ? "," : "") + "{\"name\":\"" + esc(capped(nasty, 20)) + "\",\"pct\":99.9,\"sev\":\"crit\",\"mem_used_gb\":9999.9,\"mem_total_gb\":9999.9,\"temp_c\":99.9}";
-  j += "],\"jellyfin\":{\"transcodes\":99,\"tasks\":[";
-  for (int i = 0; i < 3; i++) j += std::string(i ? "," : "") + "\"" + esc(capped(nasty, 28)) + "\"";
-  j += "]}},\"announcements\":{\"count\":3,\"items\":[";
+  j += "]},\"announcements\":{\"count\":3,\"items\":[";
   for (int i = 0; i < 3; i++)
     j += std::string(i ? "," : "") + "{\"title\":\"" + esc(capped(nasty, 32)) + "\",\"text\":\"" + esc(capped(nasty, 80)) + "\",\"type\":\"critical\",\"pinned\":true}";
   j += "]}}";
@@ -349,7 +349,8 @@ static void testGpusAndTheLargestRequest() {
   CHECK(s.resources.gpus[3].pct == 100 && s.resources.gpus[3].sev == SEV_CRIT && s.resources.gpus[3].tempC == 100);
   CHECK(s.resources.gpus[0].memUsedDg == 65535);   // 9999.9 GB in tenths, clamped
   CHECK(strlen(s.resources.gpus[0].name) <= MAX_GPU_NAME);
-  CHECK(s.resources.jfTranscodes == 99 && s.resources.jfTaskN == MAX_JF_TASKS && strlen(s.resources.jfTask[0]) <= MAX_JF_TASK_NAME);
+  CHECK(s.jellyfin.transcodes == 99 && s.jellyfin.taskN == MAX_JF_TASKS && strlen(s.jellyfin.task[0]) <= MAX_JF_TASK_NAME);
+  CHECK(jellyfinBusy(s));
   CHECK(s.services.items[39].ms == 65535 && s.services.items[39].status == ST_SLOW);
 
   // More cards and disks than the contract allows: the parser stops at its caps.
@@ -382,16 +383,19 @@ static void testGpusAndTheLargestRequest() {
   CHECK(parse(lat, SEC_SERVICES, s, err, sizeof(err)) == PARSE_OK);
   CHECK(s.services.items[0].ms == 45 && s.services.items[1].ms == 0 && s.services.items[2].ms == 0);
 
-  // Jellyfin's activity: transcodes and task names, capped and folded; absent means idle.
-  std::string jf = "{\"v\":1,\"now\":\"2026-10-06T12:00:00Z\",\"site\":\"H\",\"overall\":\"operational\",\"resources\":{\"cpu\":1,"
-                   "\"jellyfin\":{\"transcodes\":2,\"tasks\":[\"Generate Trickplay Images\",7,\"\",\"Caf\xC3\xA9\",\"c\",\"d\"]}}}";
-  CHECK(parse(jf, SEC_RESOURCES, s, err, sizeof(err)) == PARSE_OK);
-  CHECK(s.resources.jfTranscodes == 2 && s.resources.jfTaskN == MAX_JF_TASKS);
-  CHECK_STR(s.resources.jfTask[0], "Generate Trickplay Images");
-  CHECK_STR(s.resources.jfTask[1], "task");   // an empty name still says that something runs
-  CHECK_STR(s.resources.jfTask[2], "Cafe");
+  // Jellyfin's activity, in the header: transcodes and task names, capped and folded; absent means idle.
+  // It is read whichever sections were asked for.
+  std::string jf = "{\"v\":1,\"now\":\"2026-10-06T12:00:00Z\",\"site\":\"H\",\"overall\":\"operational\","
+                   "\"jellyfin\":{\"transcodes\":2,\"tasks\":[\"Generate Trickplay Images\",7,\"\",\"Caf\xC3\xA9\",\"c\",\"d\"]}}";
+  CHECK(parse(jf, SEC_SERVICES, s, err, sizeof(err)) == PARSE_OK);
+  CHECK(s.jellyfin.transcodes == 2 && s.jellyfin.taskN == MAX_JF_TASKS && jellyfinBusy(s));
+  CHECK_STR(s.jellyfin.task[0], "Generate Trickplay Images");
+  CHECK_STR(s.jellyfin.task[1], "task");   // an empty name still says that something runs
+  CHECK_STR(s.jellyfin.task[2], "Cafe");
   CHECK(parse(none, SEC_RESOURCES, s, err, sizeof(err)) == PARSE_OK);
-  CHECK(s.resources.jfTranscodes == 0 && s.resources.jfTaskN == 0);
+  CHECK(s.jellyfin.transcodes == 0 && s.jellyfin.taskN == 0 && !jellyfinBusy(s));
+  std::string idle = "{\"v\":1,\"now\":\"2026-10-06T12:00:00Z\",\"site\":\"H\",\"overall\":\"operational\",\"jellyfin\":{\"transcodes\":0,\"tasks\":[]}}";
+  CHECK(parse(idle, 0, s, err, sizeof(err)) == PARSE_OK && !jellyfinBusy(s));
 }
 
 static void testTimestamps() {

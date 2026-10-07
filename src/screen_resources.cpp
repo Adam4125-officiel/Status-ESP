@@ -104,7 +104,6 @@ struct Block {
   char value[8];
   int16_t pct;        // NA = unknown
   uint8_t sev;
-  bool bar;           // false: a line of text only (Jellyfin's activity has no percentage)
 };
 
 void drawBar(int16_t y, int16_t pct, uint16_t color) {
@@ -125,15 +124,13 @@ void drawBlock(uint8_t index, const Block &b) {
   tft.setTextColor(b.pct == NA ? portal_ui::GREY : color, TFT_BLACK);
   tft.drawString(b.value, BAR_X + BAR_W, y, 2);
   tft.setTextPadding(0);
-  if (b.bar) drawBar(y + BAR_DY, b.pct, color);
-  else tft.fillRect(BAR_X, y + BAR_DY, BAR_W, BAR_H, TFT_BLACK);   // what the block before it had here
+  drawBar(y + BAR_DY, b.pct, color);
 }
 
 uint32_t blockSignature(const Block &b) {
   uint32_t h = hashText(2166136261u, b.label);
   h = hashText(h, b.value);
   h = hashBytes(h, &b.pct, sizeof(b.pct));
-  h = hashBytes(h, &b.bar, sizeof(b.bar));
   return hashBytes(h, &b.sev, sizeof(b.sev));
 }
 
@@ -142,13 +139,8 @@ void makeValue(char *out, size_t cap, int16_t pct) {
   else snprintf(out, cap, "%d%%", pct);
 }
 
-// Jellyfin's blocks: one for the transcodes while there are any, one per running task. None when it is idle.
-uint8_t jellyfinBlocks(const portal::Summary &d) { return (uint8_t)((d.resources.jfTranscodes ? 1 : 0) + d.resources.jfTaskN); }
-
-// How many blocks the answer holds: CPU, RAM, two per GPU (load, video memory), Jellyfin's, one per disk.
-uint8_t totalBlocks(const portal::Summary &d) {
-  return (uint8_t)(2 + 2 * d.resources.gpuN + jellyfinBlocks(d) + d.resources.n);
-}
+// How many blocks the answer holds: CPU, RAM, two per GPU (load, video memory), one per disk.
+uint8_t totalBlocks(const portal::Summary &d) { return (uint8_t)(2 + 2 * d.resources.gpuN + d.resources.n); }
 
 // "<name>   <tail>", the name giving way so that the whole label stays inside its padding.
 void makeLabel(char *out, size_t cap, const char *name, const char *tail) {
@@ -157,12 +149,10 @@ void makeLabel(char *out, size_t cap, const char *name, const char *tail) {
   snprintf(out, cap, "%s%s", fitted, tail);
 }
 
-// Builds block `index` (0 CPU, 1 RAM, then GPUs, Jellyfin's activity, then disks). False when there is no such block.
+// Builds block `index` (0 CPU, 1 RAM, then GPUs, then disks). False when there is no such block.
 bool makeBlock(const portal::Summary &d, uint8_t index, Block &b) {
   memset(&b, 0, sizeof(b));
-  b.bar = true;
   const auto &r = d.resources;
-  const uint8_t jfFirst = (uint8_t)(2 + 2 * r.gpuN);
   if (index == 0) {
     if (r.cpuTempC != NA) snprintf(b.label, sizeof(b.label), "CPU   %dC", r.cpuTempC);
     else strlcpy(b.label, "CPU", sizeof(b.label));
@@ -200,19 +190,8 @@ bool makeBlock(const portal::Summary &d, uint8_t index, Block &b) {
       if (b.pct != NA && b.pct > 100) b.pct = 100;
       b.sev = portal::SEV_OK;
     }
-  } else if (index < jfFirst + jellyfinBlocks(d)) {
-    // "Jellyfin   2 transcodes", then the name of each task it is running (trickplay, a library scan).
-    // The portal sends no progress for a task, so these are text only.
-    b.bar = false;
-    uint8_t at = (uint8_t)(index - jfFirst);
-    if (r.jfTranscodes && at == 0) {
-      snprintf(b.label, sizeof(b.label), "Jellyfin   %u %s", (unsigned)r.jfTranscodes, r.jfTranscodes == 1 ? "transcode" : "transcodes");
-    } else {
-      portal_ui::fitText(b.label, sizeof(b.label), r.jfTask[at - (r.jfTranscodes ? 1 : 0)], LABEL_W, 2);
-    }
-    return true;
   } else {
-    uint8_t disk = index - jfFirst - jellyfinBlocks(d);
+    uint8_t disk = index - 2 - 2 * r.gpuN;
     if (disk >= r.n) return false;
     // "Media   460 GB free"
     char size[12], tail[24];

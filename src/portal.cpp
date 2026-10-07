@@ -98,7 +98,7 @@ Outcome fetchOnce() {
   url += s.portalUrl;
   url += F("/api/device/summary?sections=");
   appendSections(url, sections);
-  url += F("&services=all&resources=all");   // every service, OK ones included, every disk and the GPUs (older portals ignore both)
+  url += F("&services=all&resources=all&jellyfin=1");   // every service (latency included), every disk and the GPUs, what Jellyfin is doing (older portals ignore all three)
 
   // HTTPClient::begin(client, url) keeps a CLONE of `client` and connects that one: this local object
   // never gets a connection, everything is read through the HTTPClient itself (see weather.cpp).

@@ -180,14 +180,16 @@ void readResources(JsonVariantConst o, Summary &out) {
     g.tempC = whole(it, "temp_c");
   }
   if (out.resources.gpuCount < out.resources.gpuN) out.resources.gpuCount = out.resources.gpuN;
-  // Jellyfin's activity (portal >= 1.11.0-rc.3, resources=all): transcodes now, and the tasks it is running.
-  JsonVariantConst jf = member(o, "jellyfin");
+}
+
+// Jellyfin's activity (portal >= 1.11.0-rc.4, jellyfin=1): transcodes now, and the tasks it is running.
+void readJellyfin(JsonVariantConst jf, Summary &out) {
   uint16_t tc = count(jf, "transcodes");
-  out.resources.jfTranscodes = (uint8_t)(tc > 255 ? 255 : tc);
+  out.jellyfin.transcodes = (uint8_t)(tc > 255 ? 255 : tc);
   for (JsonVariantConst t : member(jf, "tasks").as<JsonArrayConst>()) {
-    if (out.resources.jfTaskN >= MAX_JF_TASKS) break;
+    if (out.jellyfin.taskN >= MAX_JF_TASKS) break;
     if (!t.is<const char *>()) continue;
-    char *dst = out.resources.jfTask[out.resources.jfTaskN++];
+    char *dst = out.jellyfin.task[out.jellyfin.taskN++];
     ascii::fold(t.as<const char *>(), dst, MAX_JF_TASK_NAME + 1);
     if (!dst[0]) strlcpy(dst, "task", MAX_JF_TASK_NAME + 1);
   }
@@ -286,6 +288,7 @@ ParseResult parse(const Text &body, uint8_t sections, Summary &out, char *error,
   }
   out.now = parseTimestamp(text(root, "now"));
   copyText(root, "site", out.site, sizeof(out.site));
+  readJellyfin(member(root, "jellyfin"), out);
 
   JsonVariantConst obj;
   if (section(root, sections, SEC_SERVICES, "services", obj)) readServices(obj, out);

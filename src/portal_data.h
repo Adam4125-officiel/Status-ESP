@@ -152,10 +152,15 @@ struct Summary {
     uint8_t gpuCount;           // how many GPUs the portal sees (only sent with resources=all)
     uint8_t gpuN;
     Gpu gpus[MAX_GPU_ITEMS];
-    uint8_t jfTranscodes;       // Jellyfin transcodes running now (portal >= 1.11.0-rc.3, resources=all)
-    uint8_t jfTaskN;            // names of the scheduled tasks it is running (trickplay, scans...)
-    char jfTask[MAX_JF_TASKS][MAX_JF_TASK_NAME + 1];
   } resources;
+
+  // What Jellyfin is doing (portal >= 1.11.0-rc.4, asked for with jellyfin=1). It is in the header of the
+  // answer, not in a section, so it is here whichever sections were switched on. Idle: both are 0.
+  struct {
+    uint8_t transcodes;         // transcodes running now
+    uint8_t taskN;              // scheduled tasks it is running (trickplay generation, a library scan...)
+    char task[MAX_JF_TASKS][MAX_JF_TASK_NAME + 1];
+  } jellyfin;
 
   struct {
     bool present;
@@ -192,6 +197,9 @@ inline const char *statusName(uint8_t s) {
     default: return "unknown";
   }
 }
+
+// Jellyfin is transcoding or running a scheduled task.
+inline bool jellyfinBusy(const Summary &d) { return d.jellyfin.transcodes || d.jellyfin.taskN; }
 
 // Worse of two statuses.
 inline uint8_t worse(uint8_t a, uint8_t b) { return a > b ? a : b; }
