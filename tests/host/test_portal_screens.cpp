@@ -847,6 +847,65 @@ static void testJellyfinBand() {
   expectClean("portal, Jellyfin long task name");
 }
 
+
+// ---- Jellyfin's band in the Resources header -----------------------------------------------------------------
+
+static void testResourcesJellyfinBand() {
+  // Busy: the site name keeps the top band, a blue band under it says what Jellyfin does.
+  defaults();
+  beginFrame("resources_jellyfin_busy");
+  install(withJellyfin("{\"transcodes\":2,\"tasks\":[]}"));
+  tft.resetStats();
+  show(screenResourcesEnter, screenResourcesUpdate);
+  CHECK(drew("Home Server") && drew("Jellyfin  2 transcodes") && drewContaining("CPU"));
+  expectClean("resources, Jellyfin busy");
+
+  // Nothing changed: no drawing. The names of the tasks are cut to a line.
+  tft.resetStats();
+  screenResourcesUpdate(false);
+  CHECK(tft.ops == 0);
+
+  // With the alarm too: HIGH LOAD on top of the Jellyfin band.
+  defaults();
+  beginFrame("resources_jellyfin_alarm");
+  install(variant("\"cpu\":23.4,\"cpu_sev\":\"ok\"", "\"cpu\":97.0,\"cpu_sev\":\"crit\""));
+  show(screenResourcesEnter, screenResourcesUpdate);
+  g_ms += 60000;
+  install(withJellyfin("{\"transcodes\":0,\"tasks\":[\"Generate Trickplay Images\"]}",
+                       variant("\"cpu\":23.4,\"cpu_sev\":\"ok\"", "\"cpu\":97.0,\"cpu_sev\":\"crit\"").c_str()));
+  tft.resetStats();
+  screenResourcesUpdate(false);
+  CHECK(drew("HIGH LOAD") && drewContaining("Generate Trickplay") && !drew("Home Server"));
+  expectClean("resources, alarm and Jellyfin");
+
+  // It ends: the plain 28 px header comes back and the strip under it is cleared.
+  g_ms += 60000;
+  install(variant("\"cpu\":23.4,\"cpu_sev\":\"ok\"", "\"cpu\":97.0,\"cpu_sev\":\"crit\""));
+  tft.resetStats();
+  screenResourcesUpdate(false);
+  CHECK(drew("HIGH LOAD") && !drewContaining("Jellyfin"));
+  expectClean("resources, Jellyfin ended");
+
+  // Jellyfin's line is there on every page of a paged answer, and the widest of it fits.
+  defaults();
+  beginFrame("resources_jellyfin_paged");
+  std::string paged = pagedAnswer(4, 8, repeat('W', 20).c_str(), 16);
+  size_t at = paged.find("\"overall\":");
+  at = paged.find(",", at);
+  paged.insert(at + 1, "\"jellyfin\":{\"transcodes\":255,\"tasks\":[\"" + repeat('W', 28) + "\"]},");
+  install(paged);
+  tft.resetStats();
+  show(screenResourcesEnter, screenResourcesUpdate);
+  CHECK(drewContaining("Jellyfin  255 transcodes"));
+  expectClean("resources, Jellyfin worst, page 1");
+  for (int page = 2; page <= 3; page++) {
+    g_ms += 6000;
+    tft.resetStats();
+    screenResourcesUpdate(false);
+    expectClean("resources, Jellyfin worst, later page");
+  }
+}
+
 // An answer with a section the firmware does not know, or fields it does not use, changes nothing.
 static void testNewerPortal() {
   defaults();
@@ -869,6 +928,7 @@ int main() {
   testResourcesPaging();
   testLatencyAndJellyfin();
   testJellyfinBand();
+  testResourcesJellyfinBand();
   testNewerPortal();
   beginFrame("");
   printf("%d checks, %d failed\n", checks, failures);

@@ -12,6 +12,8 @@ changes the first, second and third number, and what a `-rc.N` pre-release is) i
   (trickplay generation, a library scan), the status banner is split: the status keeps the top half in a
   smaller font and a blue band under it says "Jellyfin  2 transcodes", or the name of the task. It goes
   back to the one big word when Jellyfin is idle. Needs Status-Portal **1.11.0-rc.4**.
+- The same band on the **Resources** screen: the header grows from 28 to 32 px and is split in two (the
+  site name or HIGH LOAD on top, the blue Jellyfin band under it) while Jellyfin is busy.
 
 ### Changed
 - On the Status-Portal screen the latency now comes before the status word ("45ms OK", "1.8s SLOW").

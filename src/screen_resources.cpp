@@ -1,7 +1,8 @@
 // Theme "resources" (Status-Portal): the load of the machine the portal runs on.
 //
 //   y   0..27   header: the portal's site name, or a red band "HIGH LOAD" while the CPU or the
-//               memory is critical (the portal's own judgement, 85 % and up)
+//               memory is critical (the portal's own judgement, 85 % and up). While Jellyfin is busy it is
+//               32 px, split in two: that on top, a blue band saying what Jellyfin is doing under it
 //   y  32..     six blocks of 30 px per page: CPU, RAM, then each GPU (its load, then its video memory),
 //               then the disks, the fullest first. Each is a label on the left, the percentage on the
 //               right and a bar under them, coloured by the portal's own severity (green, orange from
@@ -87,14 +88,37 @@ bool highLoad(const portal::Summary &d) {
   return d.resources.present && (d.resources.cpuSev == portal::SEV_CRIT || d.resources.memSev == portal::SEV_CRIT);
 }
 
+// The header is 28 px: the site name, or a red "HIGH LOAD" band. While Jellyfin is busy it grows to 32 px and
+// is split in two bands of 16 px: the site name (or HIGH LOAD) on top, a blue band with what Jellyfin is doing
+// under it. The first block starts right below, so nothing else on the screen moves.
 void drawHeader(const portal::Summary &d) {
-  if (highLoad(d)) {
+  char jellyfin[48];
+  portal_ui::jellyfinLine(d, jellyfin, sizeof(jellyfin));
+  const bool alarm = highLoad(d);
+  if (jellyfin[0]) {
+    char site[32];
+    portal_ui::fitText(site, sizeof(site), d.site[0] ? d.site : "Resources", config::SCREEN_W - 8, 2);
+    if (alarm) portal_ui::drawBand(0, 16, portal_ui::RED, TFT_WHITE, "HIGH LOAD");
+    else portal_ui::drawBand(0, 16, TFT_BLACK, portal_ui::LIGHT_GREY, site);
+    portal_ui::drawBand(16, 16, portal_ui::BLUE, TFT_WHITE, jellyfin);
+    return;
+  }
+  tft.fillRect(0, HEADER_H, config::SCREEN_W, BLOCK_Y - HEADER_H, TFT_BLACK);   // the band of the split header, if it was there
+  if (alarm) {
     tft.fillRect(0, 0, config::SCREEN_W, HEADER_H, portal_ui::RED);
     display::drawFit("HIGH LOAD", 1, TFT_WHITE, portal_ui::RED);
   } else {
     tft.fillRect(0, 0, config::SCREEN_W, HEADER_H, TFT_BLACK);
     display::drawFit(d.site[0] ? d.site : "Resources", 1, portal_ui::LIGHT_GREY);
   }
+}
+
+// Changes when what drawHeader() would draw changes.
+uint32_t headerSignature(const portal::Summary &d) {
+  char jellyfin[48];
+  portal_ui::jellyfinLine(d, jellyfin, sizeof(jellyfin));
+  uint32_t h = hashText(highLoad(d) ? 1 : 2, highLoad(d) ? "" : d.site);
+  return hashText(h, jellyfin);
 }
 
 // --- Blocks -------------------------------------------------------------------------------------------------------
@@ -229,7 +253,7 @@ void updateContent(bool turned) {
   if (updated == shownUpdated && shownHeader >= 0 && !turned) return;   // nothing new: nothing to do
 
   // The answer is what the header and the blocks are made of.
-  uint32_t headerSig = highLoad(d) ? 1 : hashText(2, d.site);
+  uint32_t headerSig = headerSignature(d);
   if (shownHeader < 0 || headerSig != shownHeaderSig) {
     drawHeader(d);
     shownHeader = highLoad(d) ? 1 : 0;
