@@ -1,0 +1,29 @@
+# Local toolchain (created by tools/setup.*) and build output
+.venv/
+.pio/
+.pio-core/
+dist/
+
+# Firmware images never go in the repository:
+# our builds are published as GitHub Release assets, and GeekMagic's
+# (proprietary) firmware and personal flash dumps are never published at all.
+*.bin
+*.bin.gz
+
+# Output of tools/analyze_firmware.py
+*_analysis/
+*_analyse/
+
+# Python
+__pycache__/
+*.pyc
+
+# Editors / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Generated at build time from web/index.html (tools/embed_web.py)
+src/generated/

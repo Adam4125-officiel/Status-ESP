@@ -1,23 +1,25 @@
-# Compile le firmware et verifie qu'il respecte la limite de taille.
-# Resultat : .pio\build\smalltv-ultra\firmware.bin
+# Builds the firmware and checks that it respects the size limit.
+# Output: .pio\build\smalltv-ultra\firmware.bin
 
-# Pas de $ErrorActionPreference = "Stop" : sous PowerShell 5.1, les avertissements
-# du compilateur (stderr) deviendraient des erreurs fatales. On teste $LASTEXITCODE.
+# No $ErrorActionPreference = "Stop": under PowerShell 5.1, compiler warnings
+# (stderr) would become fatal errors. We test $LASTEXITCODE instead.
 $root = Split-Path $PSScriptRoot -Parent
 Set-Location $root
 
-# Toolchain stockee dans le projet (et pas dans %USERPROFILE%\.platformio)
+# Keep the toolchain inside the project (not in %USERPROFILE%\.platformio)
 $env:PLATFORMIO_CORE_DIR = Join-Path $root ".pio-core"
 
 .\.venv\Scripts\pio.exe run
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-# Le firmware d'origine ne laisse que ~540 Ko libres pour une mise a jour,
-# et notre firmware doit laisser >= 505 200 octets pour un retour a l'origine.
+# The stock firmware leaves only ~540 KB free for an update, and our firmware must
+# leave >= 505 200 bytes free so that going back to stock stays possible.
+# The image must be strictly smaller than $MaxSize.
 $MaxSize = 520000
+$version = (Get-Content (Join-Path $root "VERSION") -Raw).Trim()
 $bin = Get-Item ".pio\build\smalltv-ultra\firmware.bin"
-Write-Host ("firmware.bin : {0} octets (limite {1})" -f $bin.Length, $MaxSize)
-if ($bin.Length -gt $MaxSize) {
-    Write-Host "TROP GROS : il ne pourra pas etre installe depuis le firmware d'origine." -ForegroundColor Red
+Write-Host ("firmware.bin: version {0}, {1} bytes (limit {2})" -f $version, $bin.Length, $MaxSize)
+if ($bin.Length -ge $MaxSize) {
+    Write-Host "TOO BIG: it could not be installed from the stock firmware." -ForegroundColor Red
     exit 1
 }
