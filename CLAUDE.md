@@ -27,21 +27,22 @@ Founding constraints:
 - The stock files on the device (images, settings, Wi-Fi) stay untouched.
 
 ## 2. Current state (handover)
-- **1.1.0 is in progress on branch `1.1.0`** (2026-10-08, `1.1.0-rc.3` published, installed on the owner's device; PR #3 open as a draft;
-  rc.2 and rc.3 pulled the hourly chart, the VM footer and the Resources footer in from the edges, see the "plastic" rule in section 12). It
-  removes the countdown and analog-clock themes (to buy flash), adds the **hourly forecast** theme (`hourly`:
-  the next six hours in detail over a 24-hour temperature curve with rain bars) and the **virtual machines**
-  theme (`vms`: Hyper-V VM names, states and uptimes), and needs **Status-Portal 1.11.1** for the VMs. Read
-  `CHANGELOG.md` for the detail, and "NOT verified" below: none of it has been seen on a real screen.
-- **1.0.0 is the first stable release (2026-10-07).** The owner picked that number for the first
-  stable; the policy table in section 5 is unchanged. It rolls up the 0.3.0 and 0.4.0 lines (PRs
-  #1 and #2, merged into `main` with merge commits) and is the `0.4.0-rc.5` build with a new
-  version string. `main` is the only long-lived branch; the next version gets a branch of its
-  own (section 6).
+- **1.1.0 is the current stable release (2026-10-08)**, promoted from `1.1.0-rc.3` (same build, new version
+  string) after the owner tested the candidates on the device (PR #3 merged into `main` with a merge commit, branch
+  deleted; 1.0.0 was the first stable, 2026-10-07). It removed the countdown and analog-clock themes (to buy flash),
+  added the **hourly forecast** theme (`hourly`: the next six hours in detail over a 24-hour temperature curve with
+  rain bars) and the **virtual machines** theme (`vms`: Hyper-V VM names, states and uptimes), and needs
+  **Status-Portal 1.11.1** for the VMs (released first, 2026-10-08). The policy table in section 5 is unchanged;
+  `main` is the only long-lived branch and the next version gets a branch of its own (section 6). Read
+  `CHANGELOG.md` for the detail. **Installed on the owner's device** (the stable build; rc.3 before it).
+- **What the owner's SmallTV-Ultra taught**: the plastic over the glass hides roughly the last 16 px at the bottom
+  (half of a label at y 222..238) and is unkind to anything within a few px of a side. Section 12 has the rule;
+  rc.2 and rc.3 applied it to the hourly chart, the VM footer and the Resources footer. **Not done**: the
+  Status-Portal screen's announcement band (y 220..236) is still at the edge - ROADMAP, "Display".
 - **Size: `firmware.bin` is 506,512 bytes against the 520,000 limit (about 13.5 KB of flash left; it was
   509,456 in 1.0.0: removing countdown (2.8 KB) and analog (7 KB, it was the only user of the trigonometry
   functions) paid for the hourly forecast (4 KB) and the VMs (2.7 KB)), static RAM 42,596 of 81,920, idle
-  free heap about 31 KB (largest block about 30 KB) - the heap is what 1.1.0 has not measured on the device.**
+  free heap about 31 KB at rest (largest block about 30 KB), measured on the device with 1.1.0.**
   Flash and RAM are both nearly spent: a feature has to find savings first (ROADMAP, "Memory").
   Read `heap`, `max_block` and `req_heap` in `/api/status` after any change that allocates.
 - **What the firmware has**: a six-tab web interface and JSON API; Open-Meteo weather with
@@ -74,11 +75,10 @@ Founding constraints:
   because the owner's portal was still on 1.11.0-rc.1 when this was released. Also never seen:
   GIF decoding speed, `status-esp.local` on a real network, the password prompt in a real browser,
   and the progressive-JPEG message. If the owner reports something odd on the screen, start from
-  that list. **1.1.0 adds to it**: the hourly forecast and VM screens were checked on a PC (layout bounds,
-  no redraw when unchanged, the parsers against garbage, pictures rendered from the real drawing calls) and
-  never looked at on the device, and the VM list has only ever been a stand-in's: this sandbox has no
-  Hyper-V. The hourly screen's icons were stubbed in those pictures, and 28 px is smaller than the icons
-  have been drawn at before.
+  that list. **1.1.0**: the owner ran rc.1 to rc.3 on the device and called them stable, and what they saw is
+  how the edge margins came about (rc.2, rc.3); what this sandbox never produced is a VM list from a real
+  Hyper-V host (it has none), and the hourly screen's icons were stubbed in every picture it rendered. The
+  device was read after each upload (`heap` about 31 KB at rest, weather and portal link up), not watched.
 - Installing the firmware changes the device's visible identity (rescue access point
   `Status-ESP`, hostname `status-esp`, `/v.json` reports `Status-ESP-<version>`); the settings
   file is still `/custom.json` (section 5). **v0.2.0 is a tag only**: it was never published.
@@ -197,7 +197,8 @@ The full description is in [docs/releasing.md](docs/releasing.md); the essential
 - **One commit per completed change**, with its tests, docs and `CHANGELOG.md` entry in that
   same commit. Never one giant commit at the end of a session: `git bisect` and `git revert`
   only work at commit granularity, and release notes are written from the history.
-- **Merge with a regular merge commit** (`gh pr merge <n> --merge`), **never squash or
+- **Merge with a regular merge commit** (`gh pr merge <n> --merge`; a draft PR must be marked ready first with
+  `gh pr ready <n>`), **never squash or
   rebase**: it would collapse the separate per-change commits.
 - A **docs-only edit** goes straight to `main` when no branch is open; if a branch is open, it
   rides along on that branch. The stable `VERSION` bump is not a docs-only edit: it is the
@@ -522,14 +523,14 @@ there, not here; when something ships, remove it from `ROADMAP.md` (the changelo
 exists). Check every idea against the 520,000-byte limit and the memory rule first.
 
 ## 15. Resuming work (read this first if you are a new session)
-1. **State.** `main` holds 1.0.0; branch `1.1.0` holds the 1.1.0 work (section 2). Read section 2, then
-   `git log --oneline -15`, `CHANGELOG.md` and `ROADMAP.md`. Nothing is half-done on a branch unless
-   `git branch -a` says so.
+1. **State.** `main` holds 1.1.0, stable (section 2). Read section 2, then `git log --oneline -15`,
+   `CHANGELOG.md` and `ROADMAP.md`. Nothing is half-done on a branch unless `git branch -a` says so.
 2. **Toolchain** (project-local, created by `bash tools/setup.sh`, git-ignored): build with
    `PLATFORMIO_CORE_DIR=$PWD/.pio-core .venv/bin/pio run`, check the image with
    `.venv/bin/python tools/check_firmware.py .pio/build/smalltv-ultra/firmware.bin`, run the PC
    tests with `bash tools/test_host.sh` (it needs one firmware build first: it borrows ArduinoJson from
-   `.pio/libdeps`). Run the tests after every change to `portal_*`, `weather_hourly.*` or any `screen_*.cpp`
+   `.pio/libdeps`; it stops at the first test program that fails, so run a later one by hand to see it fail too).
+   Run the tests after every change to `portal_*`, `weather_hourly.*` or any `screen_*.cpp`
    they cover (`screen_portal`, `screen_resources`, `screen_vms`, `screen_hourly`); they take seconds and
    catch layout overflows (the stand-in knows font 2 and 4 only: do not use another font in one of those
    screens without teaching it to `tests/host/TFT_eSPI.h`).

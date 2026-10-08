@@ -5,7 +5,7 @@ Alternative firmware for the **GeekMagic SmallTV-Ultra**, a small connected disp
 page**, with no need to open the case or plug in a cable, and you can **go back to the
 stock firmware** at any time the same way.
 
-> Status: **1.0.0, the first stable release**: a clock, weather, forecast and photo-album display with a
+> Status: **1.1.0, stable** (1.0.0 was the first stable release): a clock, weather, forecast, hourly forecast and photo-album display with a
 > web interface to configure it, and a window on [Status-Portal](https://github.com/Adam4125-officiel/Status-Portal),
 > a sibling project: the display shows its service status, incidents, maintenance, server resources
 > (CPU, memory, GPUs, disks, Jellyfin's activity), its Hyper-V virtual machines and announcements (see [Status-Portal](#status-portal)
