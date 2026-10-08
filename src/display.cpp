@@ -19,14 +19,14 @@ struct Screen {
 static const Screen SCREENS[settings::THEME_COUNT] = {
     {screenWeatherEnter, screenWeatherUpdate, screenWeatherLeave},      // THEME_WEATHER_CLOCK
     {screenForecastEnter, screenForecastUpdate, screenForecastLeave},   // THEME_FORECAST
+    {screenHourlyEnter, screenHourlyUpdate, screenHourlyLeave},         // THEME_HOURLY
     {screenAlbumEnter, screenAlbumUpdate, screenAlbumLeave},            // THEME_ALBUM
     {screenClockEnter, screenClockUpdate, screenClockLeave},            // THEME_CLOCK
-    {screenAnalogEnter, screenAnalogUpdate, screenAnalogLeave},         // THEME_ANALOG
-    {screenCountdownEnter, screenCountdownUpdate, screenCountdownLeave},   // THEME_COUNTDOWN
     {screenWordsEnter, screenWordsUpdate, screenWordsLeave},            // THEME_WORDS
     {screenBinaryEnter, screenBinaryUpdate, screenBinaryLeave},         // THEME_BINARY
     {screenPortalEnter, screenPortalUpdate, screenPortalLeave},         // THEME_PORTAL
     {screenResourcesEnter, screenResourcesUpdate, screenResourcesLeave},   // THEME_RESOURCES
+    {screenVmsEnter, screenVmsUpdate, screenVmsLeave},                  // THEME_VMS
 };
 
 static const uint8_t NO_THEME = 255;
@@ -126,13 +126,15 @@ static bool available(uint8_t theme) {
   switch (theme) {
     case settings::THEME_WEATHER_CLOCK:
     case settings::THEME_FORECAST:
+    case settings::THEME_HOURLY:
       return settings::hasCity();
-    case settings::THEME_COUNTDOWN:
-      return settings::get().cdYear != 0;
     case settings::THEME_PORTAL:   // without an answer it says why (not set up, unreachable...), so only "set up" counts
       return portal::configured();
     case settings::THEME_RESOURCES:
       return portal::configured() && (settings::get().portalSections & portal::SEC_RESOURCES);
+    case settings::THEME_VMS:   // skipped while the portal is known to have none: a slide of "no VMs" helps nobody
+      return portal::configured() && (settings::get().portalSections & portal::SEC_VMS) &&
+             !(portal::fresh() && portal::data().vms.n == 0);
     case settings::THEME_ALBUM:
       hasPicture = false;
       media::listDir(config::DIR_IMAGE, noteFile, nullptr);

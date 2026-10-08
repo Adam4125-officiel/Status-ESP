@@ -5,11 +5,11 @@ Alternative firmware for the **GeekMagic SmallTV-Ultra**, a small connected disp
 page**, with no need to open the case or plug in a cable, and you can **go back to the
 stock firmware** at any time the same way.
 
-> Status: **1.0.0, the first stable release**: a clock, weather, forecast and photo-album display with a
+> Status: **1.1.0, stable** (1.0.0 was the first stable release): a clock, weather, forecast, hourly forecast and photo-album display with a
 > web interface to configure it, and a window on [Status-Portal](https://github.com/Adam4125-officiel/Status-Portal),
 > a sibling project: the display shows its service status, incidents, maintenance, server resources
-> (CPU, memory, GPUs, disks, Jellyfin's activity) and announcements (see [Status-Portal](#status-portal)
-> below; Status-Portal 1.11.0 or newer is best). It builds and passes the automated checks; what has and has not
+> (CPU, memory, GPUs, disks, Jellyfin's activity), its Hyper-V virtual machines and announcements (see [Status-Portal](#status-portal)
+> below; Status-Portal 1.11.1 or newer is best). It builds and passes the automated checks; what has and has not
 > been tested on a real device is in [CLAUDE.md](CLAUDE.md) and [ROADMAP.md](ROADMAP.md), which also say what is planned.
 
 ## Installation
@@ -50,12 +50,12 @@ Version numbering and the release process are described in
     humidity, wind and pressure, and a small 80x80 animated GIF of your choice;
   - *Simple weather clock*: a big time, the weather icon and the current temperature;
   - *Forecast*: the next three days with icon, highest and lowest temperature;
+  - *Hourly forecast*: the next 24 hours - the next six in detail (icon, temperature, chance of rain)
+    and a temperature curve with rain bars for the whole day;
   - *Photo album*: the JPG and animated GIF files in `/image`, one after the other or one fixed
     picture;
   - *Clock*: a big clock in the colours you choose;
-  - *Analog clock*: a clock face with hour, minute and second hands, and the date;
   - *Big digits*: the hour over the minutes in very large digits, with a seconds bar;
-  - *Countdown*: the days (then hours, minutes and seconds) left until a date you pick;
   - *Word clock*: the time spelled out in English by lighting words in a grid of letters, to the
     nearest five minutes, with four dots for the minutes in between;
   - *Rings*: three concentric rings (seconds, minutes, hours) filling around the digital time;
@@ -97,12 +97,14 @@ deletes nothing).
 ## Status-Portal
 The display can show information from a [Status-Portal](https://github.com/Adam4125-officiel/Status-Portal)
 server on your local network:
-1. Update Status-Portal to **1.11.0 or newer** (1.10.0 works but shows less: no GPUs, latencies, Jellyfin
-   band or full service list), open its admin panel, **System → Display device**, enable it and copy the key.
+1. Update Status-Portal to **1.11.1 or newer** (1.11.0 works but has no virtual machines; 1.10.0 shows even
+   less: no GPUs, latencies, Jellyfin band or full service list), open its admin panel, **System → Display device**, enable it and copy the key.
 2. In the device's web interface, **Status-Portal** tab: enter the portal's local address with
    `http://` (for example `http://192.0.2.10:5000`; the ESP8266 cannot do `https://`) and the key,
    choose what to show and the alert mode, then **Test connection**.
-3. Add the `portal` and `resources` themes to the rotation, or let the alert mode switch to them.
+3. Add the `portal`, `resources` and `vms` (Hyper-V virtual machines: name, state and uptime of each) themes to the
+   rotation, or let the alert mode switch to them. A device that was already set up does not get the new
+   themes in its rotation by itself: tick them in **Settings**.
 
 ## Going back to the stock firmware
 Upload the official GeekMagic `.bin` to `/update`. See [docs/recovery.md](docs/recovery.md).

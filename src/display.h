@@ -21,9 +21,9 @@
 //                         decode (~100-300 ms) is acceptable once per picture.
 // Leave  : release resources (GIF decoder, files). May draw nothing. Idempotent.
 //
-// Names: screenClock*, screenWeather* (theme weather_clock), screenForecast*,
-// screenAlbum*, screenAnalog*, screenCountdown*, screenWords*,
-// screenBinary*, screenPortal*, screenResources*. All sets are
+// Names: screenClock*, screenWeather* (theme weather_clock), screenForecast*, screenHourly*,
+// screenAlbum*, screenWords*,
+// screenBinary*, screenPortal*, screenResources*, screenVms*. All sets are
 // declared below; the manager calls them through its own table, so a screen file only has
 // to define its three functions.
 //
@@ -53,19 +53,15 @@ void screenForecastEnter();
 void screenForecastUpdate(bool full);
 void screenForecastLeave();
 
+void screenHourlyEnter();
+void screenHourlyUpdate(bool full);
+void screenHourlyLeave();
+
 void screenAlbumEnter();
 void screenAlbumUpdate(bool full);
 void screenAlbumLeave();
 
-void screenAnalogEnter();
-void screenAnalogUpdate(bool full);
-void screenAnalogLeave();
 
-
-
-void screenCountdownEnter();
-void screenCountdownUpdate(bool full);
-void screenCountdownLeave();
 
 void screenWordsEnter();
 void screenWordsUpdate(bool full);
@@ -83,6 +79,10 @@ void screenPortalLeave();
 void screenResourcesEnter();
 void screenResourcesUpdate(bool full);
 void screenResourcesLeave();
+
+void screenVmsEnter();
+void screenVmsUpdate(bool full);
+void screenVmsLeave();
 
 namespace display {
 

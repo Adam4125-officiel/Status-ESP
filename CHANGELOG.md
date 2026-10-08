@@ -5,6 +5,57 @@ All notable changes to this project are documented in this file. The format foll
 changes the first, second and third number, and what a `-rc.N` pre-release is) is in
 [docs/releasing.md](docs/releasing.md).
 
+## [1.1.0] - 2026-10-08
+
+Promoted from `1.1.0-rc.3` (the same build with a new version string) after the owner tested the release candidates on
+their device and found them stable. Install it through the device's `/update` page like any release; the stock firmware
+stays one upload away. Needs **Status-Portal 1.11.1** for the VM screen (everything else works with 1.11.0).
+
+### Added
+- **The hourly forecast theme** (`hourly`): the next 24 hours on one screen. The top half shows the next six
+  hours side by side (hour, icon, temperature, chance of rain); the bottom half draws the 24 hours as a
+  temperature curve with the highest and lowest marked, the chance of rain of each hour as bars underneath, and
+  the hour of every sixth point. It uses the city, units and 12 or 24-hour format already set, goes by the
+  city's own hour (so a fetch that is an hour old still starts at the current hour, and a long outage says "No
+  hourly forecast" instead of showing the past), and is skipped in the rotation until a city is set. It keeps
+  16 px clear of the bottom and its chart 24 px from the sides, because the plastic over a SmallTV-Ultra's glass
+  hides the edge (on the owner's, half of the hour labels). The weather request now also asks Open-Meteo for the
+  hours (`forecast_hours=24`): the answer grows from about 1.1 KB to about 2.3 KB, and an answer without hours is
+  still a good one. Costs 4,016 bytes of firmware.
+- **The virtual machines theme** (`vms`, "Virtual machines (Status-Portal)"): the Hyper-V VMs of the machine the
+  portal runs on, five per page (two lines each: a dot in the colour of the state, the name and Hyper-V's own
+  state word on the right, and "up 3d 4h" under it while it runs), turning every `portal_page` seconds, with
+  "3 of 5 running" in the footer (above the plastic, at y 206..222) and the same Jellyfin band as the Resources
+  screen. A new "virtual machines" switch in the Status-Portal tab (`portal_vms`, on by default) decides whether
+  the device asks for them. Each of its empty states says why: switched off, a portal older than 1.11.1, or none
+  to show - and the rotation skips the theme while the portal is known to have none. The request now names the
+  `vms` section, and the device's cap on an answer goes from 8 to 9 KB (the portal's largest possible answer
+  with it measures 8.9 KB). Costs 2,736 bytes of firmware.
+
+### Changed
+- **The Resources screen's last line moved up.** The network rates and "Page 2/3" were at y 218..234, where the
+  plastic hides half a line; they are now at y 206..222. The blocks (CPU, RAM, GPUs, disks) are 28 px instead of
+  30, with the bar a pixel thinner, and there are still six to a page.
+- The PC tests know a "safe area" (nothing below y 224, and the hourly chart's labels 8 px from the sides) and fail
+  when the hourly, VM or Resources screen draws outside it. The Status-Portal screen's announcement band
+  (y 220..236) is not held to it yet and is not moved.
+
+### Removed
+- **The countdown theme**, its web form (label, date, time) and its `cd_date`, `cd_time` and `cd_label`
+  settings, to make room in flash (2,784 bytes). A saved choice of the theme falls back to the default theme,
+  and the three old settings in a settings file or backup are ignored.
+- **The analog clock theme**, for the same reason (6,976 bytes: it was the only user of the trigonometry
+  functions). A saved choice falls back to the default theme; the hour, minute and second colours stay, the
+  other clocks use them.
+
+### Not verified
+- The VM screen with data from a real Hyper-V host was never produced by the author's tests: their sandbox has no
+  Hyper-V, so the VM list was a stand-in's. The screens were otherwise checked on a PC (layout bounds, no redraw when
+  nothing changed, the parsers against garbage, pictures rendered from the real drawing calls) and on the device
+  (boots, keeps its Wi-Fi, weather and portal link, heap about 31 KB at rest).
+- A device that was already set up does not get the new themes in its rotation by itself: tick **Hourly
+  forecast** and **Virtual machines** under Settings.
+
 ## [1.0.0] - 2026-10-07
 
 The first stable release. It is the 0.4.0-rc.5 build with a new version string, and it rolls up

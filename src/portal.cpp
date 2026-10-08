@@ -23,7 +23,7 @@ const uint32_t RETRY_FIRST_MS = 30000;        // after the first failure, doubli
 const uint32_t RETRY_MAX_MS = 300000;
 const uint32_t NO_MEMORY_RETRY_MS = 10000;    // heap too fragmented right now: look again soon
 const uint32_t AFTER_WEATHER_MS = 2500;       // keep clear of a weather request that has just blocked the loop
-const size_t MAX_BODY = 8192;                 // the contract's bound with services=all and resources=all (Status-Portal >= 1.11.0-rc.2)
+const size_t MAX_BODY = 9216;                 // the contract's bound with every extension and the VMs (Status-Portal >= 1.11.1): 8.9 KB measured
 const uint32_t MIN_FREE_HEAP = 15000;         // the body, the parse (~8 KB at its peak), HTTPClient and the socket
 const uint32_t MIN_FREE_BLOCK = 6000;
 const uint32_t MIN_STALE_MS = 180000;         // an answer is "fresh" for three intervals, three minutes at least
@@ -68,9 +68,9 @@ uint8_t requestedSections() { return settings::get().portalSections & SEC_ALL; }
 // "services,incidents,..." for the ones that are on. The portal wants at least one known name (an
 // empty list means "everything"), so with every switch off ask for the cheapest one and read none.
 void appendSections(String &url, uint8_t sections) {
-  static const char *const NAMES[] = {"services", "incidents", "maintenance", "resources", "announcements"};
+  static const char *const NAMES[] = {"services", "incidents", "maintenance", "resources", "announcements", "vms"};
   bool first = true;
-  for (uint8_t i = 0; i < 5; i++) {
+  for (uint8_t i = 0; i < 6; i++) {
     if (!(sections & (1u << i))) continue;
     if (!first) url += ',';
     url += NAMES[i];

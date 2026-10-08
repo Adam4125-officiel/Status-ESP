@@ -19,12 +19,10 @@
 //   hc mc sc "#RRGGBB"    hour12 0|1    date_fmt 0 DD/MM/YYYY|1 MM/DD/YYYY|2 YYYY-MM-DD
 //   colon 0|1             font 0 digital (Font 7)|1 plain (Font 6)|2 large (Font 8, clock theme only)     ntp "" or host name
 //   album_auto 0|1        album_interval 2..3600 (s)    album_file "" or file in /image
-//   theme "weather_clock"|"forecast"|"album"|"clock"|"analog"|"countdown"|
+//   theme "weather_clock"|"forecast"|"hourly"|"album"|"clock"|
 //         "words"|"binary"|"portal"|"resources"
 //   auto_switch 0|1       auto_interval 5..3600 (s)     auto_themes ["clock", ...]
 //   night_en 0|1          night_start "HH:MM"           night_end "HH:MM"     night_brt 0..100
-//   cd_date "" (no countdown) or "YYYY-MM-DD" (2000..2099)   cd_time "HH:MM" (default 00:00)
-//   cd_label "" or up to 20 printable ASCII characters
 //   pw "" or 4..32 printable ASCII characters: the web password (user "admin"), "" = none.
 //       Write-only: it is stored in /custom.json but never returned by toJson() unless the
 //       caller asks for secrets (only save() does), so no API response and no export has it.
@@ -32,7 +30,7 @@
 //       refused, the device has no TLS; no path)    portal_key "" or 8..64 printable ASCII characters
 //       without spaces: Status-Portal's device key, write-only exactly like pw
 //   portal_interval 30..600 (s)  portal_page 2..60 (s)     portal_alert "off"|"indicator"|"switch"
-//   portal_services portal_incidents portal_maintenance portal_resources portal_announcements 0|1:
+//   portal_services portal_incidents portal_maintenance portal_resources portal_announcements portal_vms 0|1:
 //       which sections of the answer are asked for (and shown)
 #pragma once
 
@@ -44,14 +42,14 @@ namespace settings {
 enum Theme : uint8_t {
   THEME_WEATHER_CLOCK = 0,
   THEME_FORECAST = 1,
-  THEME_ALBUM = 2,
-  THEME_CLOCK = 3,
-  THEME_ANALOG = 4,
-  THEME_COUNTDOWN = 5,
-  THEME_WORDS = 6,
-  THEME_BINARY = 7,
-  THEME_PORTAL = 8,     // Status-Portal: overall status, services, incidents, maintenance, announcements
-  THEME_RESOURCES = 9,  // Status-Portal: the CPU, memory and disks of the machine the portal runs on
+  THEME_HOURLY = 2,     // the next 24 hours of the weather
+  THEME_ALBUM = 3,
+  THEME_CLOCK = 4,
+  THEME_WORDS = 5,
+  THEME_BINARY = 6,
+  THEME_PORTAL = 7,     // Status-Portal: overall status, services, incidents, maintenance, announcements
+  THEME_RESOURCES = 8,  // Status-Portal: the CPU, memory and disks of the machine the portal runs on
+  THEME_VMS = 9,        // Status-Portal: the Hyper-V virtual machines of the machine the portal runs on
   THEME_COUNT = 10       // autoMask is a uint16_t: at most 16 themes, this is the limit
 };
 // What Status-Portal's alert does to the display (portal_alert).
@@ -97,11 +95,6 @@ struct Settings {
   bool nightEnabled;
   uint16_t nightStart, nightEnd;      // minutes since local midnight
   uint8_t nightBrightness;
-  // Countdown theme: the target is local time (the clock's own offset). cdYear == 0 = none.
-  uint16_t cdYear;
-  uint8_t cdMonth, cdDay;
-  uint16_t cdMinutes;        // minutes since local midnight
-  char cdLabel[21];
   // Security
   char password[33];         // pw, "" = the web interface and the API are open
   // Status-Portal (a portal 1.10.0 or newer, over plain http on the LAN)
@@ -109,7 +102,7 @@ struct Settings {
   char portalKey[65];        // portal_key, "" = none. Write-only: never returned by the API or the export
   uint16_t portalInterval;   // portal_interval, seconds between two requests
   uint8_t portalPage;        // portal_page, seconds each page of the Status-Portal screen stays up
-  uint8_t portalSections;    // portal::Section mask: the five portal_* switches
+  uint8_t portalSections;    // portal::Section mask: the six portal_* switches
   uint8_t portalAlert;       // portal_alert (a PortalAlert)
 };
 
@@ -126,9 +119,9 @@ enum : uint32_t {
   CH_ALBUM = 1u << 8,
   CH_BOOT_DELAY = 1u << 9,
   CH_AUTH = 1u << 10,        // pw
-  CH_COUNTDOWN = 1u << 11,   // cd_date, cd_time, cd_label
-  CH_PORTAL = 1u << 12,      // portal_url, portal_key, portal_interval, portal_alert, the five switches
-  CH_VISUAL = CH_THEME | CH_CLOCK | CH_TIMEZONE | CH_LOCATION | CH_WEATHER | CH_ALBUM | CH_COUNTDOWN | CH_PORTAL
+  // bit 11 was the countdown theme's settings (removed in 1.1.0); not reused so a bit keeps one meaning
+  CH_PORTAL = 1u << 12,      // portal_url, portal_key, portal_interval, portal_alert, the six switches
+  CH_VISUAL = CH_THEME | CH_CLOCK | CH_TIMEZONE | CH_LOCATION | CH_WEATHER | CH_ALBUM | CH_PORTAL
 };
 
 // Mounts LittleFS WITHOUT ever formatting it (the stock files must survive), then

@@ -91,6 +91,7 @@ a{color:#8cf}
       <label class="inline"><input type="checkbox" name="portal_maintenance" data-t="b"> Maintenance in progress and coming up</label>
       <label class="inline"><input type="checkbox" name="portal_announcements" data-t="b"> Announcements</label>
       <label class="inline"><input type="checkbox" name="portal_resources" data-t="b"> The server's CPU, memory, GPUs, disks and Jellyfin activity (the Resources screen)</label>
+      <label class="inline"><input type="checkbox" name="portal_vms" data-t="b"> The server's virtual machines (the Virtual machines screen; needs Status-Portal 1.11.1)</label>
       <p class="hint">The device only asks the portal for what is ticked. A block with nothing in it is left out of the screen.</p>
 
       <h3>When something is wrong</h3>
@@ -225,19 +226,6 @@ a{color:#8cf}
       <button>Save</button>
     </form>
   </div>
-  <div class="card">
-    <h2>Countdown</h2>
-    <form data-settings id="f-countdown">
-      <label for="cd_label">Label (up to 20 letters, digits and symbols, no accents)</label>
-      <input type="text" id="cd_label" name="cd_label" maxlength="20" placeholder="Holidays">
-      <div class="row">
-        <div><label for="cd_date">Date</label><input type="date" id="cd_date" name="cd_date" min="2000-01-01" max="2099-12-31"></div>
-        <div><label for="cd_time">Time (optional)</label><input type="time" id="cd_time" name="cd_time"></div>
-      </div>
-      <p class="hint">Shown by the Countdown theme (pick it in Settings). Whole days left; during the last 24 hours it shows hours, minutes and seconds, and once the moment has come it says so. The time is the one of the clock on the device (see Time zone above). Clear the date to switch the countdown off.</p>
-      <button>Save</button>
-    </form>
-  </div>
 </section>
 
 <!-- 5. Pictures ------------------------------------------------------------------------------>
@@ -272,14 +260,14 @@ a{color:#8cf}
       <select id="theme" name="theme">
         <option value="weather_clock">Weather clock</option>
         <option value="forecast">Forecast (3 days)</option>
+        <option value="hourly">Hourly forecast (24 hours)</option>
         <option value="album">Photo album</option>
         <option value="clock">Clock</option>
-        <option value="analog">Analog clock</option>
-        <option value="countdown">Countdown</option>
         <option value="words">Word clock</option>
         <option value="binary">Binary clock</option>
         <option value="portal">Status-Portal</option>
         <option value="resources">Resources (Status-Portal)</option>
+        <option value="vms">Virtual machines (Status-Portal)</option>
       </select>
       <p class="hint">To choose a theme manually, turn auto-switch off.</p>
       <label class="inline"><input type="checkbox" name="auto_switch" data-t="b"> Auto-switch between themes</label>
@@ -288,16 +276,16 @@ a{color:#8cf}
       <div>
         <label class="inline"><input type="checkbox" name="auto_themes" value="weather_clock"> Weather clock</label>
         <label class="inline"><input type="checkbox" name="auto_themes" value="forecast"> Forecast</label>
+        <label class="inline"><input type="checkbox" name="auto_themes" value="hourly"> Hourly forecast</label>
         <label class="inline"><input type="checkbox" name="auto_themes" value="album"> Photo album</label>
         <label class="inline"><input type="checkbox" name="auto_themes" value="clock"> Clock</label>
-        <label class="inline"><input type="checkbox" name="auto_themes" value="analog"> Analog clock</label>
-        <label class="inline"><input type="checkbox" name="auto_themes" value="countdown"> Countdown</label>
         <label class="inline"><input type="checkbox" name="auto_themes" value="words"> Word clock</label>
         <label class="inline"><input type="checkbox" name="auto_themes" value="binary"> Binary clock</label>
         <label class="inline"><input type="checkbox" name="auto_themes" value="portal"> Status-Portal</label>
         <label class="inline"><input type="checkbox" name="auto_themes" value="resources"> Resources (Status-Portal)</label>
+        <label class="inline"><input type="checkbox" name="auto_themes" value="vms"> Virtual machines (Status-Portal)</label>
       </div>
-      <p class="hint">A theme without data (no city set, no picture uploaded, no countdown date, Status-Portal not set up) is skipped.</p>
+      <p class="hint">A theme without data (no city set, no picture uploaded, Status-Portal not set up) is skipped.</p>
       <button>Save</button>
     </form>
   </div>

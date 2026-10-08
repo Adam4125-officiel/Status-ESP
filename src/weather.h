@@ -8,18 +8,21 @@
 // so weather::loop() returns immediately unless a fetch is due. When one is due it
 // may block for at most ~5 s (HTTP timeout <= 5 s, set both on the client and on the
 // connect), at most once per settings::get().weatherInterval minutes, with a 60 s
-// back-off after a failure. The ~1.1 KB body is read whole by HTTPClient (capped at 4 KB, so a
+// back-off after a failure. The ~2.3 KB body is read whole by HTTPClient (capped at 4 KB, so a
 // wrong answer cannot eat the heap) and parsed from memory through an ArduinoJson filter, after
 // http.useHTTP10(true) so that the server does not answer with chunked encoding.
 // Check ESP.getMaxFreeBlockSize() first and skip the fetch (retry later) if it is
 // too low: a GIF decoder may be alive on the screen.
 //
-// Request (current + 3 days after today, all metric, local time of the city):
+// Request (current + 3 days after today + the next 24 hours, all metric, local time of the city):
 //   http://api.open-meteo.com/v1/forecast?latitude=..&longitude=..
 //     &current=temperature_2m,apparent_temperature,relative_humidity_2m,
 //              surface_pressure,wind_speed_10m,weather_code,is_day
 //     &daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset
-//     &timezone=auto&forecast_days=4&wind_speed_unit=kmh
+//     &hourly=temperature_2m,weather_code,precipitation_probability,is_day
+//     &timezone=auto&forecast_days=4&forecast_hours=24&wind_speed_unit=kmh
+// `forecast_hours` makes the hourly arrays start at the hour the answer was made in (and last that
+// many hours), instead of at midnight of the first day.
 // "utc_offset_seconds" in the answer is the offset of that city right now (DST
 // included): it drives the clock when the time zone is set to Auto.
 #pragma once
@@ -34,6 +37,18 @@ struct Day {
   float minC;
   float maxC;
 };
+
+// One hour of the hourly forecast. Metric, like everything in Data.
+struct Hour {
+  int16_t tempDc;   // temperature in tenths of a degree Celsius
+  uint8_t code;     // WMO weather code
+  uint8_t rain;     // chance of precipitation in percent, RAIN_UNKNOWN when the model gave none
+  uint8_t isDay;    // 1 by day, 0 by night
+};
+
+const uint8_t HOURLY_MAX = 24;      // hours kept (and asked for)
+const uint8_t RAIN_UNKNOWN = 255;
+const uint8_t HOUR_UNKNOWN = 255;
 
 // Always metric: convert at draw time with units.h.
 struct Data {
@@ -53,6 +68,9 @@ struct Data {
   int16_t sunriseMin;       // today's sunrise / sunset, minutes since local midnight (the city's
   int16_t sunsetMin;        // own time zone); -1 = not reported (polar day or night)
   Day forecast[3];          // the three days AFTER today (tomorrow first)
+  uint8_t hourN;            // hours in hours[]; 0 when the answer carried none
+  uint8_t hourFirst;        // local hour of the city (0..23) of hours[0], HOUR_UNKNOWN when hourN is 0
+  Hour hours[HOURLY_MAX];   // the hour the answer was made in, then the following ones
 };
 
 // Why the weather is (not) arriving, for the web interface and the "No weather data" screen.

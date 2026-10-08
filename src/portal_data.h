@@ -1,7 +1,8 @@
 // The Status-Portal answer, parsed into plain fixed-size structs, and the parser.
 //
-// Contract: Status-Portal 1.10.0 or newer, GET /api/device/summary (schema version 1). The answer is
-// compact JSON of at most 4096 bytes whose every list and string has a fixed cap; the structs below
+// Contract: Status-Portal 1.10.0 or newer, GET /api/device/summary (schema version 1; 1.11.1 for the VMs). The
+// answer is compact JSON of at most 4096 bytes (9 KB with every extension asked for) whose every list and string
+// has a fixed cap; the structs below
 // have room for exactly those caps, so nothing here allocates and a hostile or newer portal cannot
 // make anything larger. All text is folded to printable ASCII on the way in (ascii.h).
 //
@@ -44,14 +45,15 @@ enum IncidentStatus : uint8_t { INC_UNKNOWN = 0, INC_INVESTIGATING, INC_IDENTIFI
 enum Severity : uint8_t { SEV_OK = 0, SEV_WARN, SEV_CRIT };
 enum AnnouncementType : uint8_t { ANN_INFO = 0, ANN_WARNING, ANN_CRITICAL, ANN_SUCCESS };
 
-// Sections of the answer, as a bit mask (the web interface's five switches, and the `sections=` query).
+// Sections of the answer, as a bit mask (the web interface's six switches, and the `sections=` query).
 enum Section : uint8_t {
   SEC_SERVICES = 1,
   SEC_INCIDENTS = 2,
   SEC_MAINTENANCE = 4,
   SEC_RESOURCES = 8,
   SEC_ANNOUNCEMENTS = 16,
-  SEC_ALL = 31
+  SEC_VMS = 32,           // portal >= 1.11.1: an opt-in section, only sent when it is named
+  SEC_ALL = 63
 };
 
 // The caps of the contract (UTF-8 bytes; a folded string is never longer).
@@ -63,6 +65,7 @@ const size_t MAX_DISK_ITEMS = 8, MAX_DISK_NAME = 16;     // with resources=all (
 const size_t MAX_GPU_ITEMS = 4, MAX_GPU_NAME = 20;
 const size_t MAX_JF_TASKS = 3, MAX_JF_TASK_NAME = 28;
 const size_t MAX_ANN_ITEMS = 3, MAX_ANN_TITLE = 32, MAX_ANN_TEXT = 80;
+const size_t MAX_VM_ITEMS = 10, MAX_VM_NAME = 24, MAX_VM_STATE = 12, MAX_VM_UP = 10;   // portal >= 1.11.1
 
 const int16_t NA = -32768;   // "no value" for the integer readings below (the portal sends null)
 
@@ -99,6 +102,22 @@ struct Gpu {
   uint8_t sev;                  // SEV_*
   uint16_t memUsedDg, memTotalDg;   // video memory in gigabytes, in tenths
   int16_t tempC;                // NA when the card exposes none
+};
+
+// What a VM is doing, for its colour: Hyper-V's own state word is kept as text, this is the family it is in.
+enum VmKind : uint8_t {
+  VM_OTHER = 0,    // Unknown, Other, or a state this firmware has never heard of
+  VM_RUNNING,      // Running
+  VM_OFF,          // Off
+  VM_PAUSED,       // Paused, Saved, FastSaved
+  VM_BUSY          // Starting, Stopping, Saving, Pausing, Resuming, FastSaving, Snapshotting
+};
+
+struct Vm {
+  char name[MAX_VM_NAME + 1];
+  char state[MAX_VM_STATE + 1];   // Hyper-V's word: "Running", "Off", "Paused"...
+  char up[MAX_VM_UP + 1];         // the portal's short uptime text ("3d 4h"); only means something while running
+  uint8_t kind;                   // VM_*
 };
 
 struct Announcement {
@@ -168,6 +187,15 @@ struct Summary {
     uint8_t n;
     Announcement items[MAX_ANN_ITEMS];
   } announcements;
+
+  // The Hyper-V VMs (portal >= 1.11.1, only with sections=...,vms). present == false: the portal is older,
+  // could not read its VM list (null), or the section was not asked for. No VMs at all is present, total 0.
+  struct {
+    bool present;
+    uint16_t total, running;    // how many VMs the portal sees, and how many of them are running
+    uint8_t n;
+    Vm items[MAX_VM_ITEMS];
+  } vms;
 };
 
 enum ParseResult : uint8_t {

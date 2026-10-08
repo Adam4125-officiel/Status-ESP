@@ -14,6 +14,7 @@
 #include "net.h"
 #include "settings.h"
 #include "units.h"
+#include "weather_hourly.h"
 
 namespace weather {
 
@@ -22,7 +23,7 @@ namespace {
 const uint32_t HTTP_TIMEOUT_MS = 5000;     // connect, headers and each stalled read
 const uint32_t FAILURE_BACKOFF_MS = 60000; // after a failed fetch
 const uint32_t NO_MEMORY_RETRY_MS = 15000; // heap too fragmented right now: look again soon
-const size_t MAX_BODY = 4096;              // the real answer is ~1.1 KB
+const size_t MAX_BODY = 4096;              // the real answer is ~2.3 KB with the hourly part
 const uint32_t MIN_FREE_BLOCK = 9000;      // HTTP client + filtered document, with margin
 
 Data cache;
@@ -88,7 +89,7 @@ int16_t minutesOfLocalTime(const char *iso) {
   return (h > 23 || m > 59) ? -1 : (int16_t)(h * 60 + m);
 }
 
-// Keeps only what is used: the answer is ~1.5 KB of text, the filtered document a lot less.
+// Keeps only what is used: the answer is ~2.3 KB of text, the filtered document a lot less.
 void buildFilter(JsonDocument &filter) {
   filter["utc_offset_seconds"] = true;
   JsonObject cur = filter["current"].to<JsonObject>();
@@ -106,6 +107,12 @@ void buildFilter(JsonDocument &filter) {
   day["temperature_2m_min"][0] = true;
   day["sunrise"][0] = true;
   day["sunset"][0] = true;
+  JsonObject hour = filter["hourly"].to<JsonObject>();
+  hour["time"][0] = true;
+  hour["temperature_2m"][0] = true;
+  hour["weather_code"][0] = true;
+  hour["precipitation_probability"][0] = true;
+  hour["is_day"][0] = true;
 }
 
 // Fills `out` from the parsed document. Returns false when the answer is not usable.
@@ -147,6 +154,8 @@ bool extract(JsonDocument &doc, Data &out) {
     int8_t wd = weekdayOf(dTime[i + 1] | "");
     d.wday = wd < 0 ? 0 : (uint8_t)wd;
   }
+  // Optional: without usable hours the answer is still a good one, the hourly screen says so.
+  out.hourN = extractHourly(doc["hourly"], out.hours, HOURLY_MAX, out.hourFirst);
   out.valid = true;
   out.offsetValid = true;
   out.updatedAtMs = millis() ? millis() : 1;
@@ -171,7 +180,7 @@ Outcome fetchOnce() {
   units::formatFixed(lat, sizeof(lat), s.lat, 4);
   units::formatFixed(lon, sizeof(lon), s.lon, 4);
   String url;
-  url.reserve(300);
+  url.reserve(400);
   url += F("http://api.open-meteo.com/v1/forecast?latitude=");
   url += lat;
   url += F("&longitude=");
@@ -179,7 +188,8 @@ Outcome fetchOnce() {
   url += F("&current=temperature_2m,apparent_temperature,relative_humidity_2m,surface_pressure,"
            "wind_speed_10m,weather_code,is_day"
            "&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset"
-           "&timezone=auto&forecast_days=4&wind_speed_unit=kmh");
+           "&hourly=temperature_2m,weather_code,precipitation_probability,is_day"
+           "&timezone=auto&forecast_days=4&forecast_hours=24&wind_speed_unit=kmh");
 
   // HTTPClient::begin(client, url) keeps a CLONE of `client` and connects that one: this
   // local object never gets a connection. Everything is read through http.getStreamPtr();
@@ -211,7 +221,7 @@ Outcome fetchOnce() {
   // TCP segments (414 or 950 body bytes of ~1120, "IncompleteInput"), while this call gets it all.
   // The cause was never pinned down (see "Known pitfalls" in CLAUDE.md).
   BodySink sink(MAX_BODY);
-  sink.text.reserve(1280);
+  sink.text.reserve(2560);   // the answer is ~2.3 KB with the 24 hours
   http.writeToPrint(&sink);
   http.end();
   const String &body = sink.text;
@@ -229,7 +239,7 @@ Outcome fetchOnce() {
     DeserializationError err = deserializeJson(doc, body, DeserializationOption::Filter(filter));
     good = !err && extract(doc, fresh);
     if (err) {
-      // The length tells a truncated answer from a malformed one (the whole answer is ~1.1 KB).
+      // The length tells a truncated answer from a malformed one (the whole answer is ~2.3 KB).
       fail(PSTR("bad JSON: %s (%u B)"), err.c_str(), (unsigned)body.length());
     } else if (!good) {
       fail(doc.isNull() ? PSTR("answer is not JSON") : PSTR("unexpected answer"));

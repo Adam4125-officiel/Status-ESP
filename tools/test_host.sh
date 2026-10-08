@@ -25,14 +25,23 @@ g++ -std=gnu++17 -O1 -g -Wall -Wextra -Werror -Wno-maybe-uninitialized \
     -o "$out/test_portal_parse"
 "$out/test_portal_parse"
 
-# The two Status-Portal screens, against a recording stand-in for the display (tests/host/TFT_eSPI.h).
+# The three Status-Portal screens, against a recording stand-in for the display (tests/host/TFT_eSPI.h).
 # -Wno-format-truncation: units.h's formatFixed() is written for the device's small buffers, and the
 # compiler cannot know which values reach it.
 g++ -std=gnu++17 -O1 -g -Wall -Wextra -Werror -Wno-maybe-uninitialized -Wno-format-truncation \
     -fsanitize=address,undefined -fno-sanitize-recover=undefined \
     -DARDUINOJSON_USE_DOUBLE=0 -DARDUINOJSON_USE_LONG_LONG=0 -DFW_VERSION='"test"' \
     -Itests/host -Isrc -isystem "$json" \
-    tests/host/test_portal_screens.cpp src/screen_portal.cpp src/screen_resources.cpp src/portal_ui.cpp \
+    tests/host/test_portal_screens.cpp src/screen_portal.cpp src/screen_resources.cpp src/screen_vms.cpp src/portal_ui.cpp \
     src/portal_parse.cpp src/ascii.cpp \
     -o "$out/test_portal_screens"
 "$out/test_portal_screens"
+
+# The hourly forecast: the parser for Open-Meteo's hourly arrays and the theme that draws them.
+g++ -std=gnu++17 -O1 -g -Wall -Wextra -Werror -Wno-maybe-uninitialized -Wno-format-truncation \
+    -fsanitize=address,undefined -fno-sanitize-recover=undefined \
+    -DARDUINOJSON_USE_DOUBLE=0 -DARDUINOJSON_USE_LONG_LONG=0 -DFW_VERSION='"test"' \
+    -Itests/host -Isrc -isystem "$json" \
+    tests/host/test_hourly.cpp src/screen_hourly.cpp src/weather_hourly.cpp \
+    -o "$out/test_hourly"
+"$out/test_hourly"
