@@ -5,6 +5,15 @@ All notable changes to this project are documented in this file. The format foll
 changes the first, second and third number, and what a `-rc.N` pre-release is) is in
 [docs/releasing.md](docs/releasing.md).
 
+## [Unreleased]
+
+Needs **Status-Portal 1.11.1** for the VM screen (everything else works with 1.11.0).
+
+### Removed
+- **The countdown theme**, its web form (label, date, time) and its `cd_date`, `cd_time` and `cd_label`
+  settings, to make room in flash (2,784 bytes). A saved choice of the theme falls back to the default theme,
+  and the three old settings in a settings file or backup are ignored.
+
 ## [1.0.0] - 2026-10-07
 
 The first stable release. It is the 0.4.0-rc.5 build with a new version string, and it rolls up

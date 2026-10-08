@@ -55,7 +55,6 @@ Version numbering and the release process are described in
   - *Clock*: a big clock in the colours you choose;
   - *Analog clock*: a clock face with hour, minute and second hands, and the date;
   - *Big digits*: the hour over the minutes in very large digits, with a seconds bar;
-  - *Countdown*: the days (then hours, minutes and seconds) left until a date you pick;
   - *Word clock*: the time spelled out in English by lighting words in a grid of letters, to the
     nearest five minutes, with four dots for the minutes in between;
   - *Rings*: three concentric rings (seconds, minutes, hours) filling around the digital time;

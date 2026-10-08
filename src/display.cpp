@@ -22,7 +22,6 @@ static const Screen SCREENS[settings::THEME_COUNT] = {
     {screenAlbumEnter, screenAlbumUpdate, screenAlbumLeave},            // THEME_ALBUM
     {screenClockEnter, screenClockUpdate, screenClockLeave},            // THEME_CLOCK
     {screenAnalogEnter, screenAnalogUpdate, screenAnalogLeave},         // THEME_ANALOG
-    {screenCountdownEnter, screenCountdownUpdate, screenCountdownLeave},   // THEME_COUNTDOWN
     {screenWordsEnter, screenWordsUpdate, screenWordsLeave},            // THEME_WORDS
     {screenBinaryEnter, screenBinaryUpdate, screenBinaryLeave},         // THEME_BINARY
     {screenPortalEnter, screenPortalUpdate, screenPortalLeave},         // THEME_PORTAL
@@ -127,8 +126,6 @@ static bool available(uint8_t theme) {
     case settings::THEME_WEATHER_CLOCK:
     case settings::THEME_FORECAST:
       return settings::hasCity();
-    case settings::THEME_COUNTDOWN:
-      return settings::get().cdYear != 0;
     case settings::THEME_PORTAL:   // without an answer it says why (not set up, unreachable...), so only "set up" counts
       return portal::configured();
     case settings::THEME_RESOURCES:

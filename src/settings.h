@@ -19,12 +19,10 @@
 //   hc mc sc "#RRGGBB"    hour12 0|1    date_fmt 0 DD/MM/YYYY|1 MM/DD/YYYY|2 YYYY-MM-DD
 //   colon 0|1             font 0 digital (Font 7)|1 plain (Font 6)|2 large (Font 8, clock theme only)     ntp "" or host name
 //   album_auto 0|1        album_interval 2..3600 (s)    album_file "" or file in /image
-//   theme "weather_clock"|"forecast"|"album"|"clock"|"analog"|"countdown"|
+//   theme "weather_clock"|"forecast"|"album"|"clock"|"analog"|
 //         "words"|"binary"|"portal"|"resources"
 //   auto_switch 0|1       auto_interval 5..3600 (s)     auto_themes ["clock", ...]
 //   night_en 0|1          night_start "HH:MM"           night_end "HH:MM"     night_brt 0..100
-//   cd_date "" (no countdown) or "YYYY-MM-DD" (2000..2099)   cd_time "HH:MM" (default 00:00)
-//   cd_label "" or up to 20 printable ASCII characters
 //   pw "" or 4..32 printable ASCII characters: the web password (user "admin"), "" = none.
 //       Write-only: it is stored in /custom.json but never returned by toJson() unless the
 //       caller asks for secrets (only save() does), so no API response and no export has it.
@@ -47,12 +45,11 @@ enum Theme : uint8_t {
   THEME_ALBUM = 2,
   THEME_CLOCK = 3,
   THEME_ANALOG = 4,
-  THEME_COUNTDOWN = 5,
-  THEME_WORDS = 6,
-  THEME_BINARY = 7,
-  THEME_PORTAL = 8,     // Status-Portal: overall status, services, incidents, maintenance, announcements
-  THEME_RESOURCES = 9,  // Status-Portal: the CPU, memory and disks of the machine the portal runs on
-  THEME_COUNT = 10       // autoMask is a uint16_t: at most 16 themes, this is the limit
+  THEME_WORDS = 5,
+  THEME_BINARY = 6,
+  THEME_PORTAL = 7,     // Status-Portal: overall status, services, incidents, maintenance, announcements
+  THEME_RESOURCES = 8,  // Status-Portal: the CPU, memory and disks of the machine the portal runs on
+  THEME_COUNT = 9        // autoMask is a uint16_t: at most 16 themes, this is the limit
 };
 // What Status-Portal's alert does to the display (portal_alert).
 enum PortalAlert : uint8_t { PORTAL_ALERT_OFF = 0, PORTAL_ALERT_INDICATOR = 1, PORTAL_ALERT_SWITCH = 2 };
@@ -97,11 +94,6 @@ struct Settings {
   bool nightEnabled;
   uint16_t nightStart, nightEnd;      // minutes since local midnight
   uint8_t nightBrightness;
-  // Countdown theme: the target is local time (the clock's own offset). cdYear == 0 = none.
-  uint16_t cdYear;
-  uint8_t cdMonth, cdDay;
-  uint16_t cdMinutes;        // minutes since local midnight
-  char cdLabel[21];
   // Security
   char password[33];         // pw, "" = the web interface and the API are open
   // Status-Portal (a portal 1.10.0 or newer, over plain http on the LAN)
@@ -126,9 +118,9 @@ enum : uint32_t {
   CH_ALBUM = 1u << 8,
   CH_BOOT_DELAY = 1u << 9,
   CH_AUTH = 1u << 10,        // pw
-  CH_COUNTDOWN = 1u << 11,   // cd_date, cd_time, cd_label
+  // bit 11 was the countdown theme's settings (removed in 1.1.0); not reused so a bit keeps one meaning
   CH_PORTAL = 1u << 12,      // portal_url, portal_key, portal_interval, portal_alert, the five switches
-  CH_VISUAL = CH_THEME | CH_CLOCK | CH_TIMEZONE | CH_LOCATION | CH_WEATHER | CH_ALBUM | CH_COUNTDOWN | CH_PORTAL
+  CH_VISUAL = CH_THEME | CH_CLOCK | CH_TIMEZONE | CH_LOCATION | CH_WEATHER | CH_ALBUM | CH_PORTAL
 };
 
 // Mounts LittleFS WITHOUT ever formatting it (the stock files must survive), then
