@@ -339,7 +339,21 @@ static void testGpusAndTheLargestRequest() {
     j += std::string(i ? "," : "") + "{\"title\":\"" + esc(capped(nasty, 32)) + "\",\"text\":\"" + esc(capped(nasty, 80)) + "\",\"type\":\"critical\",\"pinned\":true}";
   j += "]}}";
   printf("largest document with services=all and resources=all: %zu bytes\n", j.size());
-  CHECK(j.size() <= 8192);   // the portal's ceiling for it (MAX_BYTES_ALL); the device caps the body at the same value
+  CHECK(j.size() <= 8192);   // the portal's ceiling for it (MAX_BYTES_ALL), which a firmware that never asks for the VMs keeps
+
+  // The same, plus ten VMs made of what costs most once serialised: the request the device actually makes now.
+  std::string withVms = j.substr(0, j.size() - 1) + ",\"vms\":{\"total\":65535,\"running\":65535,\"items\":[";
+  for (int i = 0; i < 10; i++)
+    withVms += std::string(i ? "," : "") + "{\"name\":\"" + esc(capped(nasty, 24)) + "\",\"state\":\"" + esc(capped("\"\\", 12)) + "\",\"up\":\"" + esc(capped("\"\\", 10)) + "\"}";
+  withVms += "]}}";
+  printf("largest document with the VMs too: %zu bytes\n", withVms.size());
+  CHECK(withVms.size() <= 9216);   // the portal's MAX_BYTES_ALL_WITH_VMS; portal.cpp's MAX_BODY is the same number
+  {
+    Summary w;
+    char werr[64];
+    CHECK(parse(withVms, SEC_ALL, w, werr, sizeof(werr)) == PARSE_OK);
+    CHECK(w.vms.present && w.vms.n == MAX_VM_ITEMS && w.services.n == MAX_SERVICE_ITEMS && w.resources.gpuN == MAX_GPU_ITEMS);
+  }
 
   Summary s;
   char err[64];
@@ -396,6 +410,89 @@ static void testGpusAndTheLargestRequest() {
   CHECK(s.jellyfin.transcodes == 0 && s.jellyfin.taskN == 0 && !jellyfinBusy(s));
   std::string idle = "{\"v\":1,\"now\":\"2026-10-06T12:00:00Z\",\"site\":\"H\",\"overall\":\"operational\",\"jellyfin\":{\"transcodes\":0,\"tasks\":[]}}";
   CHECK(parse(idle, 0, s, err, sizeof(err)) == PARSE_OK && !jellyfinBusy(s));
+}
+
+// The VMs (portal >= 1.11.1): an opt-in section, only present when it was asked for and the portal sent an object.
+static const char VMS_ANSWER[] =
+    "{\"v\":1,\"now\":\"2026-10-06T12:00:00Z\",\"site\":\"Home Server\",\"overall\":\"operational\","
+    "\"vms\":{\"total\":4,\"running\":2,\"items\":["
+    "{\"name\":\"Docker-Host\",\"state\":\"Running\",\"up\":\"12d 4h\"},"
+    "{\"name\":\"Game-Server\",\"state\":\"Running\",\"up\":\"3h 20m\"},"
+    "{\"name\":\"Old-VM\",\"state\":\"Saved\",\"up\":\"0m\"},"
+    "{\"name\":\"Test-VM\",\"state\":\"Off\",\"up\":\"0m\"}]}}";
+
+static void testVms() {
+  Summary s;
+  char err[64];
+  CHECK(run(VMS_ANSWER, SEC_VMS, s, err, sizeof(err)) == PARSE_OK);
+  CHECK(s.vms.present && s.vms.total == 4 && s.vms.running == 2 && s.vms.n == 4);
+  CHECK_STR(s.vms.items[0].name, "Docker-Host");
+  CHECK_STR(s.vms.items[0].state, "Running");
+  CHECK_STR(s.vms.items[0].up, "12d 4h");
+  CHECK(s.vms.items[0].kind == VM_RUNNING && s.vms.items[1].kind == VM_RUNNING);
+  CHECK(s.vms.items[2].kind == VM_PAUSED && s.vms.items[3].kind == VM_OFF);
+  CHECK(!s.services.present && s.overall == ST_OPERATIONAL);
+
+  // Not asked for: not read, whatever the portal sent.
+  CHECK(run(VMS_ANSWER, SEC_ALL & ~SEC_VMS, s, err, sizeof(err)) == PARSE_OK);
+  CHECK(!s.vms.present && s.vms.n == 0);
+  CHECK(run(VMS_ANSWER, 0, s, err, sizeof(err)) == PARSE_OK && !s.vms.present);
+
+  // An older portal ignores the name: no vms object at all. The EXAMPLE (the 1.11.0 contract) has none.
+  CHECK(run(EXAMPLE, SEC_ALL, s, err, sizeof(err)) == PARSE_OK);
+  CHECK(!s.vms.present);
+  // A portal that could not read its list says null, which is not "no VMs".
+  CHECK(run("{\"v\":1,\"overall\":\"operational\",\"vms\":null}", SEC_VMS, s, err, sizeof(err)) == PARSE_OK && !s.vms.present);
+  CHECK(run("{\"v\":1,\"overall\":\"operational\",\"vms\":[1]}", SEC_VMS, s, err, sizeof(err)) == PARSE_OK && !s.vms.present);
+  // No VMs at all is an answer.
+  CHECK(run("{\"v\":1,\"overall\":\"operational\",\"vms\":{\"total\":0,\"running\":0,\"items\":[]}}", SEC_VMS, s, err, sizeof(err)) == PARSE_OK);
+  CHECK(s.vms.present && s.vms.total == 0 && s.vms.n == 0);
+
+  // States this firmware has never heard of (or in another case) are "other", not a crash and not green.
+  CHECK(run("{\"v\":1,\"overall\":\"operational\",\"vms\":{\"total\":3,\"running\":0,\"items\":["
+            "{\"name\":\"a\",\"state\":\"running\",\"up\":\"\"},{\"name\":\"b\",\"state\":\"Hibernating\",\"up\":\"\"},"
+            "{\"name\":\"c\",\"state\":null,\"up\":null}]}}", SEC_VMS, s, err, sizeof(err)) == PARSE_OK);
+  CHECK(s.vms.items[0].kind == VM_OTHER && s.vms.items[1].kind == VM_OTHER && s.vms.items[2].kind == VM_OTHER);
+  CHECK_STR(s.vms.items[2].state, "");
+  // Every Hyper-V state the portal can send has a family.
+  const struct { const char *word; uint8_t kind; } FAMILIES[] = {
+      {"Running", VM_RUNNING}, {"Off", VM_OFF}, {"Paused", VM_PAUSED}, {"Saved", VM_PAUSED}, {"FastSaved", VM_PAUSED},
+      {"Starting", VM_BUSY}, {"Stopping", VM_BUSY}, {"Saving", VM_BUSY}, {"FastSaving", VM_BUSY}, {"Pausing", VM_BUSY},
+      {"Resuming", VM_BUSY}, {"Snapshotting", VM_BUSY}, {"Unknown", VM_OTHER}, {"Other", VM_OTHER}};
+  for (const auto &f : FAMILIES) {
+    std::string j = std::string("{\"v\":1,\"overall\":\"operational\",\"vms\":{\"total\":1,\"running\":0,\"items\":[{\"name\":\"x\",\"state\":\"") + f.word + "\",\"up\":\"\"}]}}";
+    CHECK(run(j.c_str(), SEC_VMS, s, err, sizeof(err)) == PARSE_OK && s.vms.items[0].kind == f.kind);
+  }
+
+  // A portal that lies about its own counts cannot make the list longer than the whole, or more run than exist.
+  CHECK(run("{\"v\":1,\"overall\":\"operational\",\"vms\":{\"total\":1,\"running\":9,\"items\":["
+            "{\"name\":\"a\",\"state\":\"Running\",\"up\":\"\"},{\"name\":\"b\",\"state\":\"Off\",\"up\":\"\"}]}}", SEC_VMS, s, err, sizeof(err)) == PARSE_OK);
+  CHECK(s.vms.n == 2 && s.vms.total == 2 && s.vms.running == 2);
+
+  // Over the cap: the extra VMs are dropped, the total still tells the truth.
+  std::string many = "{\"v\":1,\"overall\":\"operational\",\"vms\":{\"total\":40,\"running\":40,\"items\":[";
+  for (int i = 0; i < 40; i++) many += std::string(i ? "," : "") + "{\"name\":\"VM-" + std::to_string(i) + "\",\"state\":\"Running\",\"up\":\"1d\"}";
+  many += "]}}";
+  CHECK(parse(many, SEC_VMS, s, err, sizeof(err)) == PARSE_OK);
+  CHECK(s.vms.n == MAX_VM_ITEMS && s.vms.total == 40 && s.vms.running == 40);
+  CHECK_STR(s.vms.items[MAX_VM_ITEMS - 1].name, "VM-9");
+
+  // Strings are folded to ASCII and cut to their caps, and never run into the next field.
+  std::string nasty = "{\"v\":1,\"overall\":\"operational\",\"vms\":{\"total\":1,\"running\":1,\"items\":[{\"name\":\"" + std::string(60, 'n') +
+                      "\xC3\xA9\",\"state\":\"" + std::string(40, 's') + "\",\"up\":\"\xE2\x80\x94\xE2\x80\x94\xE2\x80\x94\xE2\x80\x94\xE2\x80\x94\"}]}}";
+  CHECK(parse(nasty, SEC_VMS, s, err, sizeof(err)) == PARSE_OK);
+  CHECK(strlen(s.vms.items[0].name) == MAX_VM_NAME && strlen(s.vms.items[0].state) == MAX_VM_STATE && strlen(s.vms.items[0].up) <= MAX_VM_UP);
+  for (const char *p = s.vms.items[0].up; *p; p++) CHECK((unsigned char)*p >= 32 && (unsigned char)*p < 127);
+
+  // The largest document the portal can send for the VMs alone, and with everything: under the device's 9 KB.
+  std::string worst = "{\"v\":1,\"now\":\"2026-10-06T12:00:00Z\",\"site\":\"H\",\"overall\":\"down\",\"vms\":{\"total\":65535,\"running\":65535,\"items\":[";
+  for (int i = 0; i < 10; i++)
+    worst += std::string(i ? "," : "") + "{\"name\":\"" + esc(capped("\"A\\\xC3\xA9\xC3\x86\xF0\x9F\x98\x80z/", 24)) + "\",\"state\":\"" + esc(capped("\"\\", 12)) +
+             "\",\"up\":\"" + esc(capped("\"\\", 10)) + "\"}";
+  worst += "]}}";
+  printf("largest vms document: %zu bytes\n", worst.size());
+  CHECK(worst.size() < 2048);
+  CHECK(parse(worst, SEC_VMS, s, err, sizeof(err)) == PARSE_OK && s.vms.n == MAX_VM_ITEMS);
 }
 
 static void testTimestamps() {
@@ -496,12 +593,11 @@ static void testUrl() {
 // the sanitizers stay quiet and a "good" result still respects the caps.
 static void testFuzz() {
   srand(12345);
-  std::string base = EXAMPLE;
   Summary s;
   char err[64];
   int ok = 0, refused = 0;
-  for (int iter = 0; iter < 20000; iter++) {
-    std::string m = base;
+  for (int iter = 0; iter < 30000; iter++) {
+    std::string m = iter % 3 == 2 ? VMS_ANSWER : EXAMPLE;
     int edits = 1 + rand() % 6;
     for (int e = 0; e < edits; e++) {
       size_t at = (size_t)rand() % m.size();
@@ -518,6 +614,8 @@ static void testFuzz() {
       ok++;
       CHECK(s.services.n <= MAX_SERVICE_ITEMS && s.incidents.n <= MAX_INCIDENT_ITEMS);
       CHECK(strlen(s.site) <= MAX_SITE);
+      CHECK(s.vms.n <= MAX_VM_ITEMS && s.vms.running <= s.vms.total && s.vms.n <= s.vms.total);
+      for (uint8_t v = 0; v < s.vms.n; v++) CHECK(strlen(s.vms.items[v].name) <= MAX_VM_NAME && s.vms.items[v].kind <= VM_BUSY);
     } else {
       refused++;
     }
@@ -534,6 +632,7 @@ int main() {
   testTruncated();
   testLargest();
   testGpusAndTheLargestRequest();
+  testVms();
   testTimestamps();
   testFold();
   testUrl();

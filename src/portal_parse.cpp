@@ -209,6 +209,35 @@ void readAnnouncements(JsonVariantConst o, Summary &out) {
   }
 }
 
+// The family of a Hyper-V VM state word (Get-VM's own names), for its colour.
+NOINLINE uint8_t vmKind(const char *state) {
+  static const struct { const char *word; uint8_t kind; } STATES[] = {
+      {"Running", VM_RUNNING},  {"Off", VM_OFF},          {"Paused", VM_PAUSED},     {"Saved", VM_PAUSED},
+      {"FastSaved", VM_PAUSED}, {"Starting", VM_BUSY},    {"Stopping", VM_BUSY},     {"Saving", VM_BUSY},
+      {"FastSaving", VM_BUSY},  {"Pausing", VM_BUSY},     {"Resuming", VM_BUSY},     {"Snapshotting", VM_BUSY},
+  };
+  for (const auto &s : STATES) {
+    if (strcmp(state, s.word) == 0) return s.kind;
+  }
+  return VM_OTHER;
+}
+
+void readVms(JsonVariantConst o, Summary &out) {
+  out.vms.present = true;
+  out.vms.total = count(o, "total");
+  out.vms.running = count(o, "running");
+  for (JsonVariantConst it : items(o)) {
+    if (out.vms.n >= MAX_VM_ITEMS) break;
+    Vm &v = out.vms.items[out.vms.n++];
+    copyText(it, "name", v.name, sizeof(v.name));
+    copyText(it, "state", v.state, sizeof(v.state));
+    copyText(it, "up", v.up, sizeof(v.up));
+    v.kind = vmKind(v.state);
+  }
+  if (out.vms.total < out.vms.n) out.vms.total = out.vms.n;   // the list can never be longer than the whole
+  if (out.vms.running > out.vms.total) out.vms.running = out.vms.total;
+}
+
 void setError(char *error, size_t cap, const char *fmt, ...) __attribute__((format(printf, 3, 4)));
 void setError(char *error, size_t cap, const char *fmt, ...) {
   if (!error || cap == 0) return;
@@ -296,6 +325,7 @@ ParseResult parse(const Text &body, uint8_t sections, Summary &out, char *error,
   if (section(root, sections, SEC_MAINTENANCE, "maintenance", obj)) readMaintenance(obj, out);
   if (section(root, sections, SEC_RESOURCES, "resources", obj)) readResources(obj, out);
   if (section(root, sections, SEC_ANNOUNCEMENTS, "announcements", obj)) readAnnouncements(obj, out);
+  if (section(root, sections, SEC_VMS, "vms", obj)) readVms(obj, out);
   return PARSE_OK;
 }
 

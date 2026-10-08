@@ -10,6 +10,15 @@ changes the first, second and third number, and what a `-rc.N` pre-release is) i
 Needs **Status-Portal 1.11.1** for the VM screen (everything else works with 1.11.0).
 
 ### Added
+- **The virtual machines theme** (`vms`, "Virtual machines (Status-Portal)"): the Hyper-V VMs of the machine the
+  portal runs on, five per page (two lines each: a dot in the colour of the state, the name and Hyper-V's own
+  state word on the right, and "up 3d 4h" under it while it runs), turning every `portal_page` seconds, with
+  "3 of 5 running" in the footer and the same Jellyfin band as the Resources screen. A new "virtual machines"
+  switch in the Status-Portal tab (`portal_vms`, on by default) decides whether the device asks for them. Each of
+  its empty states says why: switched off, a portal older than 1.11.1, or none to show - and the rotation skips
+  the theme while the portal is known to have none. The request now names the `vms` section, and the device's
+  cap on an answer goes from 8 to 9 KB (the portal's largest possible answer with it measures 8.9 KB). Costs
+  2,736 bytes of firmware.
 - **The hourly forecast theme** (`hourly`): the next 24 hours on one screen. The top half shows the next six
   hours side by side (hour, icon, temperature, chance of rain); the bottom half draws the 24 hours as a
   temperature curve with the highest and lowest marked, the chance of rain of each hour as bars underneath, and

@@ -30,7 +30,7 @@
 //       refused, the device has no TLS; no path)    portal_key "" or 8..64 printable ASCII characters
 //       without spaces: Status-Portal's device key, write-only exactly like pw
 //   portal_interval 30..600 (s)  portal_page 2..60 (s)     portal_alert "off"|"indicator"|"switch"
-//   portal_services portal_incidents portal_maintenance portal_resources portal_announcements 0|1:
+//   portal_services portal_incidents portal_maintenance portal_resources portal_announcements portal_vms 0|1:
 //       which sections of the answer are asked for (and shown)
 #pragma once
 
@@ -49,7 +49,8 @@ enum Theme : uint8_t {
   THEME_BINARY = 6,
   THEME_PORTAL = 7,     // Status-Portal: overall status, services, incidents, maintenance, announcements
   THEME_RESOURCES = 8,  // Status-Portal: the CPU, memory and disks of the machine the portal runs on
-  THEME_COUNT = 9        // autoMask is a uint16_t: at most 16 themes, this is the limit
+  THEME_VMS = 9,        // Status-Portal: the Hyper-V virtual machines of the machine the portal runs on
+  THEME_COUNT = 10       // autoMask is a uint16_t: at most 16 themes, this is the limit
 };
 // What Status-Portal's alert does to the display (portal_alert).
 enum PortalAlert : uint8_t { PORTAL_ALERT_OFF = 0, PORTAL_ALERT_INDICATOR = 1, PORTAL_ALERT_SWITCH = 2 };
@@ -101,7 +102,7 @@ struct Settings {
   char portalKey[65];        // portal_key, "" = none. Write-only: never returned by the API or the export
   uint16_t portalInterval;   // portal_interval, seconds between two requests
   uint8_t portalPage;        // portal_page, seconds each page of the Status-Portal screen stays up
-  uint8_t portalSections;    // portal::Section mask: the five portal_* switches
+  uint8_t portalSections;    // portal::Section mask: the six portal_* switches
   uint8_t portalAlert;       // portal_alert (a PortalAlert)
 };
 
@@ -119,7 +120,7 @@ enum : uint32_t {
   CH_BOOT_DELAY = 1u << 9,
   CH_AUTH = 1u << 10,        // pw
   // bit 11 was the countdown theme's settings (removed in 1.1.0); not reused so a bit keeps one meaning
-  CH_PORTAL = 1u << 12,      // portal_url, portal_key, portal_interval, portal_alert, the five switches
+  CH_PORTAL = 1u << 12,      // portal_url, portal_key, portal_interval, portal_alert, the six switches
   CH_VISUAL = CH_THEME | CH_CLOCK | CH_TIMEZONE | CH_LOCATION | CH_WEATHER | CH_ALBUM | CH_PORTAL
 };
 

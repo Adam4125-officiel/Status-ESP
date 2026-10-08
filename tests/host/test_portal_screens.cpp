@@ -1,4 +1,4 @@
-// Host test of the two Status-Portal screens (screen_portal.cpp, screen_resources.cpp) and of what they
+// Host test of the three Status-Portal screens (screen_portal.cpp, screen_resources.cpp, screen_vms.cpp) and of what they
 // share (portal_ui.cpp), driven by the real parser on the contract's own example and on worst-case
 // answers. Built and run by tools/test_host.sh, with the address and memory sanitizers on.
 //
@@ -906,6 +906,211 @@ static void testResourcesJellyfinBand() {
   }
 }
 
+// ---- The virtual machines screen (screen_vms.cpp) ---------------------------------------------------------------
+
+// A portal answer holding `n` VMs named VM-1..VM-n (a third of them off, a seventh paused), `total` of them in all,
+// and optionally Jellyfin's activity. Only the sections asked for in the test are in it.
+static std::string vmsAnswer(int n, int total = -1, const char *jellyfin = nullptr) {
+  if (total < 0) total = n;
+  int running = 0;
+  std::string items;
+  for (int i = 1; i <= n; i++) {
+    const char *state = i % 3 == 0 ? "Off" : (i % 7 == 0 ? "Paused" : "Running");
+    if (state[0] == 'R') running++;
+    items += std::string(i > 1 ? "," : "") + "{\"name\":\"VM-" + std::to_string(i) + "\",\"state\":\"" + state + "\",\"up\":\"" +
+             (state[0] == 'R' ? std::to_string(i) + "d 4h" : "0m") + "\"}";
+  }
+  std::string j = "{\"v\":1,\"now\":\"2026-10-06T12:00:00Z\",\"site\":\"Home Server\",\"overall\":\"operational\",";
+  if (jellyfin) j += std::string("\"jellyfin\":") + jellyfin + ",";
+  j += "\"vms\":{\"total\":" + std::to_string(total) + ",\"running\":" + std::to_string(running) + ",\"items\":[" + items + "]}}";
+  return j;
+}
+
+static void testVmsScreen() {
+  defaults();
+  beginFrame("vms_four");
+  install(vmsAnswer(4));
+  tft.resetStats();
+  show(screenVmsEnter, screenVmsUpdate);
+  CHECK(drew("Virtual machines"));
+  CHECK(drew("VM-1") && drew("VM-2") && drew("VM-3") && drew("VM-4"));
+  CHECK(drew("Running") && drew("Off"));
+  CHECK(drew("up 1d 4h") && drew("up 2d 4h") && drew("up 4d 4h"));
+  CHECK(!drewContaining("up 0m"));              // a VM that does not run has no uptime to show
+  CHECK(drew("3 of 4 running"));
+  CHECK(!drewContaining("Page "));              // one page: no page counter
+  expectClean("vms, four");
+
+  // Nothing changed: not one drawing call, and a new answer with the same content does not redraw either.
+  g_ms += 3000;
+  tft.resetStats();
+  screenVmsUpdate(false);
+  CHECK(tft.ops == 0);
+  install(vmsAnswer(4));
+  tft.resetStats();
+  screenVmsUpdate(false);
+  CHECK(tft.ops == 0);
+
+  // VM-2 stops: its row and the footer are redrawn, no other row is.
+  g_ms += 1000;
+  std::string stopped = vmsAnswer(4);
+  size_t at = stopped.find("{\"name\":\"VM-2\",\"state\":\"Running\",\"up\":\"2d 4h\"}");
+  CHECK(at != std::string::npos);
+  stopped.replace(at, strlen("{\"name\":\"VM-2\",\"state\":\"Running\",\"up\":\"2d 4h\"}"), "{\"name\":\"VM-2\",\"state\":\"Off\",\"up\":\"0m\"}");
+  stopped.replace(stopped.find("\"running\":3"), strlen("\"running\":3"), "\"running\":2");
+  install(stopped);
+  tft.resetStats();
+  screenVmsUpdate(false);
+  CHECK(drew("VM-2") && drew("2 of 4 running"));
+  CHECK(!drew("VM-1") && !drew("VM-3") && !drew("VM-4") && !drew("Virtual machines"));
+  expectClean("vms, one stops");
+
+  // The Jellyfin band under the title, the first row still where it was.
+  defaults();
+  beginFrame("vms_jellyfin");
+  install(vmsAnswer(3, -1, "{\"transcodes\":2,\"tasks\":[]}"));
+  tft.resetStats();
+  show(screenVmsEnter, screenVmsUpdate);
+  CHECK(drew("Virtual machines") && drew("Jellyfin  2 transcodes") && drew("VM-1"));
+  expectClean("vms, Jellyfin busy");
+  tft.resetStats();
+  screenVmsUpdate(false);
+  CHECK(tft.ops == 0);
+  // Jellyfin goes idle again: the band is replaced by the plain title.
+  g_ms += 1000;
+  install(vmsAnswer(3));
+  tft.resetStats();
+  screenVmsUpdate(false);
+  CHECK(drew("Virtual machines") && !drewContaining("Jellyfin") && !drew("VM-1"));
+  expectClean("vms, Jellyfin idle again");
+}
+
+static void testVmsPaging() {
+  // Ten VMs are two pages of five; page_seconds after it went up the next one replaces the rows.
+  defaults();
+  beginFrame("vms_page1");
+  install(vmsAnswer(10));
+  tft.resetStats();
+  show(screenVmsEnter, screenVmsUpdate);
+  CHECK(drew("VM-1") && drew("VM-5") && !drew("VM-6"));
+  CHECK(drew("Page 1/2") && drewContaining("running"));
+  expectClean("vms page 1");
+
+  g_ms += 3000;
+  tft.resetStats();
+  screenVmsUpdate(false);
+  CHECK(tft.ops == 0);
+  g_ms += 3000;
+  tft.resetStats();
+  screenVmsUpdate(false);
+  CHECK(drew("Page 2/2") && drew("VM-6") && drew("VM-10") && !drew("VM-1") && !drew("Virtual machines"));
+  expectClean("vms page 2");
+  g_ms += 6000;
+  tft.resetStats();
+  screenVmsUpdate(false);
+  CHECK(drew("Page 1/2") && drew("VM-1"));
+
+  // Seven are two pages of four, not five and two.
+  defaults();
+  beginFrame("vms_seven");
+  install(vmsAnswer(7));
+  tft.resetStats();
+  show(screenVmsEnter, screenVmsUpdate);
+  CHECK(drew("VM-4") && !drew("VM-5") && drew("Page 1/2"));
+  g_ms += 6000;
+  tft.resetStats();
+  screenVmsUpdate(false);
+  CHECK(drew("VM-5") && drew("VM-7") && drew("Page 2/2"));
+  expectClean("vms seven");
+
+  // The page counter goes away when the list shrinks to one page, and the footer is laid out again.
+  install(vmsAnswer(3));
+  tft.resetStats();
+  screenVmsUpdate(false);
+  CHECK(!drewContaining("Page ") && drewContaining("running"));
+  expectClean("vms shrinks to one page");
+
+  // More VMs than the portal listed: say how many are not shown.
+  defaults();
+  beginFrame("vms_not_listed");
+  install(vmsAnswer(10, 14));
+  tft.resetStats();
+  show(screenVmsEnter, screenVmsUpdate);
+  CHECK(drewContaining("/14 running, +4 more") && drew("Page 1/2"));
+  expectClean("vms not listed");
+}
+
+static void testVmsNotices() {
+  defaults();
+  beginFrame("vms_off");
+  install(vmsAnswer(3));
+  g_settings.portalSections &= ~SEC_VMS;
+  tft.resetStats();
+  show(screenVmsEnter, screenVmsUpdate);
+  CHECK(drew("VMs are off") && !drew("VM-1"));
+  expectClean("vms off");
+  g_settings.portalSections |= SEC_VMS;   // the switch is turned on and the next answer carries them
+  install(vmsAnswer(3));
+  tft.resetStats();
+  screenVmsUpdate(false);
+  CHECK(drew("VM-1") && !drew("VMs are off"));
+
+  // A portal that does not know the section (an answer without it), and one that could not read its list.
+  defaults();
+  beginFrame("vms_old_portal");
+  install(CALM);
+  tft.resetStats();
+  show(screenVmsEnter, screenVmsUpdate);
+  CHECK(drew("No VM data") && drewContaining("1.11.1"));
+  expectClean("vms, old portal");
+
+  // None at all: said plainly, and the rotation skips the theme (display.cpp) because of the same fact.
+  defaults();
+  beginFrame("vms_none");
+  install(vmsAnswer(0));
+  tft.resetStats();
+  show(screenVmsEnter, screenVmsUpdate);
+  CHECK(drew("No virtual machines") && !drewContaining("running"));
+  expectClean("vms, none");
+
+  // The portal's own states come first: not set up, no network, unreachable.
+  defaults();
+  beginFrame("vms_unreachable");
+  g_configured = true;
+  g_have = false;
+  g_diag.attemptMs = 1;
+  strlcpy(g_diag.error, "bad key (HTTP 401)", sizeof(g_diag.error));
+  tft.resetStats();
+  show(screenVmsEnter, screenVmsUpdate);
+  CHECK(drew("No portal data"));
+  expectClean("vms, unreachable");
+  g_configured = false;
+  tft.resetStats();
+  screenVmsUpdate(false);
+  CHECK(drew("Portal not set up"));
+}
+
+static void testVmsWorstCase() {
+  // The widest names and states the contract allows, a count that does not fit its column, uptimes at their
+  // longest, on both pages.
+  std::string j = "{\"v\":1,\"now\":\"2026-10-06T12:00:00Z\",\"site\":\"Home Server\",\"overall\":\"operational\",\"vms\":{\"total\":65535,\"running\":65535,\"items\":[";
+  const char *states[] = {"Snapshotting", "FastSaving", "Running", "Hibernating!"};
+  for (int i = 0; i < 10; i++)
+    j += std::string(i ? "," : "") + "{\"name\":\"WWWWWWWWWWWWWWWWWWWWWWWW\",\"state\":\"" + states[i % 4] + "\",\"up\":\"123d 23h\"}";
+  j += "]}}";
+  defaults();
+  beginFrame("vms_worst");
+  install(j);
+  tft.resetStats();
+  show(screenVmsEnter, screenVmsUpdate);
+  expectClean("vms worst, page 1");
+  CHECK(drewContaining("running") && drew("Page 1/2"));   // the footer is cut with "..." to the room it has
+  g_ms += 6000;
+  tft.resetStats();
+  screenVmsUpdate(false);
+  expectClean("vms worst, page 2");
+}
+
 // An answer with a section the firmware does not know, or fields it does not use, changes nothing.
 static void testNewerPortal() {
   defaults();
@@ -929,6 +1134,10 @@ int main() {
   testLatencyAndJellyfin();
   testJellyfinBand();
   testResourcesJellyfinBand();
+  testVmsScreen();
+  testVmsPaging();
+  testVmsNotices();
+  testVmsWorstCase();
   testNewerPortal();
   beginFrame("");
   printf("%d checks, %d failed\n", checks, failures);

@@ -91,6 +91,7 @@ a{color:#8cf}
       <label class="inline"><input type="checkbox" name="portal_maintenance" data-t="b"> Maintenance in progress and coming up</label>
       <label class="inline"><input type="checkbox" name="portal_announcements" data-t="b"> Announcements</label>
       <label class="inline"><input type="checkbox" name="portal_resources" data-t="b"> The server's CPU, memory, GPUs, disks and Jellyfin activity (the Resources screen)</label>
+      <label class="inline"><input type="checkbox" name="portal_vms" data-t="b"> The server's virtual machines (the Virtual machines screen; needs Status-Portal 1.11.1)</label>
       <p class="hint">The device only asks the portal for what is ticked. A block with nothing in it is left out of the screen.</p>
 
       <h3>When something is wrong</h3>
@@ -266,6 +267,7 @@ a{color:#8cf}
         <option value="binary">Binary clock</option>
         <option value="portal">Status-Portal</option>
         <option value="resources">Resources (Status-Portal)</option>
+        <option value="vms">Virtual machines (Status-Portal)</option>
       </select>
       <p class="hint">To choose a theme manually, turn auto-switch off.</p>
       <label class="inline"><input type="checkbox" name="auto_switch" data-t="b"> Auto-switch between themes</label>
@@ -281,6 +283,7 @@ a{color:#8cf}
         <label class="inline"><input type="checkbox" name="auto_themes" value="binary"> Binary clock</label>
         <label class="inline"><input type="checkbox" name="auto_themes" value="portal"> Status-Portal</label>
         <label class="inline"><input type="checkbox" name="auto_themes" value="resources"> Resources (Status-Portal)</label>
+        <label class="inline"><input type="checkbox" name="auto_themes" value="vms"> Virtual machines (Status-Portal)</label>
       </div>
       <p class="hint">A theme without data (no city set, no picture uploaded, Status-Portal not set up) is skipped.</p>
       <button>Save</button>

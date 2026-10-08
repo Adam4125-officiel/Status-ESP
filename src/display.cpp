@@ -26,6 +26,7 @@ static const Screen SCREENS[settings::THEME_COUNT] = {
     {screenBinaryEnter, screenBinaryUpdate, screenBinaryLeave},         // THEME_BINARY
     {screenPortalEnter, screenPortalUpdate, screenPortalLeave},         // THEME_PORTAL
     {screenResourcesEnter, screenResourcesUpdate, screenResourcesLeave},   // THEME_RESOURCES
+    {screenVmsEnter, screenVmsUpdate, screenVmsLeave},                  // THEME_VMS
 };
 
 static const uint8_t NO_THEME = 255;
@@ -131,6 +132,9 @@ static bool available(uint8_t theme) {
       return portal::configured();
     case settings::THEME_RESOURCES:
       return portal::configured() && (settings::get().portalSections & portal::SEC_RESOURCES);
+    case settings::THEME_VMS:   // skipped while the portal is known to have none: a slide of "no VMs" helps nobody
+      return portal::configured() && (settings::get().portalSections & portal::SEC_VMS) &&
+             !(portal::fresh() && portal::data().vms.n == 0);
     case settings::THEME_ALBUM:
       hasPicture = false;
       media::listDir(config::DIR_IMAGE, noteFile, nullptr);

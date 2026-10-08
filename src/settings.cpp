@@ -16,7 +16,7 @@ static_assert(sizeof(Settings::portalUrl) == portal::MAX_URL + 1, "portalUrl mus
 static_assert(sizeof(Settings::portalKey) == portal::MAX_KEY + 1, "portalKey must hold exactly what portal::validKey accepts");
 
 static const char *const THEME_NAMES[THEME_COUNT] = {"weather_clock", "forecast", "hourly", "album",    "clock",
-                                                     "words",         "binary",   "portal", "resources"};
+                                                     "words",         "binary",   "portal", "resources", "vms"};
 
 const char *themeName(uint8_t theme) {
   return theme < THEME_COUNT ? THEME_NAMES[theme] : THEME_NAMES[THEME_CLOCK];
@@ -205,7 +205,7 @@ static uint32_t diff(const Settings &a, const Settings &b) {
 
 // --- apply / toJson -----------------------------------------------------------
 
-// The five Status-Portal switches: one JSON key per bit of Settings::portalSections.
+// The six Status-Portal switches: one JSON key per bit of Settings::portalSections.
 struct PortalSwitch {
   const char *key;
   uint8_t bit;
@@ -216,6 +216,7 @@ static const PortalSwitch PORTAL_SWITCHES[] = {
     {"portal_maintenance", portal::SEC_MAINTENANCE},
     {"portal_resources", portal::SEC_RESOURCES},
     {"portal_announcements", portal::SEC_ANNOUNCEMENTS},
+    {"portal_vms", portal::SEC_VMS},
 };
 
 uint32_t apply(JsonObjectConst obj) {
