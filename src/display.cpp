@@ -19,6 +19,7 @@ struct Screen {
 static const Screen SCREENS[settings::THEME_COUNT] = {
     {screenWeatherEnter, screenWeatherUpdate, screenWeatherLeave},      // THEME_WEATHER_CLOCK
     {screenForecastEnter, screenForecastUpdate, screenForecastLeave},   // THEME_FORECAST
+    {screenHourlyEnter, screenHourlyUpdate, screenHourlyLeave},         // THEME_HOURLY
     {screenAlbumEnter, screenAlbumUpdate, screenAlbumLeave},            // THEME_ALBUM
     {screenClockEnter, screenClockUpdate, screenClockLeave},            // THEME_CLOCK
     {screenWordsEnter, screenWordsUpdate, screenWordsLeave},            // THEME_WORDS
@@ -124,6 +125,7 @@ static bool available(uint8_t theme) {
   switch (theme) {
     case settings::THEME_WEATHER_CLOCK:
     case settings::THEME_FORECAST:
+    case settings::THEME_HOURLY:
       return settings::hasCity();
     case settings::THEME_PORTAL:   // without an answer it says why (not set up, unreachable...), so only "set up" counts
       return portal::configured();

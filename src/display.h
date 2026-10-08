@@ -21,7 +21,7 @@
 //                         decode (~100-300 ms) is acceptable once per picture.
 // Leave  : release resources (GIF decoder, files). May draw nothing. Idempotent.
 //
-// Names: screenClock*, screenWeather* (theme weather_clock), screenForecast*,
+// Names: screenClock*, screenWeather* (theme weather_clock), screenForecast*, screenHourly*,
 // screenAlbum*, screenWords*,
 // screenBinary*, screenPortal*, screenResources*. All sets are
 // declared below; the manager calls them through its own table, so a screen file only has
@@ -52,6 +52,10 @@ void screenWeatherLeave();
 void screenForecastEnter();
 void screenForecastUpdate(bool full);
 void screenForecastLeave();
+
+void screenHourlyEnter();
+void screenHourlyUpdate(bool full);
+void screenHourlyLeave();
 
 void screenAlbumEnter();
 void screenAlbumUpdate(bool full);

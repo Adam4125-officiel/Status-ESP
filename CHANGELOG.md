@@ -9,6 +9,16 @@ changes the first, second and third number, and what a `-rc.N` pre-release is) i
 
 Needs **Status-Portal 1.11.1** for the VM screen (everything else works with 1.11.0).
 
+### Added
+- **The hourly forecast theme** (`hourly`): the next 24 hours on one screen. The top half shows the next six
+  hours side by side (hour, icon, temperature, chance of rain); the bottom half draws the 24 hours as a
+  temperature curve with the highest and lowest marked, the chance of rain of each hour as bars underneath, and
+  the hour of every sixth point. It uses the city, units and 12 or 24-hour format already set, goes by the
+  city's own hour (so a fetch that is an hour old still starts at the current hour, and a long outage says "No
+  hourly forecast" instead of showing the past), and is skipped in the rotation until a city is set. The weather
+  request now also asks Open-Meteo for the hours (`forecast_hours=24`): the answer grows from about 1.1 KB to
+  about 2.3 KB, and an answer without hours is still a good one. Costs 4,016 bytes of firmware.
+
 ### Removed
 - **The countdown theme**, its web form (label, date, time) and its `cd_date`, `cd_time` and `cd_label`
   settings, to make room in flash (2,784 bytes). A saved choice of the theme falls back to the default theme,

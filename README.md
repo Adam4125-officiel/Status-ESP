@@ -50,6 +50,8 @@ Version numbering and the release process are described in
     humidity, wind and pressure, and a small 80x80 animated GIF of your choice;
   - *Simple weather clock*: a big time, the weather icon and the current temperature;
   - *Forecast*: the next three days with icon, highest and lowest temperature;
+  - *Hourly forecast*: the next 24 hours - the next six in detail (icon, temperature, chance of rain)
+    and a temperature curve with rain bars for the whole day;
   - *Photo album*: the JPG and animated GIF files in `/image`, one after the other or one fixed
     picture;
   - *Clock*: a big clock in the colours you choose;

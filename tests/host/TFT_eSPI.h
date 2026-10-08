@@ -118,6 +118,22 @@ class TFT_eSPI {
     ops++;
     if (log) fprintf(log, "{\"op\":\"circle\",\"x\":%d,\"y\":%d,\"r\":%d,\"c\":%u}\n", (int)x, (int)y, (int)r, c);
   }
+  void drawLine(int32_t x0, int32_t y0, int32_t x1, int32_t y1, uint16_t c) {
+    ops++;
+    if (x0 < 0 || y0 < 0 || x1 < 0 || y1 < 0 || x0 >= 240 || x1 >= 240 || y0 >= 240 || y1 >= 240)
+      problem("drawLine %d,%d to %d,%d is off the screen", (int)x0, (int)y0, (int)x1, (int)y1);
+    if (log) fprintf(log, "{\"op\":\"line\",\"x0\":%d,\"y0\":%d,\"x1\":%d,\"y1\":%d,\"c\":%u}\n", (int)x0, (int)y0, (int)x1, (int)y1, c);
+  }
+  void drawFastHLine(int32_t x, int32_t y, int32_t w, uint16_t c) {
+    ops++;
+    if (w < 0 || x < 0 || y < 0 || x + w > 240 || y >= 240) problem("drawFastHLine %d,%d w%d is off the screen", (int)x, (int)y, (int)w);
+    if (log) fprintf(log, "{\"op\":\"line\",\"x0\":%d,\"y0\":%d,\"x1\":%d,\"y1\":%d,\"c\":%u}\n", (int)x, (int)y, (int)(x + w - 1), (int)y, c);
+  }
+  void drawFastVLine(int32_t x, int32_t y, int32_t h, uint16_t c) {
+    ops++;
+    if (h < 0 || x < 0 || y < 0 || y + h > 240 || x >= 240) problem("drawFastVLine %d,%d h%d is off the screen", (int)x, (int)y, (int)h);
+    if (log) fprintf(log, "{\"op\":\"line\",\"x0\":%d,\"y0\":%d,\"x1\":%d,\"y1\":%d,\"c\":%u}\n", (int)x, (int)y, (int)x, (int)(y + h - 1), c);
+  }
 
  private:
   uint16_t fg_ = 0xFFFF, bg_ = 0;

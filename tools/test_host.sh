@@ -36,3 +36,12 @@ g++ -std=gnu++17 -O1 -g -Wall -Wextra -Werror -Wno-maybe-uninitialized -Wno-form
     src/portal_parse.cpp src/ascii.cpp \
     -o "$out/test_portal_screens"
 "$out/test_portal_screens"
+
+# The hourly forecast: the parser for Open-Meteo's hourly arrays and the theme that draws them.
+g++ -std=gnu++17 -O1 -g -Wall -Wextra -Werror -Wno-maybe-uninitialized -Wno-format-truncation \
+    -fsanitize=address,undefined -fno-sanitize-recover=undefined \
+    -DARDUINOJSON_USE_DOUBLE=0 -DARDUINOJSON_USE_LONG_LONG=0 -DFW_VERSION='"test"' \
+    -Itests/host -Isrc -isystem "$json" \
+    tests/host/test_hourly.cpp src/screen_hourly.cpp src/weather_hourly.cpp \
+    -o "$out/test_hourly"
+"$out/test_hourly"
