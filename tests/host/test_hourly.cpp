@@ -218,6 +218,11 @@ static void parserTests() {
 static const time_t T0 = 1791468900;   // 2026-10-08T14:15:00Z
 
 static void defaults() {
+  // The plastic over the glass: nothing in the chart may come within 16 px of the bottom, and its labels stay 8 px
+  // from the sides (the owner saw half of the hour labels when they were drawn at y 222..238).
+  tft.safeBottom = 224;
+  tft.safeSide = 8;
+  tft.safeSideBelow = 120;
   memset(&g_settings, 0, sizeof(g_settings));
   strlcpy(g_settings.city, "Paris", sizeof(g_settings.city));
   g_settings.tempUnit = settings::TEMP_C;

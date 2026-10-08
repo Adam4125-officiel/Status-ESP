@@ -2,11 +2,11 @@
 //
 //   y   0..27   header: "Virtual machines". While Jellyfin is busy it is 32 px, split in two: that on top, a blue
 //               band saying what Jellyfin is doing under it (the same header as the Resources screen)
-//   y  32..     five rows of 36 px per page, each two lines: a dot in the colour of the state, the name, and
+//   y  32..     five rows of 34 px per page, each two lines: a dot in the colour of the state, the name, and
 //               Hyper-V's own state word on the right (Running, Off, Paused...); under the name "up 3d 4h" while
 //               it runs. With more VMs than fit they are split evenly over pages that turn every portal_page
 //               seconds, as the Status-Portal and Resources screens' do
-//   y 218..234  "3 of 5 running" (and "+2 more" when the portal sent fewer VMs than it has), with
+//   y 206..222  "3 of 5 running" (and "+2 more" when the portal sent fewer VMs than it has), with
 //               "Page 2/3" on the right when there are several pages
 //
 // The data comes from the portal's `vms` section (portal 1.11.1 or newer, asked for with sections=...,vms), which
@@ -24,12 +24,12 @@
 namespace {
 
 const int16_t HEADER_H = 28;
-const int16_t ROW_Y = 32, ROW_H = 36;
+const int16_t ROW_Y = 32, ROW_H = 34;
 const int16_t DOT_X = 12, DOT_DY = 8, DOT_R = 5;
 const int16_t NAME_X = 24, NAME_W = 128;           // the name, at the left
 const int16_t STATE_RIGHT = 236, STATE_W = 84;     // the state word, right-aligned
 const int16_t UP_DY = 17;                          // the uptime line, under the name
-const int16_t FOOT_Y = 218;
+const int16_t FOOT_Y = 206;                        // the plastic over the glass hides the last ~14 px: see screen_hourly.cpp
 const int16_t FOOT_PAGED_W = 160, PAGE_W = 70;
 const uint8_t ROWS = 5;                            // rows on one page
 

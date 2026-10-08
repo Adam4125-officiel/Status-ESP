@@ -6,6 +6,11 @@
 // not have. Only Fonts 2 and 4 are modelled (the two the Status-Portal screens use); the glyph widths are
 // the real ones, so text fits here exactly when it fits on the device.
 //
+// The plastic over a SmallTV-Ultra hides the edge of the glass: on the owner's, half of a 16 px label at y 222
+// was not visible. A test that cares sets the safe area, and any string painted outside it is flagged:
+// `safeBottom` is the lowest y a string may reach, and a string whose top is at or below `safeSideBelow` must
+// stay `safeSide` px from the left and right edges. The defaults flag nothing.
+//
 // Set `log` and every call is also written as one JSON line (test_portal_screens.cpp does that when
 // PORTAL_OPS_DIR is set), which a script can turn into a picture.
 #pragma once
@@ -57,6 +62,7 @@ class TFT_eSPI {
   std::vector<std::string> drawn;     // every string drawn, in order
   std::vector<std::string> problems;  // what each violation was
   FILE *log = nullptr;                // one JSON line per call, when set
+  int safeBottom = 240, safeSide = 0, safeSideBelow = 240;   // see the header; survive resetStats()
 
   void resetStats() {
     ops = fills = 0;
@@ -95,6 +101,8 @@ class TFT_eSPI {
     else if (datum_ == TR_DATUM) x0 = (int)x - span;
     const int tx = datum_ == TC_DATUM ? (int)x - cw / 2 : (datum_ == TR_DATUM ? (int)x - cw : (int)x);   // where the glyphs start
     if (x0 < 0 || x0 + span > 240 || y < 0 || y + h > 240) problem("\"%s\" paints x %d..%d y %d..%d, off the screen", s, x0, x0 + span, (int)y, (int)y + h);
+    if (y + h > safeBottom) problem("\"%s\" reaches y %d, below the safe area (%d)", s, (int)y + h, safeBottom);
+    if (y >= safeSideBelow && (tx < safeSide || tx + cw > 240 - safeSide)) problem("\"%s\" has glyphs at x %d..%d, closer than %d px to a side", s, tx, tx + cw, safeSide);
     if (pad_ > 0 && cw > pad_) problem("\"%s\" is %d px wide but its padding is %d: the text it replaces would show through", s, cw, pad_);
     if (log) fprintf(log, "{\"op\":\"text\",\"s\":\"%s\",\"x\":%d,\"y\":%d,\"w\":%d,\"h\":%d,\"sx\":%d,\"sw\":%d,\"fg\":%u,\"bg\":%u}\n", s, tx, (int)y, cw, h, x0, span, fg_, bg_);
     return (int16_t)cw;

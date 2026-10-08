@@ -136,6 +136,7 @@ static void beginFrame(const char *name) {
 static const uint32_t START_MS = 100000, START_EPOCH = 1791288030u;
 
 static void defaults() {
+  tft.safeBottom = 240;   // the older screens keep their footers where they have always been (y 218..234)
   memset(&g_settings, 0, sizeof(g_settings));
   g_settings.portalInterval = 60;
   g_settings.portalPage = 6;
@@ -928,6 +929,7 @@ static std::string vmsAnswer(int n, int total = -1, const char *jellyfin = nullp
 
 static void testVmsScreen() {
   defaults();
+  tft.safeBottom = 224;   // the plastic over the glass hides the lowest rows of pixels
   beginFrame("vms_four");
   install(vmsAnswer(4));
   tft.resetStats();
@@ -967,6 +969,7 @@ static void testVmsScreen() {
 
   // The Jellyfin band under the title, the first row still where it was.
   defaults();
+  tft.safeBottom = 224;   // the plastic over the glass hides the lowest rows of pixels
   beginFrame("vms_jellyfin");
   install(vmsAnswer(3, -1, "{\"transcodes\":2,\"tasks\":[]}"));
   tft.resetStats();
@@ -988,6 +991,7 @@ static void testVmsScreen() {
 static void testVmsPaging() {
   // Ten VMs are two pages of five; page_seconds after it went up the next one replaces the rows.
   defaults();
+  tft.safeBottom = 224;   // the plastic over the glass hides the lowest rows of pixels
   beginFrame("vms_page1");
   install(vmsAnswer(10));
   tft.resetStats();
@@ -1012,6 +1016,7 @@ static void testVmsPaging() {
 
   // Seven are two pages of four, not five and two.
   defaults();
+  tft.safeBottom = 224;   // the plastic over the glass hides the lowest rows of pixels
   beginFrame("vms_seven");
   install(vmsAnswer(7));
   tft.resetStats();
@@ -1032,6 +1037,7 @@ static void testVmsPaging() {
 
   // More VMs than the portal listed: say how many are not shown.
   defaults();
+  tft.safeBottom = 224;   // the plastic over the glass hides the lowest rows of pixels
   beginFrame("vms_not_listed");
   install(vmsAnswer(10, 14));
   tft.resetStats();
@@ -1042,6 +1048,7 @@ static void testVmsPaging() {
 
 static void testVmsNotices() {
   defaults();
+  tft.safeBottom = 224;   // the plastic over the glass hides the lowest rows of pixels
   beginFrame("vms_off");
   install(vmsAnswer(3));
   g_settings.portalSections &= ~SEC_VMS;
@@ -1057,6 +1064,7 @@ static void testVmsNotices() {
 
   // A portal that does not know the section (an answer without it), and one that could not read its list.
   defaults();
+  tft.safeBottom = 224;   // the plastic over the glass hides the lowest rows of pixels
   beginFrame("vms_old_portal");
   install(CALM);
   tft.resetStats();
@@ -1066,6 +1074,7 @@ static void testVmsNotices() {
 
   // None at all: said plainly, and the rotation skips the theme (display.cpp) because of the same fact.
   defaults();
+  tft.safeBottom = 224;   // the plastic over the glass hides the lowest rows of pixels
   beginFrame("vms_none");
   install(vmsAnswer(0));
   tft.resetStats();
@@ -1075,6 +1084,7 @@ static void testVmsNotices() {
 
   // The portal's own states come first: not set up, no network, unreachable.
   defaults();
+  tft.safeBottom = 224;   // the plastic over the glass hides the lowest rows of pixels
   beginFrame("vms_unreachable");
   g_configured = true;
   g_have = false;
@@ -1099,6 +1109,7 @@ static void testVmsWorstCase() {
     j += std::string(i ? "," : "") + "{\"name\":\"WWWWWWWWWWWWWWWWWWWWWWWW\",\"state\":\"" + states[i % 4] + "\",\"up\":\"123d 23h\"}";
   j += "]}}";
   defaults();
+  tft.safeBottom = 224;   // the plastic over the glass hides the lowest rows of pixels
   beginFrame("vms_worst");
   install(j);
   tft.resetStats();

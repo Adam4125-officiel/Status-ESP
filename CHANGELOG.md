@@ -5,6 +5,23 @@ All notable changes to this project are documented in this file. The format foll
 changes the first, second and third number, and what a `-rc.N` pre-release is) is in
 [docs/releasing.md](docs/releasing.md).
 
+## [1.1.0-rc.2] - 2026-10-08
+
+Needs **Status-Portal 1.11.1** for the VM screen, as 1.1.0-rc.1 does.
+
+### Fixed
+- **The hourly forecast's hour labels were half hidden** by the plastic over the glass of a SmallTV-Ultra: they were
+  drawn at y 222..238 and the first one started at x 3. The chart now ends 16 px above the bottom (the labels at
+  y 208..224, the rain bars and the curve a little lower in height to make the room) and its 24 points are drawn
+  between x 24 and x 220, so the first label is 9 px from the left edge.
+- **The VM screen's footer ("3 of 5 running", "Page 1/2") had the same problem** (y 218..234): it is now at y 206..222,
+  and the rows are 34 px instead of 36 to make the room.
+- The "No hourly forecast" message says "Waiting for fresh weather data", which fits the screen with a margin.
+
+### Changed
+- The PC tests now know a "safe area" (nothing below y 224, and the chart's labels 8 px from the sides) and fail when
+  a screen draws outside it. Only the hourly and VM screens are held to it so far.
+
 ## [1.1.0-rc.1] - 2026-10-08
 
 Needs **Status-Portal 1.11.1** for the VM screen (everything else works with 1.11.0).

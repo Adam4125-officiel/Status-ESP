@@ -27,7 +27,8 @@ Founding constraints:
 - The stock files on the device (images, settings, Wi-Fi) stay untouched.
 
 ## 2. Current state (handover)
-- **1.1.0 is in progress on branch `1.1.0`** (2026-10-08, `1.1.0-rc.1` published; PR open as a draft). It
+- **1.1.0 is in progress on branch `1.1.0`** (2026-10-08, `1.1.0-rc.2` published, installed on the owner's device; PR #3 open as a draft;
+  rc.2 pulled the hourly chart and the VM footer in from the edges, see the "plastic" rule in section 12). It
   removes the countdown and analog-clock themes (to buy flash), adds the **hourly forecast** theme (`hourly`:
   the next six hours in detail over a 24-hour temperature curve with rain bars) and the **virtual machines**
   theme (`vms`: Hyper-V VM names, states and uptimes), and needs **Status-Portal 1.11.1** for the VMs. Read
@@ -37,7 +38,7 @@ Founding constraints:
   #1 and #2, merged into `main` with merge commits) and is the `0.4.0-rc.5` build with a new
   version string. `main` is the only long-lived branch; the next version gets a branch of its
   own (section 6).
-- **Size: `firmware.bin` is 506,448 bytes against the 520,000 limit (about 13.5 KB of flash left; it was
+- **Size: `firmware.bin` is 506,512 bytes against the 520,000 limit (about 13.5 KB of flash left; it was
   509,456 in 1.0.0: removing countdown (2.8 KB) and analog (7 KB, it was the only user of the trigonometry
   functions) paid for the hourly forecast (4 KB) and the VMs (2.7 KB)), static RAM 42,596 of 81,920, idle
   free heap about 31 KB (largest block about 30 KB) - the heap is what 1.1.0 has not measured on the device.**
@@ -453,6 +454,14 @@ HTTP routes:
 - Keep the versions pinned in `platformio.ini`; a platform or library update is a change to
   test on the device and to record in the changelog.
 - Everything committed is in English. Replies to the owner are in French.
+
+- **Keep text clear of the edges: the plastic over the glass hides them.** On the owner's SmallTV-Ultra, half of a
+  16 px label drawn at y 222..238 was cut off, and a label starting at x 3 is at the mercy of the left edge. Treat the
+  last 16 px at the bottom as unusable, and keep text 8 px from the sides where it can be (the tests' "safe area":
+  `tft.safeBottom`, `safeSide`, `safeSideBelow`, set by `tests/host/test_hourly.cpp` and by the VM scenarios). **Only the
+  hourly and VM screens are held to it so far**: the Status-Portal and Resources screens still draw their footers at
+  y 218..234 and may be partly hidden too (ROADMAP, "Display"); move them when the owner reports it, and add them to
+  the test then.
 
 ## 13. Known pitfalls
 - The classic XOR checksum of ESP8266 images does not match on Arduino binaries: `elf2bin.py`

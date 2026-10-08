@@ -4,10 +4,14 @@
 //   y  32..116  the next six hours side by side: hour, icon, temperature, chance of rain
 //   y 120       divider
 //   y 124..140  the label of the highest temperature of the 24 hours
-//   y 142..176  the 24 hours as a curve of the temperature (a dot at the highest and the lowest)
-//   y 178..194  the label of the lowest
-//   y 198..218  the chance of rain of each hour, as bars
-//   y 222..238  the hour of every sixth point
+//   y 142..168  the 24 hours as a curve of the temperature (a dot at the highest and the lowest)
+//   y 170..186  the label of the lowest
+//   y 190..204  the chance of rain of each hour, as bars
+//   y 208..224  the hour of every sixth point
+//
+// Margins: the plastic over a SmallTV-Ultra's glass hides its edge (on the owner's, half of a label at
+// y 222..238 and the first one at x 3 were cut off), so the chart keeps its last row 16 px above the bottom and its
+// 24 points between x 24 and x 220, which keeps the first tick label 9 px from the left. tests/host checks it.
 //
 // Only Fonts 2 and 4, like the Status-Portal screens: the PC tests (tests/host) know exactly those two,
 // and a layout that fits there fits on the device. Nothing here changes between two weather updates
@@ -28,9 +32,9 @@ const int16_t COLS = 6, COL_W = 40;
 const int16_t CITY_Y = 8, NOW_Y = 2;
 const int16_t HOUR_Y = 32, ICON_CY = 64, ICON_SIZE = 28, TEMP_Y = 82, RAIN_Y = 100;
 const int16_t DIVIDER_Y = 120;
-const int16_t CH_X0 = 14, CH_X1 = 226;                 // the 24 points are spread over this
-const int16_t MAX_LABEL_Y = 124, CURVE_TOP = 142, CURVE_BOTTOM = 176, MIN_LABEL_Y = 178;
-const int16_t BAR_TOP = 198, BAR_BOTTOM = 218, TICK_Y = 222;
+const int16_t CH_X0 = 24, CH_X1 = 220;                 // the 24 points are spread over this
+const int16_t MAX_LABEL_Y = 124, CURVE_TOP = 142, CURVE_BOTTOM = 168, MIN_LABEL_Y = 170;
+const int16_t BAR_TOP = 190, BAR_BOTTOM = 204, TICK_Y = 208;
 const int16_t MIN_RANGE_DC = 30;                       // a flat day is not drawn as a mountain range
 
 const uint16_t HIGH_COLOR = TFT_ORANGE;
@@ -228,7 +232,7 @@ void screenHourlyUpdate(bool full) {
 
   if (noHours) {
     clearScreen();
-    display::drawMessage("No hourly forecast", "Waiting for the next weather update", TFT_YELLOW);
+    display::drawMessage("No hourly forecast", "Waiting for fresh weather data", TFT_YELLOW);
   } else {
     drawHourly(w, skip, avail);
   }
