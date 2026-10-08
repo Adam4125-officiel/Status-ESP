@@ -27,13 +27,20 @@ Founding constraints:
 - The stock files on the device (images, settings, Wi-Fi) stay untouched.
 
 ## 2. Current state (handover)
+- **1.1.0 is in progress on branch `1.1.0`** (2026-10-08, `1.1.0-rc.1` published; PR open as a draft). It
+  removes the countdown and analog-clock themes (to buy flash), adds the **hourly forecast** theme (`hourly`:
+  the next six hours in detail over a 24-hour temperature curve with rain bars) and the **virtual machines**
+  theme (`vms`: Hyper-V VM names, states and uptimes), and needs **Status-Portal 1.11.1** for the VMs. Read
+  `CHANGELOG.md` for the detail, and "NOT verified" below: none of it has been seen on a real screen.
 - **1.0.0 is the first stable release (2026-10-07).** The owner picked that number for the first
   stable; the policy table in section 5 is unchanged. It rolls up the 0.3.0 and 0.4.0 lines (PRs
   #1 and #2, merged into `main` with merge commits) and is the `0.4.0-rc.5` build with a new
   version string. `main` is the only long-lived branch; the next version gets a branch of its
   own (section 6).
-- **Size: `firmware.bin` is about 509,456 bytes against the 520,000 limit (about 10 KB of flash
-  left), static RAM 42,648 of 81,920, idle free heap about 31 KB (largest block about 30 KB).**
+- **Size: `firmware.bin` is 506,448 bytes against the 520,000 limit (about 13.5 KB of flash left; it was
+  509,456 in 1.0.0: removing countdown (2.8 KB) and analog (7 KB, it was the only user of the trigonometry
+  functions) paid for the hourly forecast (4 KB) and the VMs (2.7 KB)), static RAM 42,596 of 81,920, idle
+  free heap about 31 KB (largest block about 30 KB) - the heap is what 1.1.0 has not measured on the device.**
   Flash and RAM are both nearly spent: a feature has to find savings first (ROADMAP, "Memory").
   Read `heap`, `max_block` and `req_heap` in `/api/status` after any change that allocates.
 - **What the firmware has**: a six-tab web interface and JSON API; Open-Meteo weather with
@@ -41,14 +48,16 @@ Founding constraints:
   `/image` and `/gif`; night mode; a Wi-Fi boot delay; factory reset; the `status-esp.local`
   mDNS name; settings export and import; an optional web password; a full backup and restore of
   the file system; and **ten themes**, chosen manually or rotated: weather clock
-  (`weather_clock`), forecast, photo album, clock, analog clock (`analog`), countdown, word
-  clock (`words`), binary clock (`binary`), and the two Status-Portal screens `portal` and
-  `resources`. (The big-digits, simple-weather and rings themes of 0.3.0 were removed in 0.4.0 to
-  save flash; a saved choice of one of them falls back to the default theme.)
-- **The Status-Portal client** (0.4.0): section 11. It talks to Status-Portal **1.11.0** for
-  everything (1.10.0 for the basics: an older portal ignores the extra parameters and the display
-  just shows less). Both repositories were released together: Status-Portal 1.11.0 and
-  Status-ESP 1.0.0.
+  (`weather_clock`), forecast, hourly forecast (`hourly`), photo album, clock, word clock (`words`), binary
+  clock (`binary`), and the three Status-Portal screens `portal`, `resources` and `vms`. (The big-digits,
+  simple-weather and rings themes of 0.3.0 were removed in 0.4.0, and the analog clock and countdown in
+  1.1.0, to save flash; a saved choice of one of them falls back to the default theme, and a device that was
+  already set up does not get a *new* theme in its rotation by itself: its saved `auto_themes` list does not
+  name it, so the owner ticks `hourly` and `vms` in Settings.)
+- **The Status-Portal client** (0.4.0): section 11. It talks to Status-Portal **1.11.1** for
+  everything (1.11.0 for all but the VMs, 1.10.0 for the basics: an older portal ignores the extra
+  parameters and the display just shows less). The repositories are released together, portal first:
+  Status-Portal 1.11.0 with Status-ESP 1.0.0, and Status-Portal 1.11.1 with Status-ESP 1.1.0.
 - **GIF memory** (0.4.0-rc.4): the decoder takes about 24 KB of a 31 KB idle heap; it used to be
   refused ("not enough memory") as soon as the heap drifted by half a kilobyte. A GIF now needs
   2 KB to remain free after it and **yields to web requests** (rule 10 in section 3).
@@ -64,7 +73,11 @@ Founding constraints:
   because the owner's portal was still on 1.11.0-rc.1 when this was released. Also never seen:
   GIF decoding speed, `status-esp.local` on a real network, the password prompt in a real browser,
   and the progressive-JPEG message. If the owner reports something odd on the screen, start from
-  that list.
+  that list. **1.1.0 adds to it**: the hourly forecast and VM screens were checked on a PC (layout bounds,
+  no redraw when unchanged, the parsers against garbage, pictures rendered from the real drawing calls) and
+  never looked at on the device, and the VM list has only ever been a stand-in's: this sandbox has no
+  Hyper-V. The hourly screen's icons were stubbed in those pictures, and 28 px is smaller than the icons
+  have been drawn at before.
 - Installing the firmware changes the device's visible identity (rescue access point
   `Status-ESP`, hostname `status-esp`, `/v.json` reports `Status-ESP-<version>`); the settings
   file is still `/custom.json` (section 5). **v0.2.0 is a tag only**: it was never published.
@@ -229,10 +242,10 @@ src/backup.{h,cpp}           full file-system backup / restore as a tar stream (
 src/media.{h,cpp}            JPG (tjpgd) and animated GIF (AnimatedGIF) from LittleFS to the screen
 src/icons.{h,cpp}            weather icons drawn with graphics primitives, WMO code descriptions
 src/display.{h,cpp}          screen manager: themes, rotation, backlight / night mode, drawing helpers
-src/screen_*.cpp             one theme each: clock, weather (weather_clock), forecast, album, analog,
-                             countdown, words, binary, portal, resources
+src/screen_*.cpp             one theme each: clock, weather (weather_clock), forecast, hourly, album, words,
+                             binary, portal, resources, vms
+src/weather_hourly.{h,cpp}   reads the hourly arrays of Open-Meteo's answer (pure: runs on the PC)
 src/bigfont.h                helpers for the Font 8 (75 px digits) themes
-src/countdown_calc.h         date arithmetic for the countdown (pure, testable on a PC)
 src/portal.{h,cpp}           Status-Portal client: fetch every portal_interval seconds, cache, back-off, diagnostics
 src/portal_data.h            the contract's caps and the Summary struct, the parse() declaration, jellyfinBusy()
 src/portal_parse.cpp         parse() the answer defensively (pure: no network, no Arduino: runs on the PC)
@@ -334,9 +347,15 @@ degree sign is drawn as a small circle (`display::drawDegree`). The weather scre
 `weather_notice` for the "no city / no network / loading" messages.
 
 Weather: `weather.cpp` fetches `http://api.open-meteo.com/v1/forecast` over plain HTTP (the
-device has no TLS), collects the ~1.1 KB answer through `http.writeToPrint()` into a String
-capped at 4 KB, parses it through an ArduinoJson filter, and keeps one
-metric `Data` struct (`units.h` converts at draw time, so a unit change needs no new fetch).
+device has no TLS), collects the ~2.3 KB answer (1.1 KB before the hourly part) through
+`http.writeToPrint()` into a String capped at 4 KB, parses it through an ArduinoJson filter, and keeps one
+metric `Data` struct (`units.h` converts at draw time, so a unit change needs no new fetch). Since 1.1.0 the
+request carries `forecast_hours=24` and the four `hourly` fields; `weather_hourly.cpp` (pure, tested on the PC)
+turns them into `Data::hours[]`. **The hourly part is optional**: an answer without usable hours is still a good
+one, and the `hourly` theme then says "No hourly forecast". `forecast_hours` makes the arrays start at the hour the
+answer was made in, so the screen tells how many hours have gone by from the city's own hour (the device clock
+plus the same answer's `utc_offset_seconds`, or the answer's age when the clock is not set) and never draws the
+past.
 `utc_offset_seconds` from the same answer is what the clock uses when the time zone is Auto.
 The last failure, the failure count and the attempt age are kept (`weather::diag()`) and shown by
 `/api/status`, the Weather tab and the "No weather data" screen: read them first when the weather is
@@ -358,23 +377,29 @@ AnimatedGIF, one frame per `gifPlayFrame()` call, honouring the frame delays. Ru
 section 3 is the memory rule. `drawJpgFit()` and `gifOpenCentered()` are what the album uses to
 fit and centre pictures that are not exactly 240x240.
 
-Status-Portal client (0.4.0, `portal*.{h,cpp}`, `screen_portal.cpp`, `screen_resources.cpp`):
+Status-Portal client (0.4.0, `portal*.{h,cpp}`, `screen_portal.cpp`, `screen_resources.cpp`, `screen_vms.cpp`):
 - **Contract.** `GET http://<portal>/api/device/summary?sections=<on ones>&services=all&resources=all&jellyfin=1`
   with the key in the `X-Api-Key` header (never in the URL), plain `http://` on the LAN. The shape is
   defined by Status-Portal's `device_api.py` (and the "Display device API" section of that
   repository's CLAUDE.md, which has precise conventions): `v`, `now`, `site`, `overall`, an optional
   top-level `jellyfin` (`transcodes`, `tasks[]`), then the sections `services` (counts and `items`
   with `name`, `status`, `ms`), `incidents`, `maintenance`, `resources` (cpu, mem, net, `disks[]`,
-  `gpus[]`), `announcements`. Every list has a cap and every string a cap in bytes; the caps are the
+  `gpus[]`), `announcements`, and (portal >= 1.11.1) `vms` (`total`, `running`, `items[]` of `name`,
+  `state`, `up`). Every list has a cap and every string a cap in bytes; the caps are the
   `MAX_*` constants of `portal_data.h` and must follow the portal's.
+- **`vms` is an opt-in *section*, not a modifier**: a portal never sends it unless `sections=` names it, so
+  a firmware that does not ask is handed what it always was. The firmware names it when the "virtual
+  machines" switch (`portal_vms`) is on; an older portal ignores the name (or answers 400 if it is the
+  only one asked for, which the diagnostics show), and the screen then says "No VM data". The state is
+  Hyper-V's own word, kept as text and also reduced to a family (`VmKind`) for the colour.
 - **The three parameters are opt-in on the portal's side**: without them the portal sends exactly what
   1.10.0 sent. The firmware always asks for all three; a portal that does not know them ignores them and
   the screens show less (four disks, no GPU, no latency, no Jellyfin band, services that are not
   operational only). A new field therefore never needs a firmware release to stay compatible, but a firmware
   that wants one needs the portal released first.
-- **Size.** The answer is read whole into a String (`BodySink`, capped at `MAX_BODY` = 8 KB, the portal's
-  worst case with all three parameters is about 7.7 KB), then parsed by ArduinoJson without a filter into
-  `Summary` (about 2.6 KB static, `portal::cache`). The request needs the GIF decoder to be closed (it is,
+- **Size.** The answer is read whole into a String (`BodySink`, capped at `MAX_BODY` = 9 KB, the portal's
+  worst case with all three parameters and the VMs is about 8.9 KB - without the VMs 7.7 KB), then parsed by ArduinoJson without a filter into
+  `Summary` (about 3.1 KB static, `portal::cache`). The request needs the GIF decoder to be closed (it is,
   `portal.cpp`) and about 15 KB of heap at the peak; with less it is skipped and retried in 10 s.
 - **`portal_parse.cpp` is pure** (no Arduino, no network): it is built on the PC by `tools/test_host.sh`
   with the sanitizers on, against hand-written answers, the contract's example, the largest possible
@@ -488,18 +513,21 @@ there, not here; when something ships, remove it from `ROADMAP.md` (the changelo
 exists). Check every idea against the 520,000-byte limit and the memory rule first.
 
 ## 15. Resuming work (read this first if you are a new session)
-1. **State.** `main` holds 1.0.0 (section 2). Read section 2, then `git log --oneline -15`,
-   `CHANGELOG.md` and `ROADMAP.md`. Nothing is half-done on a branch unless `git branch -a` says so.
+1. **State.** `main` holds 1.0.0; branch `1.1.0` holds the 1.1.0 work (section 2). Read section 2, then
+   `git log --oneline -15`, `CHANGELOG.md` and `ROADMAP.md`. Nothing is half-done on a branch unless
+   `git branch -a` says so.
 2. **Toolchain** (project-local, created by `bash tools/setup.sh`, git-ignored): build with
    `PLATFORMIO_CORE_DIR=$PWD/.pio-core .venv/bin/pio run`, check the image with
    `.venv/bin/python tools/check_firmware.py .pio/build/smalltv-ultra/firmware.bin`, run the PC
    tests with `bash tools/test_host.sh` (it needs one firmware build first: it borrows ArduinoJson from
-   `.pio/libdeps`). Run the tests after every change to `portal_*`, `screen_portal.cpp` or
-   `screen_resources.cpp`; they take seconds and catch layout overflows (the stand-in knows font 2 and 4
-   only: do not use another font in a portal screen without teaching it to `tests/host/TFT_eSPI.h`).
+   `.pio/libdeps`). Run the tests after every change to `portal_*`, `weather_hourly.*` or any `screen_*.cpp`
+   they cover (`screen_portal`, `screen_resources`, `screen_vms`, `screen_hourly`); they take seconds and
+   catch layout overflows (the stand-in knows font 2 and 4 only: do not use another font in one of those
+   screens without teaching it to `tests/host/TFT_eSPI.h`).
 3. **Seeing a screen without eyes.** Set `PORTAL_OPS_DIR=<dir>` when running the screen tests: every
-   scenario writes its drawing calls as JSON lines (`{"op":"rect"|"text"|...}`), and a throw-away script
-   that replays them with Pillow gives a picture. The font metrics are approximate, the layout is real.
+   scenario writes its drawing calls as JSON lines (`{"op":"rect"|"text"|"line"|"icon"|...}`), and a throw-away
+   script that replays them with Pillow gives a picture (the weather icons are stubbed in the hourly test and
+   logged as `icon` operations). The font metrics are approximate, the layout is real.
 4. **The device.** It can only be driven over the network (section 10). Ask the owner for its address
    and for permission before uploading anything (rule 5). `bash tools/upload.sh <ip> <bin>` checks
    `/v.json` before and after. To look at one theme without writing flash: `POST /api/settings?save=0`

@@ -9,7 +9,7 @@ Version numbers follow [docs/releasing.md](docs/releasing.md): new features bump
 ## Display
 - **Smooth (anti-aliased) fonts** loaded from LittleFS, as more clock fonts. The built-in
   TFT_eSPI fonts are all the firmware has today (the "Large" font is Font 8).
-- **Richer weather**: hourly forecast and more forecast days.
+- **Richer weather**: more forecast days (the hourly forecast shipped in 1.1.0), wind and a "feels like" row in the hourly strip.
 
 
 ## Memory
