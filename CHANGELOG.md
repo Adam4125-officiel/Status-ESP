@@ -13,6 +13,9 @@ Needs **Status-Portal 1.11.1** for the VM screen (everything else works with 1.1
 - **The countdown theme**, its web form (label, date, time) and its `cd_date`, `cd_time` and `cd_label`
   settings, to make room in flash (2,784 bytes). A saved choice of the theme falls back to the default theme,
   and the three old settings in a settings file or backup are ignored.
+- **The analog clock theme**, for the same reason (6,976 bytes: it was the only user of the trigonometry
+  functions). A saved choice falls back to the default theme; the hour, minute and second colours stay, the
+  other clocks use them.
 
 ## [1.0.0] - 2026-10-07
 

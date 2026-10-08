@@ -53,7 +53,6 @@ Version numbering and the release process are described in
   - *Photo album*: the JPG and animated GIF files in `/image`, one after the other or one fixed
     picture;
   - *Clock*: a big clock in the colours you choose;
-  - *Analog clock*: a clock face with hour, minute and second hands, and the date;
   - *Big digits*: the hour over the minutes in very large digits, with a seconds bar;
   - *Word clock*: the time spelled out in English by lighting words in a grid of letters, to the
     nearest five minutes, with four dots for the minutes in between;

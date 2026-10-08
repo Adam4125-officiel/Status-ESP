@@ -22,7 +22,7 @@
 // Leave  : release resources (GIF decoder, files). May draw nothing. Idempotent.
 //
 // Names: screenClock*, screenWeather* (theme weather_clock), screenForecast*,
-// screenAlbum*, screenAnalog*, screenWords*,
+// screenAlbum*, screenWords*,
 // screenBinary*, screenPortal*, screenResources*. All sets are
 // declared below; the manager calls them through its own table, so a screen file only has
 // to define its three functions.
@@ -56,10 +56,6 @@ void screenForecastLeave();
 void screenAlbumEnter();
 void screenAlbumUpdate(bool full);
 void screenAlbumLeave();
-
-void screenAnalogEnter();
-void screenAnalogUpdate(bool full);
-void screenAnalogLeave();
 
 
 

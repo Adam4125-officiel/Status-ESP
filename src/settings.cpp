@@ -15,7 +15,7 @@ static bool mounted = false;
 static_assert(sizeof(Settings::portalUrl) == portal::MAX_URL + 1, "portalUrl must hold exactly what portal::checkUrl accepts");
 static_assert(sizeof(Settings::portalKey) == portal::MAX_KEY + 1, "portalKey must hold exactly what portal::validKey accepts");
 
-static const char *const THEME_NAMES[THEME_COUNT] = {"weather_clock", "forecast", "album",  "clock",     "analog",
+static const char *const THEME_NAMES[THEME_COUNT] = {"weather_clock", "forecast", "album",  "clock",
                                                      "words",         "binary",   "portal", "resources"};
 
 const char *themeName(uint8_t theme) {

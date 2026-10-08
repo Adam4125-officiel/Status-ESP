@@ -21,7 +21,6 @@ static const Screen SCREENS[settings::THEME_COUNT] = {
     {screenForecastEnter, screenForecastUpdate, screenForecastLeave},   // THEME_FORECAST
     {screenAlbumEnter, screenAlbumUpdate, screenAlbumLeave},            // THEME_ALBUM
     {screenClockEnter, screenClockUpdate, screenClockLeave},            // THEME_CLOCK
-    {screenAnalogEnter, screenAnalogUpdate, screenAnalogLeave},         // THEME_ANALOG
     {screenWordsEnter, screenWordsUpdate, screenWordsLeave},            // THEME_WORDS
     {screenBinaryEnter, screenBinaryUpdate, screenBinaryLeave},         // THEME_BINARY
     {screenPortalEnter, screenPortalUpdate, screenPortalLeave},         // THEME_PORTAL
