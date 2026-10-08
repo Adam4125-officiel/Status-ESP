@@ -178,6 +178,9 @@ typedef void (*UpdateFn)(bool);
 
 // What display.cpp does when it switches to a theme, then on every pass.
 static void show(EnterFn enter, UpdateFn update) {
+  // The plastic over the glass hides the last rows of pixels: the Resources and VM screens may not draw text below
+  // y 224 (the Status-Portal screen has not been moved yet, see the ROADMAP). defaults() put the limit back.
+  tft.safeBottom = (update == screenResourcesUpdate || update == screenVmsUpdate) ? 224 : 240;
   enter();
   tft.fillScreen(TFT_BLACK);
   update(true);

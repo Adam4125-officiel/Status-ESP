@@ -5,6 +5,16 @@ All notable changes to this project are documented in this file. The format foll
 changes the first, second and third number, and what a `-rc.N` pre-release is) is in
 [docs/releasing.md](docs/releasing.md).
 
+## [1.1.0-rc.3] - 2026-10-08
+
+Needs **Status-Portal 1.11.1** for the VM screen, as 1.1.0-rc.1 and rc.2 do.
+
+### Fixed
+- **The Resources screen is clear of the plastic too.** Its last line (the network rates, and "Page 2/3") was at
+  y 218..234, where the plastic over a SmallTV-Ultra's glass hides half a line; it is now at y 206..222. The blocks
+  (CPU, RAM, GPUs, disks) are 28 px instead of 30 to make the room, with the bar a pixel thinner, and there are
+  still six to a page.
+
 ## [1.1.0-rc.2] - 2026-10-08
 
 Needs **Status-Portal 1.11.1** for the VM screen, as 1.1.0-rc.1 does.

@@ -9,10 +9,10 @@ Version numbers follow [docs/releasing.md](docs/releasing.md): new features bump
 ## Display
 - **Smooth (anti-aliased) fonts** loaded from LittleFS, as more clock fonts. The built-in
   TFT_eSPI fonts are all the firmware has today (the "Large" font is Font 8).
-- **Older footers behind the plastic.** The Status-Portal and Resources screens draw their last line (the network
-  rates, "Page 1/2") at y 218..234, which the plastic over a SmallTV-Ultra's glass may partly hide, as it did the
-  hourly forecast's hour labels (fixed in 1.1.0-rc.2, with the VM footer). Move them up to y 206 and hold them to
-  the tests' safe area when the owner reports it.
+- **The Status-Portal screen behind the plastic.** Its lowest rows (the ticker for announcements) may be partly
+  hidden by the plastic over a SmallTV-Ultra's glass, as the hourly forecast's hour labels were (fixed in 1.1.0-rc.2,
+  with the VM footer; the Resources footer in rc.3). Move them up and hold the screen to the tests' safe area when
+  the owner reports it.
 - **Richer weather**: more forecast days (the hourly forecast shipped in 1.1.0), wind and a "feels like" row in the hourly strip.
 
 

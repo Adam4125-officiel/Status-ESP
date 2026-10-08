@@ -3,13 +3,16 @@
 //   y   0..27   header: the portal's site name, or a red band "HIGH LOAD" while the CPU or the
 //               memory is critical (the portal's own judgement, 85 % and up). While Jellyfin is busy it is
 //               32 px, split in two: that on top, a blue band saying what Jellyfin is doing under it
-//   y  32..     six blocks of 30 px per page: CPU, RAM, then each GPU (its load, then its video memory),
+//   y  32..     six blocks of 28 px per page: CPU, RAM, then each GPU (its load, then its video memory),
 //               then the disks, the fullest first. Each is a label on the left, the percentage on the
 //               right and a bar under them, coloured by the portal's own severity (green, orange from
 //               60 %, red from 85 %). With more blocks than fit, they are split evenly over pages that
 //               turn every portal_page seconds, as the Status-Portal screen's do
-//   y 218..234  network: "up 0.1  down 1.4 MB/s", when the portal reports it; with several pages it
+//   y 206..222  network: "up 0.1  down 1.4 MB/s", when the portal reports it; with several pages it
 //               moves left to make room for "Page 2/3" on the right
+//
+// Blocks are 28 px and the footer is at y 206 because the plastic over a SmallTV-Ultra's glass hides the last ~16 px
+// (on the owner's, half of a line at y 222..238): nothing is drawn below y 224. tests/host checks it.
 //
 // The portal sends these numbers whatever its own public pages show; this screen is gated by the
 // "server's CPU, memory and disks" switch in the web interface (which also decides whether they are
@@ -29,10 +32,10 @@ namespace {
 using portal::NA;
 
 const int16_t HEADER_H = 28;
-const int16_t BLOCK_Y = 32, BLOCK_H = 30;
-const int16_t BAR_X = 4, BAR_W = 232, BAR_H = 8, BAR_DY = 19;
+const int16_t BLOCK_Y = 32, BLOCK_H = 28;
+const int16_t BAR_X = 4, BAR_W = 232, BAR_H = 7, BAR_DY = 18;
 const int16_t LABEL_W = 176, VALUE_W = 52;   // the label on the left, the percentage on the right of a block
-const int16_t NET_Y = 218;
+const int16_t NET_Y = 206;
 const int16_t NET_PAGED_W = 160, PAGE_W = 70;   // the two texts of the footer when there are several pages
 const uint8_t BLOCKS = 6;                   // blocks on one page
 

@@ -27,8 +27,8 @@ Founding constraints:
 - The stock files on the device (images, settings, Wi-Fi) stay untouched.
 
 ## 2. Current state (handover)
-- **1.1.0 is in progress on branch `1.1.0`** (2026-10-08, `1.1.0-rc.2` published, installed on the owner's device; PR #3 open as a draft;
-  rc.2 pulled the hourly chart and the VM footer in from the edges, see the "plastic" rule in section 12). It
+- **1.1.0 is in progress on branch `1.1.0`** (2026-10-08, `1.1.0-rc.3` published, installed on the owner's device; PR #3 open as a draft;
+  rc.2 and rc.3 pulled the hourly chart, the VM footer and the Resources footer in from the edges, see the "plastic" rule in section 12). It
   removes the countdown and analog-clock themes (to buy flash), adds the **hourly forecast** theme (`hourly`:
   the next six hours in detail over a 24-hour temperature curve with rain bars) and the **virtual machines**
   theme (`vms`: Hyper-V VM names, states and uptimes), and needs **Status-Portal 1.11.1** for the VMs. Read
@@ -458,10 +458,10 @@ HTTP routes:
 - **Keep text clear of the edges: the plastic over the glass hides them.** On the owner's SmallTV-Ultra, half of a
   16 px label drawn at y 222..238 was cut off, and a label starting at x 3 is at the mercy of the left edge. Treat the
   last 16 px at the bottom as unusable, and keep text 8 px from the sides where it can be (the tests' "safe area":
-  `tft.safeBottom`, `safeSide`, `safeSideBelow`, set by `tests/host/test_hourly.cpp` and by the VM scenarios). **Only the
-  hourly and VM screens are held to it so far**: the Status-Portal and Resources screens still draw their footers at
-  y 218..234 and may be partly hidden too (ROADMAP, "Display"); move them when the owner reports it, and add them to
-  the test then.
+  `tft.safeBottom`, `safeSide`, `safeSideBelow`, set by `tests/host/test_hourly.cpp` and by the VM scenarios). **The
+  hourly, VM and Resources screens are held to it** (the Resources one since rc.3, at the owner's request); the
+  Status-Portal screen is not yet and may be partly hidden too (ROADMAP, "Display"): move it when the owner reports
+  it, and add it to the test then (`show()` in `test_portal_screens.cpp` decides which screens are held).
 
 ## 13. Known pitfalls
 - The classic XOR checksum of ESP8266 images does not match on Arduino binaries: `elf2bin.py`
