@@ -5,7 +5,7 @@ All notable changes to this project are documented in this file. The format foll
 changes the first, second and third number, and what a `-rc.N` pre-release is) is in
 [docs/releasing.md](docs/releasing.md).
 
-## [Unreleased]
+## [1.1.0-rc.1] - 2026-10-08
 
 Needs **Status-Portal 1.11.1** for the VM screen (everything else works with 1.11.0).
 
@@ -35,6 +35,16 @@ Needs **Status-Portal 1.11.1** for the VM screen (everything else works with 1.1
 - **The analog clock theme**, for the same reason (6,976 bytes: it was the only user of the trigonometry
   functions). A saved choice falls back to the default theme; the hour, minute and second colours stay, the
   other clocks use them.
+
+### Not verified
+- How the hourly forecast and the VM screen look on the real display: they were checked on a PC (layout
+  bounds, no redraw when nothing changed, the parsers against garbage, pictures rendered from the real drawing
+  calls), with the weather icons stubbed at 28 px. The VM list has only been a stand-in's: the portal's
+  sandbox has no Hyper-V, so no real VM data has reached the device. Heap on the device after the 24-hour
+  weather answer (about twice as big as before) has not been measured: read `heap` and `max_block` in
+  `/api/status`.
+- A device that was already set up does not get the new themes in its rotation by itself: tick **Hourly
+  forecast** and **Virtual machines** under Settings.
 
 ## [1.0.0] - 2026-10-07
 
