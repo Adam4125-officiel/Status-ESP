@@ -136,7 +136,9 @@ static void beginFrame(const char *name) {
 static const uint32_t START_MS = 100000, START_EPOCH = 1791288030u;
 
 static void defaults() {
-  tft.safeBottom = 240;   // the older screens keep their footers where they have always been (y 218..234)
+  tft.safeBottom = 240;   // show() sets the safe area of the screen it puts up
+  tft.safeSide = 0;
+  tft.safeSideBelow = 240;
   memset(&g_settings, 0, sizeof(g_settings));
   g_settings.portalInterval = 60;
   g_settings.portalPage = 6;
@@ -178,9 +180,12 @@ typedef void (*UpdateFn)(bool);
 
 // What display.cpp does when it switches to a theme, then on every pass.
 static void show(EnterFn enter, UpdateFn update) {
-  // The plastic over the glass hides the last rows of pixels: the Resources and VM screens may not draw text below
-  // y 224 (the Status-Portal screen has not been moved yet, see the ROADMAP). defaults() put the limit back.
-  tft.safeBottom = (update == screenResourcesUpdate || update == screenVmsUpdate) ? 224 : 240;
+  // The plastic over the glass hides the last rows of pixels: none of these screens may draw text below y 224, and
+  // the Status-Portal ticker (y 206..) keeps 8 px from the sides. defaults() put the limits back.
+  tft.safeBottom = 224;
+  const bool portalScreen = update == screenPortalUpdate;
+  tft.safeSide = portalScreen ? 8 : 0;
+  tft.safeSideBelow = portalScreen ? 205 : 240;   // the ticker; the rows above it keep their glyph and tag at the edges
   enter();
   tft.fillScreen(TFT_BLACK);
   update(true);

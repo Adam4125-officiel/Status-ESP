@@ -5,6 +5,18 @@ All notable changes to this project are documented in this file. The format foll
 changes the first, second and third number, and what a `-rc.N` pre-release is) is in
 [docs/releasing.md](docs/releasing.md).
 
+## [1.1.1-rc.1] - 2026-11-06
+
+Bug fixes only. Install it through the device's `/update` page like any release.
+
+### Fixed
+- **The announcements on the Status-Portal screen were partly hidden by the plastic over the glass.** The ticker was
+  drawn at y 220..236, in the last 16 px that the plastic over a SmallTV-Ultra's glass covers (the hourly, VM and
+  Resources screens were moved out of it in 1.1.0). It is now at y 206..222, right under the seven rows it shares the
+  screen with, and the scrolling text keeps 8 px from both sides (a line that fits is centred within the same
+  margins). When the announcements go away, the ticker's band is now cleared before the rows are drawn, since the
+  eighth row takes its place. The PC tests now hold the Status-Portal screen to the same safe area as the others.
+
 ## [1.1.0] - 2026-10-08
 
 Promoted from `1.1.0-rc.3` (the same build with a new version string) after the owner tested the release candidates on
