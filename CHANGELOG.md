@@ -5,9 +5,11 @@ All notable changes to this project are documented in this file. The format foll
 changes the first, second and third number, and what a `-rc.N` pre-release is) is in
 [docs/releasing.md](docs/releasing.md).
 
-## [1.1.1-rc.1] - 2026-11-06
+## [1.1.1] - 2026-11-08
 
-Bug fixes only. Install it through the device's `/update` page like any release.
+Bug fixes only. Promoted from `1.1.1-rc.1` (the same build with a new version string) after the owner tested it on
+their device and found it stable. Install it through the device's `/update` page like any release; the stock firmware
+stays one upload away. Works with the same Status-Portal as 1.1.0 (1.11.1 for everything).
 
 ### Fixed
 - **The announcements on the Status-Portal screen were partly hidden by the plastic over the glass.** The ticker was

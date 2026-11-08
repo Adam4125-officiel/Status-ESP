@@ -27,19 +27,21 @@ Founding constraints:
 - The stock files on the device (images, settings, Wi-Fi) stay untouched.
 
 ## 2. Current state (handover)
-- **1.1.0 is the current stable release (2026-10-08)**, promoted from `1.1.0-rc.3` (same build, new version
-  string) after the owner tested the candidates on the device (PR #3 merged into `main` with a merge commit, branch
-  deleted; 1.0.0 was the first stable, 2026-10-07). It removed the countdown and analog-clock themes (to buy flash),
+- **1.1.1 is the current stable release (2026-11-08)**, promoted from `1.1.1-rc.1` (same build, new version
+  string) after the owner tested it on the device (PR #4 merged into `main` with a merge commit, branch deleted). It
+  is fixes only: the Status-Portal screen's announcement ticker moved clear of the plastic (below).
+- **1.1.0 (2026-10-08)** was promoted from `1.1.0-rc.3` after the owner tested the candidates on the device (PR #3;
+  1.0.0 was the first stable, 2026-10-07). It removed the countdown and analog-clock themes (to buy flash),
   added the **hourly forecast** theme (`hourly`: the next six hours in detail over a 24-hour temperature curve with
   rain bars) and the **virtual machines** theme (`vms`: Hyper-V VM names, states and uptimes), and needs
   **Status-Portal 1.11.1** for the VMs (released first, 2026-10-08). The policy table in section 5 is unchanged;
   `main` is the only long-lived branch and the next version gets a branch of its own (section 6). Read
-  `CHANGELOG.md` for the detail. **Installed on the owner's device** (the stable build; rc.3 before it).
+  `CHANGELOG.md` for the detail. **Installed on the owner's device**: 1.1.1-rc.1 (the stable 1.1.1 is the same
+  build; uploading it only changes the version string the device reports).
 - **What the owner's SmallTV-Ultra taught**: the plastic over the glass hides roughly the last 16 px at the bottom
   (half of a label at y 222..238) and is unkind to anything within a few px of a side. Section 12 has the rule;
   rc.2 and rc.3 applied it to the hourly chart, the VM footer and the Resources footer; 1.1.1-rc.1 moved the
-  Status-Portal screen's announcement ticker from y 220..236 to y 206..222 (8 px from the sides). **1.1.1 is in
-  progress on branch `1.1.1`** (fixes only).
+  Status-Portal screen's announcement ticker from y 220..236 to y 206..222 (8 px from the sides), released as 1.1.1.
 - **Size: `firmware.bin` is 506,512 bytes against the 520,000 limit (about 13.5 KB of flash left; it was
   509,456 in 1.0.0: removing countdown (2.8 KB) and analog (7 KB, it was the only user of the trigonometry
   functions) paid for the hourly forecast (4 KB) and the VMs (2.7 KB)), static RAM 42,596 of 81,920, idle
@@ -523,7 +525,7 @@ there, not here; when something ships, remove it from `ROADMAP.md` (the changelo
 exists). Check every idea against the 520,000-byte limit and the memory rule first.
 
 ## 15. Resuming work (read this first if you are a new session)
-1. **State.** `main` holds 1.1.0, stable (section 2). Read section 2, then `git log --oneline -15`,
+1. **State.** `main` holds 1.1.1, stable (section 2). Read section 2, then `git log --oneline -15`,
    `CHANGELOG.md` and `ROADMAP.md`. Nothing is half-done on a branch unless `git branch -a` says so.
 2. **Toolchain** (project-local, created by `bash tools/setup.sh`, git-ignored): build with
    `PLATFORMIO_CORE_DIR=$PWD/.pio-core .venv/bin/pio run`, check the image with
