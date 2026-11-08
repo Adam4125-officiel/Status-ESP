@@ -36,8 +36,8 @@ Founding constraints:
   rain bars) and the **virtual machines** theme (`vms`: Hyper-V VM names, states and uptimes), and needs
   **Status-Portal 1.11.1** for the VMs (released first, 2026-10-08). The policy table in section 5 is unchanged;
   `main` is the only long-lived branch and the next version gets a branch of its own (section 6). Read
-  `CHANGELOG.md` for the detail. **Installed on the owner's device**: 1.1.1-rc.1 (the stable 1.1.1 is the same
-  build; uploading it only changes the version string the device reports).
+  `CHANGELOG.md` for the detail. **Installed on the owner's device**: the stable 1.1.1 (uploaded 2026-11-08; rc.1
+  before it).
 - **What the owner's SmallTV-Ultra taught**: the plastic over the glass hides roughly the last 16 px at the bottom
   (half of a label at y 222..238) and is unkind to anything within a few px of a side. Section 12 has the rule;
   rc.2 and rc.3 applied it to the hourly chart, the VM footer and the Resources footer; 1.1.1-rc.1 moved the
