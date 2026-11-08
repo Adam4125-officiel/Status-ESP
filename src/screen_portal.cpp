@@ -7,7 +7,8 @@
 //               operational, then the open incidents, then the maintenance in progress or coming up.
 //               Each group gets rows in turn until they run out; a group that does not fit ends in a
 //               "+N more" row
-//   y 220..236  announcements: one line, or a slow ticker when it does not fit
+//   y 206..222  announcements: one line, or a slow ticker when it does not fit, 8 px from the sides. Not
+//               lower: the plastic over a SmallTV-Ultra's glass hides the last 16 px (CLAUDE.md, section 12)
 //
 // Every block is left out when its switch is off in the web interface or when there is nothing in it.
 // With no fresh answer the screen shows a notice instead (portal_ui.h): not set up, no network,
@@ -31,7 +32,8 @@ const int16_t COUNTS_Y = 41, COUNTS_H = 18;
 const int16_t ROWS_Y = 62, ROW_H = 20;
 const uint8_t ROWS_MAX = 8;
 const uint8_t ROWS_WITH_TICKER = 7;
-const int16_t TICKER_Y = 220;
+const int16_t TICKER_Y = 206;             // the seven rows end at 202
+const int16_t TICKER_X = 8;               // the left edge of the scrolling text, clear of the plastic
 const int16_t GLYPH_W = 16;                // the cell left of the text: a dot, "!" or "M"
 const int16_t TEXT_X = 18, TEXT_W = 152;
 const int16_t TAG_RIGHT = 238, TAG_W = 66;
@@ -74,7 +76,7 @@ int32_t tickerShownPos;                    // -1 = nothing drawn yet
 uint32_t tickerStepAt;
 const uint32_t TICKER_HOLD_MS = 3000;      // at the start of every pass
 const uint32_t TICKER_STEP_MS = 230;
-const int16_t TICKER_MAX_W = 236;
+const int16_t TICKER_MAX_W = config::SCREEN_W - 2 * TICKER_X;
 
 void resetContent() {
   emptyMessageShown = false;
@@ -474,7 +476,7 @@ void drawTicker() {
   const bool first = tickerShownPos < 0;
   if (!tickerScrolls && !first) return;
   tft.setTextColor(tickerColor, TFT_BLACK);
-  tft.setTextPadding(config::SCREEN_W - 2);
+  tft.setTextPadding(TICKER_MAX_W);
   if (!tickerScrolls) {
     tft.setTextDatum(TC_DATUM);
     tft.drawString(tickerText, config::SCREEN_W / 2, TICKER_Y, 2);
@@ -492,13 +494,14 @@ void drawTicker() {
     char window[80];
     tickerWindow(window, sizeof(window), tickerPos);
     tft.setTextDatum(TL_DATUM);
-    tft.drawString(window, 1, TICKER_Y, 2);
+    tft.drawString(window, TICKER_X, TICKER_Y, 2);
     tickerShownPos = tickerPos;
   }
   tft.setTextPadding(0);
 }
 
-void clearTicker() { tft.fillRect(0, TICKER_Y - 2, config::SCREEN_W, 20, TFT_BLACK); }
+// Its band is where the eighth row goes when there is no ticker: clear it before the rows are drawn.
+void clearTicker() { tft.fillRect(0, TICKER_Y, config::SCREEN_W, 16, TFT_BLACK); }
 
 void updateContent(bool leftNotice) {
   const Summary &d = portal::data();
@@ -530,9 +533,9 @@ void updateContent(bool leftNotice) {
     buildRows(d, tickerHas ? ROWS_WITH_TICKER : ROWS_MAX, now);
     const bool empty = rowCount == 0 && d.overall <= portal::ST_SLOW && d.services.present;
     if (!empty) drawEmptyMessage(false);   // before the rows: it clears a band they may be about to use
+    if (!tickerHas && shownTicker) clearTicker();   // the same: the eighth row overlaps the ticker's band
     drawRows();
     if (empty) drawEmptyMessage(true);
-    if (!tickerHas && shownTicker) clearTicker();
     shownUpdated = updated;
     shownMinute = minute;
     shownTicker = tickerHas;
