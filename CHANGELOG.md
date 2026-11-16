@@ -5,6 +5,18 @@ All notable changes to this project are documented in this file. The format foll
 changes the first, second and third number, and what a `-rc.N` pre-release is) is in
 [docs/releasing.md](docs/releasing.md).
 
+## [1.2.0-rc.1] - 2026-11-16
+
+### Added
+- **Pictures are prepared in your browser before they go to the album.** Choose any picture (JPG, PNG, WebP...) in
+  the Pictures tab: the page decodes it, applies its rotation (EXIF), draws it on a 240 x 240 canvas and uploads
+  that as a baseline JPEG under the same name with a `.jpg` ending. A selector next to the file field picks "Fill
+  the screen (crop)" (the default), "Fit (black bars)" or "Do not resize", which sends the file untouched exactly as
+  before. GIFs are always sent untouched so they keep their animation. If the browser cannot read the picture the
+  original is sent when it is a JPG, with a message; otherwise the upload is refused. This lifts, for pictures
+  uploaded this way, the album's progressive-JPEG, rotation and size limits, and makes big photos load faster. The
+  firmware is unchanged by it; only the page grew.
+
 ## [1.1.2-rc.1] - 2026-11-16
 
 ### Security

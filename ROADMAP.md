@@ -64,11 +64,12 @@ get in the way; remove a line when it is no longer true.
   look there first. Not measured on the device.
 - **Weather screen GIF is not clipped to its 80x80 box.** A larger GIF (say 240x240) draws over
   the rest of the screen. The web interface says "80x80"; the firmware does not enforce it.
-- **Album pictures:** baseline JPEGs only (progressive ones are skipped with a message), EXIF
-  rotation is ignored, a picture over about 1,900 pixels on a side is refused, GIFs are not
-  scaled (a canvas wider than 480 pixels is refused, one larger than the screen is cropped),
-  sub-folders are not read, and a GIF is cut off at the end of its slot rather than at the end
-  of a loop. `/image` also holds the stock firmware's own pictures (for example `boot.jpg`):
+- **Album pictures:** the web interface now prepares them (240 x 240 baseline JPEG, EXIF rotation applied), so
+  the next limits only apply to a file uploaded with "Do not resize" or by another tool: baseline JPEGs only
+  (progressive ones are skipped with a message), EXIF rotation is ignored, a picture over about 1,900 pixels on a
+  side is refused. GIFs are never prepared and are not scaled (a canvas wider than 480 pixels is refused, one
+  larger than the screen is cropped), sub-folders are not read, and a GIF is cut off at the end of its slot rather
+  than at the end of a loop. `/image` also holds the stock firmware's own pictures (for example `boot.jpg`):
   they show in the album and the web interface can delete them.
 - **Stale weather looks like fresh weather.** If the weather cannot be refreshed, the last data
   stays on screen with no "last updated" hint; only a device that never got any data says so.
