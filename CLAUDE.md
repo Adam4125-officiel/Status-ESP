@@ -146,10 +146,19 @@ Founding constraints:
     access-point mode** (`web.cpp`: `authEnforced()` is `password set && !net::isAp()`), and it
     must keep covering **every** route except `/v.json`, the 404 / captive-portal answers and
     the library's own CORS preflight: a new route goes through `route()` (or calls `guard()` /
-    `authorized()` itself, as `/api/upload` does), and `POST /update` follows the same rule through
-    `updater.updateCredentials()`. The password is never returned by any GET or by the export
+    `authorized()` itself, as `/api/upload` does), and `POST /update` is our own handler in `web.cpp`
+    (`handleUpdateChunk()`, the library's steps without its callbacks) and calls `authorized()` too. The password is never returned by any GET or by the export
     (`settings::toJson()` only writes it for the file on the device), and an import never
     touches it. Otherwise a forgotten password would brick the device without opening it.
+    **Cross-site requests (1.1.2).** Every request that is not a GET, HEAD or OPTIONS (every POST:
+    the API, `/wifi`, `/update`, `/api/upload`, `/api/backup/restore`) is refused with 403 when it carries an
+    `Origin` header whose host[:port] is not the `Host` header's (`origin_check.cpp`, called by `guard()` and
+    at the start of the three upload handlers). Origin is compared with Host, never with a list of names, so
+    the device's own pages pass however the owner reached it (IP, `status-esp.local`, a proxy that keeps Host)
+    and `/update` cannot be locked out. No Origin (curl, `tools/upload.*`) passes. **Not enforced in the rescue
+    access point**, like the password. Without this a page on another site could post to the device (the
+    browser even attaches its cached Basic credentials). `/set` and `/reboot` act on POST only (a GET is 405).
+    DNS rebinding is not covered (ROADMAP).
 
 ## 4. Privacy (public repository)
 - **Commit nothing personal**: name, e-mail, user name, user-profile or home-directory paths,
@@ -237,7 +246,8 @@ src/main.cpp                 setup() / loop() and the boot screens; everything e
 src/config.h                 FW_NAME / FW_FULL_NAME, pins, folder names, limits
 src/settings.{h,cpp}         every setting, /custom.json, validation (the same JSON as /api/settings)
 src/net.{h,cpp}              Wi-Fi state machine: boot delay, connection attempts, rescue AP, async scan
-src/web.{h,cpp}              HTTP routes, the JSON API, file upload / delete, /update page
+src/web.{h,cpp}              HTTP routes, the JSON API, file upload / delete, /update page and upload
+src/origin_check.{h,cpp}     the Origin-against-Host check for state-changing requests (pure: runs on the PC)
 src/timekeeping.{h,cpp}      SNTP (UTC) + the UTC offset applied by us, date formatting, night window
 src/weather.{h,cpp}          Open-Meteo fetch (streamed JSON), cache, back-off
 src/geocode.{h,cpp}          city search through Open-Meteo's geocoding API (explicit user action)
@@ -272,7 +282,8 @@ tools/release.sh             Linux: build + assets + tag + GitHub release (--dry
 tools/upload.ps1 | upload.sh upload a .bin through /update, checking /v.json before and after
 tools/test_host.sh           builds and runs tests/host/ with the PC's g++ (needs one firmware build first)
 tests/host/                  parser and screen tests against a recording stand-in for TFT_eSPI (see section 15);
-                             test_weather_screens.cpp covers the forecast, the clock and the weather clock
+                             test_weather_screens.cpp covers the forecast, the clock and the weather clock;
+                             test_origin_check.cpp the cross-site check
 tools/check_firmware.py      checks the Arduino CRC of a .bin (and extracts a firmware from a flash image)
 tools/analyze_firmware.py    analyses a firmware binary (segments, gzip pages, strings)
 docs/hardware.md             hardware, pinout, flash layout, size constraint
@@ -440,9 +451,9 @@ HTTP routes:
 | `GET /api/backup` | every LittleFS file + the Wi-Fi network as one tar; 403 in rescue mode (open hotspot) |
 | `POST /api/backup/restore` | multipart upload of such a tar, then reboot; checks the password itself, like `/api/upload` |
 | `POST /api/reboot`, `POST /api/factory-reset` | restart; delete `/custom.json` only, then restart |
-| `GET /update` | our page (firmware only), **declared before** `updater.setup()` because the server takes the first handler that matches |
-| `POST /update` | `ESP8266HTTPUpdateServer` handling (`firmware` field) |
-| `GET /set?brt=&blinv=`, `/wifi`, `/reboot` | the 0.1.0 routes, kept for compatibility |
+| `GET /update` | our page (firmware only) |
+| `POST /update` | our upload handler (`firmware` field; Origin and password checked at the start) |
+| `POST /set?brt=&blinv=`, `POST /reboot`, `/wifi` | the 0.1.0 routes, kept for compatibility (`/set` and `/reboot` answer a GET with 405) |
 | `GET /v.json` | `{"m":"SmallTV-Ultra","v":"Status-ESP-<version>"}` (same shape as the stock firmware's) |
 | anything else | 404, or a redirect to `http://192.168.4.1/` in rescue mode (captive portal) |
 
@@ -536,7 +547,7 @@ exists). Check every idea against the 520,000-byte limit and the memory rule fir
    `.venv/bin/python tools/check_firmware.py .pio/build/smalltv-ultra/firmware.bin`, run the PC
    tests with `bash tools/test_host.sh` (it needs one firmware build first: it borrows ArduinoJson from
    `.pio/libdeps`; it stops at the first test program that fails, so run a later one by hand to see it fail too).
-   Run the tests after every change to `portal_*`, `weather_hourly.*` or any `screen_*.cpp`
+   Run the tests after every change to `portal_*`, `weather_hourly.*`, `origin_check.*` or any `screen_*.cpp`
    they cover (`screen_portal`, `screen_resources`, `screen_vms`, `screen_hourly`, `screen_forecast`, `screen_clock`, `screen_weather`);
    they take seconds and catch layout overflows (the stand-in knows fonts 2, 4, 6, 7 and 8, with the real widths and
    heights from the TFT_eSPI font tables: do not use another font in one of those screens without teaching it to

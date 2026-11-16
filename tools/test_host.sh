@@ -55,3 +55,11 @@ g++ -std=gnu++17 -O1 -g -Wall -Wextra -Werror -Wno-maybe-uninitialized -Wno-form
     tests/host/test_weather_screens.cpp src/screen_weather.cpp src/screen_forecast.cpp src/screen_clock.cpp src/icons.cpp \
     -o "$out/test_weather_screens"
 "$out/test_weather_screens"
+
+# The cross-site check on the web API (origin_check.cpp): pure, strings in, verdict out.
+g++ -std=gnu++17 -O1 -g -Wall -Wextra -Werror \
+    -fsanitize=address,undefined -fno-sanitize-recover=undefined \
+    -Itests/host -Isrc \
+    tests/host/test_origin_check.cpp src/origin_check.cpp \
+    -o "$out/test_origin_check"
+"$out/test_origin_check"

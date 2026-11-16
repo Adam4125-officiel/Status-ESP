@@ -7,12 +7,30 @@ changes the first, second and third number, and what a `-rc.N` pre-release is) i
 
 ## [1.1.2-rc.1] - 2026-11-16
 
+### Security
+- **The device now refuses requests sent by other web sites.** Until now any page you opened in a browser on your
+  home network could, without you seeing anything, make the device reboot, factory-reset, change its settings or
+  its web password, or point the Status-Portal address at another machine (so the portal key would be sent there);
+  the web password did not help, because the browser attaches its saved login to such a request. Every request that
+  changes something (every POST: the API, `/wifi`, `/update`, the picture upload and the backup restore) is now
+  answered with 403 when the browser says it comes from a page whose address is not the device's own. The device's
+  own pages always pass, whether you reach it by its IP address, `status-esp.local` or any other name, and tools
+  that send no such header (`curl`, `tools/upload.sh`, `tools/upload.ps1`) are unaffected. The rescue access point
+  is exempt, like the password, so `/update` stays reachable there. Not covered: DNS rebinding (ROADMAP).
+- **`/set` and `/reboot` (the 0.1.0 routes) now act on POST only.** On a plain GET they changed things, so an image
+  tag on any web page could reboot the device; a GET now answers 405 with a hint.
+
 ### Added
 - **The weather clock shows the icon of the current conditions even when a GIF is chosen.** The left box holds your
   GIF, so until now the conditions were only words ("Rain"). When a GIF is set, a 36 px icon of the conditions (sun,
   cloud, rain, snow, thunder; the moon at night) now sits at the right end of the temperature row, 8 px from the edge.
   To make room the temperature's unit is drawn smaller in that case (the widest value, 122 F, ends 2 px before the
   icon). With no GIF chosen nothing changes: the big icon is still in the left box.
+
+### Changed
+- `POST /update` is now handled by the firmware's own code (the same steps as the library it replaced: begin, write,
+  end, restart) so that the check above can run before anything is written. The "filesystem" field the library also
+  took is no longer accepted. This saves about 1 KB of flash.
 
 ### Fixed
 - **The weather clock no longer draws into the part of the glass the plastic hides.** Humidity, wind and pressure were
