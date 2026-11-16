@@ -27,6 +27,13 @@ Founding constraints:
 - The stock files on the device (images, settings, Wi-Fi) stay untouched.
 
 ## 2. Current state (handover)
+- **1.2.0-rc.1 is a release candidate (2026-11-16), not yet tested on the device**, cut on top of 1.1.2-rc.1 on the same
+  branch. Web interface: album pictures are resized to 240x240 baseline JPEGs in the browser before upload, a
+  "Check for updates" button (the browser asks GitHub, the device has no TLS), a "Try" button for themes
+  (`save=0`). Firmware: the weather themes say how old stale data is (`weather::staleMinutes()`), and night mode
+  gained a night theme (`night_theme`) and a sunset-to-sunrise window (`night_sun`, `night.h`). `firmware.bin` is
+  513,104 bytes (about 6.9 KB of flash left), static RAM about 42,750. Not covered by any test: the night take-over
+  in `display.cpp`, GitHub's real API, browsers other than Chromium.
 - **1.1.2-rc.1 is a release candidate (2026-11-16), not yet tested on the device.** Fixes plus one small addition asked
   for by the owner: the weather clock, the forecast, the clock and the alert dot moved clear of the plastic; the weather
   clock draws the current conditions' icon beside the temperature when a GIF is chosen; cross-site POSTs are refused
