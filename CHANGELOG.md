@@ -5,7 +5,12 @@ All notable changes to this project are documented in this file. The format foll
 changes the first, second and third number, and what a `-rc.N` pre-release is) is in
 [docs/releasing.md](docs/releasing.md).
 
-## [1.1.2-rc.1] - 2026-11-16
+## [1.1.2] - 2026-11-16
+
+Mostly fixes and security hardening, with one small addition the owner asked for (the conditions icon on the weather
+clock, below). Promoted from `1.1.2-rc.1` (the same build with a new version string) after the owner tested it on
+their device and found it good. Install it through the device's `/update` page like any release; the stock firmware
+stays one upload away. Works with the same Status-Portal as 1.1.1 (1.11.1 for everything).
 
 ### Security
 - **The device now refuses requests sent by other web sites.** Until now any page you opened in a browser on your

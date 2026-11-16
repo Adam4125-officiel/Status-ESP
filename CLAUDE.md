@@ -27,15 +27,18 @@ Founding constraints:
 - The stock files on the device (images, settings, Wi-Fi) stay untouched.
 
 ## 2. Current state (handover)
-- **1.1.2-rc.1 is a release candidate (2026-11-16), not yet tested on the device.** Fixes plus one small addition asked
-  for by the owner: the weather clock, the forecast, the clock and the alert dot moved clear of the plastic; the weather
-  clock draws the current conditions' icon beside the temperature when a GIF is chosen; cross-site POSTs are refused
-  (`origin_check`, rule 11) and `POST /update` is our own handler in normal Wi-Fi mode, the library's in rescue mode;
-  `/set` and `/reboot` act on POST only; new PC tests for the weather screens, the mDNS parser and the backup restore.
-  `firmware.bin` is 508,848 bytes (about 11 KB of flash left), static RAM 42,644. **First thing to check on the
-  device: an upload through the new `/update` handler** (if it fails, the rescue hotspot still has the old one). The
-  work sits on the session branch `ccr-dde9c129-d2ydij` (PR #5), where 1.2.0 follows it.
-- **1.1.1 is the current stable release (2026-11-08)**, promoted from `1.1.1-rc.1` (same build, new version
+- **1.1.2 is the current stable release (2026-11-16)**, promoted from `1.1.2-rc.1` (same build, new version string)
+  after the owner tested it on the device (PR #5 is the draft for the session branch `ccr-dde9c129-d2ydij`; this
+  version was cut on the branch `1.1.2`). Fixes plus one small addition asked for by the owner: the weather clock,
+  the forecast, the clock and the alert dot moved clear of the plastic; the weather clock draws the current
+  conditions' icon beside the temperature when a GIF is chosen; cross-site POSTs are refused (`origin_check`,
+  rule 11) and `POST /update` is our own handler in normal Wi-Fi mode, the library's in rescue mode; `/set` and
+  `/reboot` act on POST only; new PC tests for the weather screens, the mDNS parser and the backup restore.
+  `firmware.bin` is 508,848 bytes (about 11 KB of flash left), static RAM 42,644. **Verified on the real device:
+  the owner's upload of the next candidate went through this version's new `/update` handler**, so that handler is
+  now proven there (the rescue-mode library handler stays as the safety net). 1.2.0 follows on `ccr-dde9c129-d2ydij`
+  (PR #5).
+- **1.1.1 (2026-11-08)** was the stable release before it:, promoted from `1.1.1-rc.1` (same build, new version
   string) after the owner tested it on the device (PR #4 merged into `main` with a merge commit, branch deleted). It
   is fixes only: the Status-Portal screen's announcement ticker moved clear of the plastic (below).
 - **1.1.0 (2026-10-08)** was promoted from `1.1.0-rc.3` after the owner tested the candidates on the device (PR #3;
@@ -556,7 +559,7 @@ there, not here; when something ships, remove it from `ROADMAP.md` (the changelo
 exists). Check every idea against the 520,000-byte limit and the memory rule first.
 
 ## 15. Resuming work (read this first if you are a new session)
-1. **State.** `main` holds 1.1.1, stable (section 2). Read section 2, then `git log --oneline -15`,
+1. **State.** `main` holds 1.1.2, stable (section 2). Read section 2, then `git log --oneline -15`,
    `CHANGELOG.md` and `ROADMAP.md`. Nothing is half-done on a branch unless `git branch -a` says so.
 2. **Toolchain** (project-local, created by `bash tools/setup.sh`, git-ignored): build with
    `PLATFORMIO_CORE_DIR=$PWD/.pio-core .venv/bin/pio run`, check the image with
