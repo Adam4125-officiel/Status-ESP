@@ -5,6 +5,19 @@ All notable changes to this project are documented in this file. The format foll
 changes the first, second and third number, and what a `-rc.N` pre-release is) is in
 [docs/releasing.md](docs/releasing.md).
 
+## [1.1.2-rc.1] - 2026-11-16
+
+### Fixed
+- **The forecast and the clock no longer draw into the part of the glass the plastic hides.** The forecast's legend
+  ("High  Low  C") was at y 214..230 and is now at y 206..222. The clock's hint ("Syncing the time...", "UTC - set a
+  city or an offset") moved from y 214..230 to y 206..222 in both layouts; in the Large layout the date moved up from
+  y 184 to y 178 to make room, and AM/PM now stops 8 px from the right edge. The forecast's city name is also kept 8 px
+  from both sides.
+- **The red or orange alert dot** (Status-Portal alerts set to "indicator") sat 5 px from the right edge and 6 px from
+  the top; it is now 8 px from both.
+- The PC tests now hold the forecast and the clock (all three fonts, 12 and 24 hours, every hint) to the same safe area
+  as the other screens, and the test display knows the digit fonts 6, 7 and 8 with their real sizes.
+
 ## [1.1.1] - 2026-11-08
 
 Bug fixes only. Promoted from `1.1.1-rc.1` (the same build with a new version string) after the owner tested it on

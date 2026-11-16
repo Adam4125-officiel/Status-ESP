@@ -198,7 +198,7 @@ void requestRedraw() { needFull = true; }
 static bool alertActive = false;        // the Status-Portal screen has taken over
 static uint8_t alertPrev = NO_THEME;    // what to go back to (never the Status-Portal screen itself)
 
-static const int16_t DOT_X = 229, DOT_Y = 11, DOT_R = 5;
+static const int16_t DOT_X = 226, DOT_Y = 14, DOT_R = 5;   // the ring (R + 1) stays 8 px from the top and the right edge
 static const uint32_t DOT_REFRESH_MS = 250;
 static uint16_t dotShown = 0;           // the colour on the screen, 0 = none
 static uint32_t dotAt = 0;

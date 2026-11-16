@@ -3,7 +3,7 @@
 // It draws nothing: it counts what a screen asks for, and it flags what a real display would get wrong:
 // a string whose box leaves the 240x240 screen, a string wider than the padding that is supposed to
 // cover whatever it replaces (the old text would show through), and a character the built-in fonts do
-// not have. Only Fonts 2 and 4 are modelled (the two the Status-Portal screens use); the glyph widths are
+// not have. Fonts 2, 4, 6, 7 and 8 are modelled; the glyph widths and cell heights are
 // the real ones, so text fits here exactly when it fits on the device.
 //
 // The plastic over a SmallTV-Ultra hides the edge of the glass: on the owner's, half of a 16 px label at y 222
@@ -18,7 +18,9 @@
 #include <Arduino.h>
 
 #include <stdarg.h>
+#include <algorithm>
 #include <stdio.h>
+#include <string.h>
 #include <string>
 #include <vector>
 
@@ -53,6 +55,51 @@ static const unsigned char TFT_WIDTHS_4[96] = {
     15, 15, 8, 12, 7, 14, 12, 18, 13, 13, 12, 13, 13, 13, 15, 1,
 };
 
+// Fonts 6, 7 and 8 (the narrow "8N" build, Font72x53rle.c) from the same library: widtbl_f64, widtbl_f7s and
+// widtbl_f72. They hold digits only (Font 6 also a, p, m): anything else prints as a space.
+static const unsigned char TFT_WIDTHS_6[96] = {
+    12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 17, 15, 12,
+    27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 15, 12, 12, 12, 12, 12,
+    12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12,
+    12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12,
+    12, 27, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 42, 12, 12,
+    29, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 7, 12, 12, 12,
+};
+static const unsigned char TFT_WIDTHS_7[96] = {
+    12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 32, 12, 12,
+    32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 12, 12, 12, 12, 12, 12,
+    12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12,
+    12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12,
+    12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12,
+    12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12,
+};
+static const unsigned char TFT_WIDTHS_8[96] = {
+    29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29,
+    53, 53, 53, 53, 53, 53, 53, 53, 53, 53, 29, 29, 29, 29, 29, 29,
+    29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29,
+    29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29,
+    29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29,
+    29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29,
+};
+
+// Cell height of each font (chr_hgt_f16, f32, f64, f7s, f72): what drawString() paints below its y.
+static inline int tftFontHeight(int font) {
+  switch (font) {
+    case 2: return 16;
+    case 4: return 26;
+    case 6: return 48;
+    case 7: return 48;
+    case 8: return 75;
+    default: return 16;
+  }
+}
+
+// What a call painted: a box, for the tests that check two things do not overlap.
+struct TFT_Box {
+  int x0, y0, x1, y1;   // x1 and y1 are exclusive
+  std::string text;     // the string, for the text boxes
+};
+
 class TFT_eSPI {
  public:
   // What the screens did since resetStats().
@@ -61,6 +108,8 @@ class TFT_eSPI {
   int violations = 0;                 // see the header
   std::vector<std::string> drawn;     // every string drawn, in order
   std::vector<std::string> problems;  // what each violation was
+  std::vector<TFT_Box> boxes;         // the glyph box of every string (without its padding)
+  std::vector<TFT_Box> shapes;        // the bounding box of every filled circle, rounded rectangle, triangle and line
   FILE *log = nullptr;                // one JSON line per call, when set
   int safeBottom = 240, safeSide = 0, safeSideBelow = 240;   // see the header; survive resetStats()
 
@@ -69,6 +118,8 @@ class TFT_eSPI {
     violations = 0;
     drawn.clear();
     problems.clear();
+    boxes.clear();
+    shapes.clear();
   }
 
   void init() {}
@@ -85,6 +136,8 @@ class TFT_eSPI {
       if (c < 32 || c > 127) {
         problem("character %d is not printable ASCII", c);
         c = 32;
+      } else if ((font == 6 || font == 7 || font == 8) && !strchr(font == 6 ? " 0123456789:-.apm" : " 0123456789:-.", c)) {
+        problem("character '%c' is not in Font %d (it would print as a space)", c, font);
       }
       w += t[c - 32];
     }
@@ -94,7 +147,7 @@ class TFT_eSPI {
   int16_t drawString(const char *s, int32_t x, int32_t y, uint8_t font) {
     ops++;
     drawn.push_back(s);
-    const int cw = textWidth(s, font), h = font == 4 ? 26 : 16;
+    const int cw = textWidth(s, font), h = tftFontHeight(font);
     const int span = pad_ > cw ? pad_ : cw;   // what gets painted: the padding box, or the text if wider
     int x0 = (int)x;
     if (datum_ == TC_DATUM) x0 = (int)x - span / 2;
@@ -103,6 +156,7 @@ class TFT_eSPI {
     if (x0 < 0 || x0 + span > 240 || y < 0 || y + h > 240) problem("\"%s\" paints x %d..%d y %d..%d, off the screen", s, x0, x0 + span, (int)y, (int)y + h);
     if (y + h > safeBottom) problem("\"%s\" reaches y %d, below the safe area (%d)", s, (int)y + h, safeBottom);
     if (y >= safeSideBelow && (tx < safeSide || tx + cw > 240 - safeSide)) problem("\"%s\" has glyphs at x %d..%d, closer than %d px to a side", s, tx, tx + cw, safeSide);
+    boxes.push_back({tx, (int)y, tx + cw, (int)y + h, s});
     if (pad_ > 0 && cw > pad_) problem("\"%s\" is %d px wide but its padding is %d: the text it replaces would show through", s, cw, pad_);
     if (log) fprintf(log, "{\"op\":\"text\",\"s\":\"%s\",\"x\":%d,\"y\":%d,\"w\":%d,\"h\":%d,\"sx\":%d,\"sw\":%d,\"fg\":%u,\"bg\":%u}\n", s, tx, (int)y, cw, h, x0, span, fg_, bg_);
     return (int16_t)cw;
@@ -117,9 +171,20 @@ class TFT_eSPI {
     if (w < 0 || h < 0 || x < 0 || y < 0 || x + w > 240 || y + h > 240) problem("fillRect %d,%d %dx%d is off the screen", (int)x, (int)y, (int)w, (int)h);
     if (log) fprintf(log, "{\"op\":\"rect\",\"x\":%d,\"y\":%d,\"w\":%d,\"h\":%d,\"c\":%u}\n", (int)x, (int)y, (int)w, (int)h, c);
   }
+  void fillRoundRect(int32_t x, int32_t y, int32_t w, int32_t h, int32_t, uint16_t c) {
+    ops++;
+    shape(x, y, x + w, y + h, "fillRoundRect");
+    if (log) fprintf(log, "{\"op\":\"rrect\",\"x\":%d,\"y\":%d,\"w\":%d,\"h\":%d,\"c\":%u}\n", (int)x, (int)y, (int)w, (int)h, c);
+  }
+  void fillTriangle(int32_t x0, int32_t y0, int32_t x1, int32_t y1, int32_t x2, int32_t y2, uint16_t c) {
+    ops++;
+    shape(std::min(x0, std::min(x1, x2)), std::min(y0, std::min(y1, y2)), std::max(x0, std::max(x1, x2)) + 1, std::max(y0, std::max(y1, y2)) + 1, "fillTriangle");
+    if (log) fprintf(log, "{\"op\":\"tri\",\"x0\":%d,\"y0\":%d,\"x1\":%d,\"y1\":%d,\"x2\":%d,\"y2\":%d,\"c\":%u}\n", (int)x0, (int)y0, (int)x1, (int)y1, (int)x2, (int)y2, c);
+  }
   void fillCircle(int32_t x, int32_t y, int32_t r, uint16_t c) {
     ops++;
     if (x - r < 0 || y - r < 0 || x + r >= 240 || y + r >= 240) problem("fillCircle %d,%d r%d is off the screen", (int)x, (int)y, (int)r);
+    shape(x - r, y - r, x + r + 1, y + r + 1, "fillCircle");
     if (log) fprintf(log, "{\"op\":\"fcircle\",\"x\":%d,\"y\":%d,\"r\":%d,\"c\":%u}\n", (int)x, (int)y, (int)r, c);
   }
   void drawCircle(int32_t x, int32_t y, int32_t r, uint16_t c) {
@@ -130,6 +195,7 @@ class TFT_eSPI {
     ops++;
     if (x0 < 0 || y0 < 0 || x1 < 0 || y1 < 0 || x0 >= 240 || x1 >= 240 || y0 >= 240 || y1 >= 240)
       problem("drawLine %d,%d to %d,%d is off the screen", (int)x0, (int)y0, (int)x1, (int)y1);
+    shape(std::min(x0, x1), std::min(y0, y1), std::max(x0, x1) + 1, std::max(y0, y1) + 1, "drawLine");
     if (log) fprintf(log, "{\"op\":\"line\",\"x0\":%d,\"y0\":%d,\"x1\":%d,\"y1\":%d,\"c\":%u}\n", (int)x0, (int)y0, (int)x1, (int)y1, c);
   }
   void drawFastHLine(int32_t x, int32_t y, int32_t w, uint16_t c) {
@@ -144,6 +210,12 @@ class TFT_eSPI {
   }
 
  private:
+  // Records a shape's box, and flags one that reaches below the safe area. (Rectangles are not shapes: the screens
+  // use them to erase, down to the last row.)
+  void shape(int x0, int y0, int x1, int y1, const char *what) {
+    if (y1 > safeBottom) problem("%s reaches y %d, below the safe area (%d)", what, y1, safeBottom);
+    shapes.push_back({x0, y0, x1, y1, what});
+  }
   uint16_t fg_ = 0xFFFF, bg_ = 0;
   uint8_t datum_ = TL_DATUM;
   int pad_ = 0;
@@ -151,6 +223,9 @@ class TFT_eSPI {
   const unsigned char *widths(uint8_t font) {
     if (font == 2) return TFT_WIDTHS_2;
     if (font == 4) return TFT_WIDTHS_4;
+    if (font == 6) return TFT_WIDTHS_6;
+    if (font == 7) return TFT_WIDTHS_7;
+    if (font == 8) return TFT_WIDTHS_8;
     problem("font %d is not modelled by this stand-in", font);
     return TFT_WIDTHS_2;
   }

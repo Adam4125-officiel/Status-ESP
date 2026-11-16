@@ -10,6 +10,13 @@
 // 236 px for HH:MM alone), so that layout is different: the weekday, HH:MM in Font 8, the
 // seconds in Font 7 below it with AM/PM beside them, and the date. It is selected by
 // `large` and every drawing step below has a branch for it; the shared state is the same.
+//
+//   Normal: weekday y 34..60, HH:MM:SS 80..128, AM/PM 134..160, date 160..186
+//   Large:  weekday y  6..32, HH:MM 40..115, seconds 124..172, AM/PM 140..166 (right edge x 232), date 178..204
+//   Both:   the hint ("Syncing the time...") y 206..222
+//
+// Nothing is drawn below y 224: the plastic over the glass hides about the last 16 px (CLAUDE.md, section 12).
+// The tests hold both layouts to that (tests/host/test_weather_screens.cpp).
 #include "bigfont.h"
 #include "config.h"
 #include "display.h"
@@ -24,14 +31,14 @@ const int16_t Y_TIME = 80;
 const int16_t TIME_H = 48;
 const int16_t Y_AMPM = 134;
 const int16_t Y_DATE = 160;
-const int16_t Y_HINT = 214;
+const int16_t Y_HINT = 206;   // y 206..222, both layouts: nothing below y 224 (the plastic over the glass)
 
 // Layout of the Large font.
 const int16_t L_Y_WEEKDAY = 6;
 const int16_t L_Y_TIME = 40;
 const int16_t L_Y_SEC = 124;
 const int16_t L_Y_AMPM = 140;
-const int16_t L_Y_DATE = 184;
+const int16_t L_Y_DATE = 178;   // y 178..204, clear of the hint at 206
 const int16_t L_X_HOUR = (config::SCREEN_W - bigfont::HM_W) / 2;
 const int16_t L_X_COLON = L_X_HOUR + bigfont::PAIR_W;
 const int16_t L_X_MIN = L_X_COLON + bigfont::COLON_W;
@@ -194,7 +201,7 @@ void screenClockUpdate(bool full) {
     tft.setTextDatum(TR_DATUM);
     tft.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
     tft.setTextPadding(40);
-    tft.drawString(ampm == 2 ? "" : (ampm ? "PM" : "AM"), large ? 236 : xSec + 2 * digitW, large ? L_Y_AMPM : Y_AMPM, 4);
+    tft.drawString(ampm == 2 ? "" : (ampm ? "PM" : "AM"), large ? 232 : xSec + 2 * digitW, large ? L_Y_AMPM : Y_AMPM, 4);
     tft.setTextPadding(0);
     shownAmPm = ampm;
   }

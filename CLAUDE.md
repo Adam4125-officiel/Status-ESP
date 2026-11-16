@@ -271,7 +271,8 @@ tools/make_release.py        makes dist/v<version>/ : Status-ESP-<version>.bin, 
 tools/release.sh             Linux: build + assets + tag + GitHub release (--dry-run supported)
 tools/upload.ps1 | upload.sh upload a .bin through /update, checking /v.json before and after
 tools/test_host.sh           builds and runs tests/host/ with the PC's g++ (needs one firmware build first)
-tests/host/                  parser and screen tests against a recording stand-in for TFT_eSPI (see section 15)
+tests/host/                  parser and screen tests against a recording stand-in for TFT_eSPI (see section 15);
+                             test_weather_screens.cpp covers the forecast and the clock
 tools/check_firmware.py      checks the Arduino CRC of a .bin (and extracts a firmware from a flash image)
 tools/analyze_firmware.py    analyses a firmware binary (segments, gzip pages, strings)
 docs/hardware.md             hardware, pinout, flash layout, size constraint
@@ -463,8 +464,11 @@ HTTP routes:
   16 px label drawn at y 222..238 was cut off, and a label starting at x 3 is at the mercy of the left edge. Treat the
   last 16 px at the bottom as unusable, and keep text 8 px from the sides where it can be (the tests' "safe area":
   `tft.safeBottom`, `safeSide`, `safeSideBelow`, set by `tests/host/test_hourly.cpp` and by `show()` in
-  `test_portal_screens.cpp`). **Every screen the tests cover is held to it**: hourly, VMs, Resources (since 1.1.0-rc.3)
-  and Status-Portal (its ticker, since 1.1.1-rc.1).
+  `test_portal_screens.cpp`). **Every screen the tests cover is held to it**: hourly, VMs, Resources (since 1.1.0-rc.3),
+  Status-Portal (its ticker, since 1.1.1-rc.1), and the forecast and the clock, both layouts (since 1.1.2-rc.1,
+  `tests/host/test_weather_screens.cpp`). The owner noticed that the word clock's four minute dots at y 228..234 ARE
+  visible on their device, only small: the 16 px figure is conservative, so keep to it, but a few px inside it is not a
+  disaster (the word clock was left alone). The alert dot's outer ring is 8 px from the top and right edges.
 
 ## 13. Known pitfalls
 - The classic XOR checksum of ESP8266 images does not match on Arduino binaries: `elf2bin.py`
@@ -533,9 +537,10 @@ exists). Check every idea against the 520,000-byte limit and the memory rule fir
    tests with `bash tools/test_host.sh` (it needs one firmware build first: it borrows ArduinoJson from
    `.pio/libdeps`; it stops at the first test program that fails, so run a later one by hand to see it fail too).
    Run the tests after every change to `portal_*`, `weather_hourly.*` or any `screen_*.cpp`
-   they cover (`screen_portal`, `screen_resources`, `screen_vms`, `screen_hourly`); they take seconds and
-   catch layout overflows (the stand-in knows font 2 and 4 only: do not use another font in one of those
-   screens without teaching it to `tests/host/TFT_eSPI.h`).
+   they cover (`screen_portal`, `screen_resources`, `screen_vms`, `screen_hourly`, `screen_forecast`, `screen_clock`);
+   they take seconds and catch layout overflows (the stand-in knows fonts 2, 4, 6, 7 and 8, with the real widths and
+   heights from the TFT_eSPI font tables: do not use another font in one of those screens without teaching it to
+   `tests/host/TFT_eSPI.h`).
 3. **Seeing a screen without eyes.** Set `PORTAL_OPS_DIR=<dir>` when running the screen tests: every
    scenario writes its drawing calls as JSON lines (`{"op":"rect"|"text"|"line"|"icon"|...}`), and a throw-away
    script that replays them with Pillow gives a picture (the weather icons are stubbed in the hourly test and
