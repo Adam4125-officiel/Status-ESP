@@ -13,7 +13,8 @@
 //   GET  /api/backup           every stored file as one tar (Wi-Fi password included; not in rescue mode)
 //   POST /api/backup/restore   put such a tar back (multipart), then reboot
 //   POST /api/reboot           POST /api/factory-reset   (deletes only /custom.json)
-//   GET  /update POST /update  firmware update (our page + our own upload handler)
+//   GET  /update POST /update  firmware update: our page; POST is our own handler in normal mode (Origin check,
+//                              password) and the library's ESP8266HTTPUpdateServer in the rescue AP (safety net)
 //   GET  /v.json  /wifi  POST /reboot  POST /set?brt=&blinv=   kept for backward compatibility
 //   anything else              404, or a redirect to the home page in rescue-AP mode
 //
@@ -23,6 +24,7 @@
 // upload scripts) passes. Not enforced in the rescue access point, like the password (CLAUDE.md rules 1, 11).
 #include "web.h"
 
+#include <ESP8266HTTPUpdateServer.h>
 #include <ESP8266WebServer.h>
 #include <ESP8266WiFi.h>
 #include <LittleFS.h>
@@ -52,6 +54,7 @@ static ESP8266WebServer server(80);
 // "why does my GIF stop" can be answered from the web interface.
 static uint32_t requestHeap;
 static uint8_t requestGif;
+static ESP8266HTTPUpdateServer updater;   // the library's /update handler: rescue mode only (see begin())
 static bool listening = false;
 
 // --- Password (HTTP Basic, user "admin") ------------------------------------------------
@@ -190,6 +193,17 @@ static bool updAllowed = false;
 static int updDenied = 0;   // 401 or 403 when the upload was refused at its start
 static String updError;
 
+// Our POST /update handler, active in normal Wi-Fi mode only. In rescue mode the library's handler serves
+// the same URL (see begin()): the same registration, but accepted only when we are not the access point.
+class NormalModeOnlyHandler : public esp8266webserver::FunctionRequestHandler<WiFiServer> {
+ public:
+  using esp8266webserver::FunctionRequestHandler<WiFiServer>::FunctionRequestHandler;
+  // canUpload() and handle() both go through canHandle(), so uploads follow the same choice.
+  bool canHandle(HTTPMethod method, const String &uri) override {
+    return !net::isAp() && esp8266webserver::FunctionRequestHandler<WiFiServer>::canHandle(method, uri);
+  }
+};
+
 static void handleUpdateChunk() {
   HTTPUpload &up = server.upload();
   if (up.status == UPLOAD_FILE_START) {
@@ -209,6 +223,7 @@ static void handleUpdateChunk() {
     if (updError.isEmpty() && !Update.end(true)) updError = Update.getErrorString();
   } else if (up.status == UPLOAD_FILE_ABORTED) {
     Update.end();
+    updAllowed = false;   // a later POST without a file must not report success on stale state
   }
   yield();
 }
@@ -948,7 +963,14 @@ void begin() {
   server.collectHeaders("Origin");
 
   route("/update", HTTP_GET, handleUpdatePage);
-  server.on("/update", HTTP_POST, handleUpdateDone, handleUpdateChunk);   // checks Origin and password itself
+  // Normal mode: our handler (Origin check, password). Rescue access point: the library's own handler, with
+  // no credentials, kept as the safety net because it is the one verified on the device many times and
+  // /update is the only way back (rule 1); neither the Origin check nor the password applies there anyway.
+  // The library's handler also takes a "filesystem" field, which would erase the file area (rule 7): our page
+  // never sends one, which is why it is confined to rescue mode and to our page. GET /update stays OUR page
+  // in both modes because it is registered first.
+  server.addHandler(new NormalModeOnlyHandler(handleUpdateDone, handleUpdateChunk, "/update", HTTP_POST));
+  updater.setup(&server, "/update", "", "");
 
   route("/", HTTP_GET, handleIndex);
 

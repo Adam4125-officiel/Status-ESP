@@ -28,9 +28,10 @@ changes the first, second and third number, and what a `-rc.N` pre-release is) i
   icon). With no GIF chosen nothing changes: the big icon is still in the left box.
 
 ### Changed
-- `POST /update` is now handled by the firmware's own code (the same steps as the library it replaced: begin, write,
-  end, restart) so that the check above can run before anything is written. The "filesystem" field the library also
-  took is no longer accepted. This saves about 1 KB of flash.
+- `POST /update` is now handled by the firmware's own code in normal Wi-Fi mode (the same steps as the library:
+  begin, write, end, restart) so that the check above can run before anything is written; the "filesystem" field is
+  not accepted there. In the rescue access point the library's own update handler, the one proven on the device,
+  still serves `/update` with no password and no Origin check, as a safety net: it is the only way back.
 - The PC tests now also cover the mDNS question parser (`status-esp.local`): valid and other-name questions, every
   truncation, looping and out-of-range name pointers, lying counts and lengths, and 60,000 mutated packets under the
   sanitizers. They found no bug; the firmware code is unchanged.

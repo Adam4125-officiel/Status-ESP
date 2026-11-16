@@ -147,7 +147,11 @@ Founding constraints:
     must keep covering **every** route except `/v.json`, the 404 / captive-portal answers and
     the library's own CORS preflight: a new route goes through `route()` (or calls `guard()` /
     `authorized()` itself, as `/api/upload` does), and `POST /update` is our own handler in `web.cpp`
-    (`handleUpdateChunk()`, the library's steps without its callbacks) and calls `authorized()` too. The password is never returned by any GET or by the export
+    (`handleUpdateChunk()`, the library's steps) with the Origin check and `authorized()` in normal mode, and
+    **the library's `ESP8266HTTPUpdateServer` handler, with no credentials, in the rescue access point**
+    (`NormalModeOnlyHandler` refuses when `net::isAp()`, so the library's handler, the one verified on the device,
+    takes over; it is the safety net, keep it. It also accepts a `filesystem` field, hence confined to rescue mode
+    and our page). The password is never returned by any GET or by the export
     (`settings::toJson()` only writes it for the file on the device), and an import never
     touches it. Otherwise a forgotten password would brick the device without opening it.
     **Cross-site requests (1.1.2).** Every request that is not a GET, HEAD or OPTIONS (every POST:
@@ -456,7 +460,7 @@ HTTP routes:
 | `POST /api/backup/restore` | multipart upload of such a tar, then reboot; checks the password itself, like `/api/upload` |
 | `POST /api/reboot`, `POST /api/factory-reset` | restart; delete `/custom.json` only, then restart |
 | `GET /update` | our page (firmware only) |
-| `POST /update` | our upload handler (`firmware` field; Origin and password checked at the start) |
+| `POST /update` | normal mode: our upload handler (`firmware` field; Origin and password checked at the start); rescue AP: the library's `ESP8266HTTPUpdateServer` handler |
 | `POST /set?brt=&blinv=`, `POST /reboot`, `/wifi` | the 0.1.0 routes, kept for compatibility (`/set` and `/reboot` answer a GET with 405) |
 | `GET /v.json` | `{"m":"SmallTV-Ultra","v":"Status-ESP-<version>"}` (same shape as the stock firmware's) |
 | anything else | 404, or a redirect to `http://192.168.4.1/` in rescue mode (captive portal) |
