@@ -6,7 +6,8 @@
 //   y  84..164  left: the GIF, or the weather icon when there is none (or it cannot play)
 //               right: temperature (84..132), conditions (134..150), "feels like" (150..166)
 //               right, only when a GIF is chosen: a 36 px icon of the conditions, x 196..232, y 90..126
-//   y 166..182  sunrise and sunset times (when the weather answer has them)
+//   y 166..182  sunrise and sunset times (when the weather answer has them); while the weather is stale
+//               (weather::staleMinutes()) "Weather 3 h old" in yellow takes this row instead
 //   y 182..224  humidity | wind | pressure, in the user's units (caption 182..198, value 198..224)
 //
 // Nothing is drawn below y 224: the plastic over the glass hides about the last 16 px (CLAUDE.md,
@@ -19,7 +20,8 @@
 // when the data changes and never touched by the GIF. With no GIF the big icon fills the left box instead.
 //
 // Update(false) repaints one thing at a time: a changed time field, the colons, the date
-// when the day changes, the whole lower area when weather::data() changed, one GIF frame.
+// when the day changes, the whole lower area when weather::data() changed, the sun row when the age of stale
+// data changes (once an hour; the GIF is not touched), one GIF frame.
 // Every text has an opaque background and a fixed-width field, so nothing is erased first.
 //
 // The GIF decoder (~24 KB in one block) and the weather fetch never coexist: the fetch
@@ -70,6 +72,7 @@ enum BoxMode : uint8_t { BOX_EMPTY, BOX_ICON, BOX_GIF };
 
 int8_t shownKind;            // weather_notice::Kind on the screen, -1 = nothing yet
 uint32_t shownUpdated;       // weather::Data::updatedAtMs the area was drawn from
+uint16_t shownAge;           // weather::ageBucket() of the stale hint on screen (0 = the sun times)
 BoxMode boxMode;
 uint32_t gifNextTry;         // millis() before which a failed GIF is not retried
 
@@ -82,6 +85,7 @@ void resetShown() {
   resetTimeShown();
   shownKind = -1;
   shownUpdated = 0;
+  shownAge = 0;
   boxMode = BOX_EMPTY;
   gifNextTry = millis();
 }
@@ -265,6 +269,21 @@ void drawSun(const weather::Data &w) {
   drawSunTime(x + GAP, false, w.sunsetMin, TFT_ORANGE);
 }
 
+// The sun row, or the stale hint in its place. The row is cleared first: the hint and the times differ in width.
+void drawSunRow(const weather::Data &w, uint32_t staleMin) {
+  tft.fillRect(0, SUN_Y, config::SCREEN_W, CAPTION_Y - SUN_Y, TFT_BLACK);
+  if (!staleMin) {
+    drawSun(w);
+    return;
+  }
+  char text[24] = "Weather ";
+  weather::formatAge(text + strlen(text), sizeof(text) - strlen(text), staleMin);
+  tft.setTextColor(TFT_YELLOW, TFT_BLACK);
+  tft.setTextDatum(TC_DATUM);
+  tft.setTextPadding(0);
+  tft.drawString(text, config::SCREEN_W / 2, SUN_Y, 2);
+}
+
 void clearBox() { tft.fillRect(BOX_X, BOX_Y, BOX_SIZE, BOX_SIZE, TFT_BLACK); }
 
 void drawIcon(const weather::Data &w) {
@@ -275,7 +294,7 @@ void drawIcon(const weather::Data &w) {
 
 // Repaints the whole lower area from the cached data. The GIF box is left empty: updateGif()
 // fills it with the animation, or with the icon when there is none.
-void drawWeatherArea(const weather::Data &w) {
+void drawWeatherArea(const weather::Data &w, uint32_t staleMin) {
   tft.fillRect(0, AREA_Y, config::SCREEN_W, AREA_H, TFT_BLACK);
   boxMode = BOX_EMPTY;
 
@@ -295,7 +314,7 @@ void drawWeatherArea(const weather::Data &w) {
   tft.drawString("Feels ", COL_X, FEELS_Y, 2);
   drawTemperature(COL_X + tft.textWidth("Feels ", 2), FEELS_Y, w.feelsC, 2, 2, 2, 4, TFT_DARKGREY);
 
-  drawSun(w);
+  drawSunRow(w, staleMin);
 
   char caption[24], value[16];
   snprintf(value, sizeof(value), "%u%%", (unsigned)w.humidity);
@@ -359,17 +378,24 @@ void updateWeather() {
       weather_notice::draw(kind);
       shownKind = (int8_t)kind;
       shownUpdated = 0;
+      shownAge = 0;
     }
     return;
   }
 
   const weather::Data &w = weather::data();
+  uint32_t staleMin = weather::staleMinutes();
+  uint16_t age = weather::ageBucket(staleMin);
   if (shownKind != (int8_t)weather_notice::NONE || w.updatedAtMs != shownUpdated) {
     closeGif();   // the area is about to be cleared: the animation restarts on the new picture
-    drawWeatherArea(w);
+    drawWeatherArea(w, staleMin);
     shownKind = (int8_t)weather_notice::NONE;
     shownUpdated = w.updatedAtMs;
+    shownAge = age;
     gifNextTry = millis();
+  } else if (age != shownAge) {
+    drawSunRow(w, staleMin);   // only the row: the GIF keeps playing
+    shownAge = age;
   }
   updateGif(w);
 }

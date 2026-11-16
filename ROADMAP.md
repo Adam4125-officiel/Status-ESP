@@ -73,9 +73,8 @@ get in the way; remove a line when it is no longer true.
   larger than the screen is cropped), sub-folders are not read, and a GIF is cut off at the end of its slot rather
   than at the end of a loop. `/image` also holds the stock firmware's own pictures (for example `boot.jpg`):
   they show in the album and the web interface can delete them.
-- **Stale weather looks like fresh weather.** If the weather cannot be refreshed, the last data
-  stays on screen with no "last updated" hint; only a device that never got any data says so.
-  Across midnight the forecast keeps its old days until the next successful fetch.
+- **Across midnight the forecast keeps its old days** until the next successful fetch (the three weather
+  screens do say how old the data is once it is stale, but the days are not shifted).
 - **With the time zone on Auto, the clock shows UTC until the first weather answer** (it needs a
   city and a network): the offset comes from Open-Meteo, not from the NTP servers.
 - **`status-esp.local` is a minimal mDNS responder.** It answers address questions only: the

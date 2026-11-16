@@ -29,6 +29,8 @@
 
 #include <Arduino.h>
 
+#include "settings.h"
+
 namespace weather {
 
 struct Day {
@@ -102,5 +104,37 @@ const Diag &diag();
 // changed, and fetch at the next loop() pass even inside the back-off. Units need no
 // refresh (Data is metric).
 void requestRefresh();
+
+// --- Stale data -------------------------------------------------------------------------------------
+// When the weather cannot be refreshed the last answer stays on the screens. They tell how old it is once it
+// is older than twice the refresh interval AND at least 90 minutes (a 20-minute interval would otherwise cry
+// wolf after 40 minutes, one missed fetch). One rule, here, for the three weather themes.
+const uint32_t STALE_MIN_MS = 90UL * 60000UL;
+
+// Pure: minutes of age when `ageMs` is stale for a refresh interval of `intervalMin` minutes, 0 when fresh.
+inline uint32_t staleMinutes(uint32_t ageMs, uint32_t intervalMin) {
+  uint32_t limit = 2UL * intervalMin * 60000UL;
+  if (limit < STALE_MIN_MS) limit = STALE_MIN_MS;
+  return ageMs > limit ? ageMs / 60000UL : 0;
+}
+
+// Minutes since the last good fetch when that is stale, else 0 (also 0 without data). millis() wraps after
+// 49 days: the unsigned subtraction stays right across it.
+inline uint32_t staleMinutes() {
+  const Data &w = data();
+  if (!w.valid || w.updatedAtMs == 0) return 0;
+  return staleMinutes(millis() - w.updatedAtMs, settings::get().weatherInterval);
+}
+
+// The age as the screens show it: whole hours up to a day, then whole days ("3 h old", "2 d old").
+inline void formatAge(char *buf, size_t size, uint32_t minutes) {
+  if (minutes >= 24 * 60) snprintf(buf, size, "%u d old", (unsigned)(minutes / (24 * 60)));
+  else snprintf(buf, size, "%u h old", (unsigned)(minutes / 60));
+}
+
+// What a screen compares to know the text changed: the age rounded as formatAge() rounds it (0 = fresh).
+inline uint16_t ageBucket(uint32_t minutes) {
+  return (uint16_t)(minutes >= 24 * 60 ? 1000 + minutes / (24 * 60) : minutes / 60);
+}
 
 }  // namespace weather

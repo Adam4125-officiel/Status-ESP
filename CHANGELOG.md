@@ -8,6 +8,14 @@ changes the first, second and third number, and what a `-rc.N` pre-release is) i
 ## [1.2.0-rc.1] - 2026-11-16
 
 ### Added
+- **The weather screens say when their data is old.** When the weather cannot be refreshed (the network or
+  Open-Meteo is down), the last answer used to stay on screen as if it were fresh. Now, once it is older than twice
+  the refresh interval and at least 90 minutes, a yellow hint appears: "Weather 3 h old" in the sun row of the
+  weather clock (it replaces the sunrise and sunset times meanwhile; the GIF is not touched), and " - 3 h old"
+  after the city on the forecast and the hourly forecast. The age is in whole hours, then whole days ("2 d old"),
+  and the screen repaints only when that text changes (once an hour), never on every pass. The rule is one
+  function, `weather::staleMinutes()`, tested on the PC with the three screens (safe area, overlaps, longest city,
+  12-hour format, a GIF playing, `millis()` wrapping).
 - **Pictures are prepared in your browser before they go to the album.** Choose any picture (JPG, PNG, WebP...) in
   the Pictures tab: the page decodes it, applies its rotation (EXIF), draws it on a 240 x 240 canvas and uploads
   that as a baseline JPEG under the same name with a `.jpg` ending. A selector next to the file field picks "Fill
