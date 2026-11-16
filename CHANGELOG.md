@@ -23,6 +23,12 @@ changes the first, second and third number, and what a `-rc.N` pre-release is) i
   cannot do TLS and sends nothing. GitHub limits anonymous requests; the page says so if you hit that. The version
   comparison (`-rc.N` older than the same stable) is tested on the PC (`tests/web/test_cmp_ver.js`, run by
   `tools/test_host.sh` when Node is installed).
+- **"Try" a theme without saving it.** Next to the theme selector in Settings, "Try" puts the chosen theme on the
+  screen right now (with auto-switch off) and the page shows "Showing <theme> - not saved" with a "Go back" button.
+  Nothing is written to the device's flash: a reboot always brings back the saved theme. While a try is active,
+  every other save on the page (night mode, brightness, a password, a settings import...) first carries the saved
+  theme and auto-switch back, so the tried theme can never be saved by accident; the Theme card's own Save keeps
+  what the form shows; and leaving or reloading the page puts the saved theme back too.
 
 ## [1.1.2-rc.1] - 2026-11-16
 

@@ -67,6 +67,7 @@ a{color:#8cf}
 </nav>
 <main>
 <div id="banner" class="banner" hidden></div>
+<div id="try-banner" class="banner" hidden><span id="try-msg"></span> <button type="button" class="small alt" id="try-back">Go back</button></div>
 
 <!-- 1. Status-Portal ------------------------------------------------------------------>
 <section class="tab" id="t-portal">
@@ -258,7 +259,7 @@ a{color:#8cf}
     <h2>Theme</h2>
     <form data-settings id="f-theme">
       <label for="theme">Theme shown on the screen</label>
-      <select id="theme" name="theme">
+      <div class="row"><select id="theme" name="theme">
         <option value="weather_clock">Weather clock</option>
         <option value="forecast">Forecast (3 days)</option>
         <option value="hourly">Hourly forecast (24 hours)</option>
@@ -269,8 +270,8 @@ a{color:#8cf}
         <option value="portal">Status-Portal</option>
         <option value="resources">Resources (Status-Portal)</option>
         <option value="vms">Virtual machines (Status-Portal)</option>
-      </select>
-      <p class="hint">To choose a theme manually, turn auto-switch off.</p>
+      </select><button type="button" class="alt" id="theme-try" style="flex:0 0 auto;margin-top:0">Try</button></div>
+      <p class="hint">To choose a theme manually, turn auto-switch off. "Try" shows the chosen theme now without saving it (a reboot brings back the saved one).</p>
       <label class="inline"><input type="checkbox" name="auto_switch" data-t="b"> Auto-switch between themes</label>
       <label for="auto_interval">Seconds per theme (5 - 3600)</label>
       <input type="number" id="auto_interval" name="auto_interval" data-t="n" min="5" max="3600" step="1">
@@ -500,8 +501,23 @@ function collect(form) {
   return o;
 }
 
+/* "Try" a theme: applied live (save=0) while the device's RAM copy differs from the saved file, so any
+   save has to carry the saved theme back (it would persist the tried one otherwise). */
+var tried = null;
+function liveSet(o, keep) {
+  return fetch("/api/settings?save=0", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(o), keepalive: !!keep });
+}
+function endTry() {
+  tried = null;
+  $("#try-banner").hidden = true;
+  $("#theme").value = S.theme;
+}
+
 function save(obj, msg) {
+  var t = tried;
+  if (t && obj.theme === undefined) { obj.theme = t.theme; obj.auto_switch = t.auto_switch; }
   return post("/api/settings", obj).then(function (j) {
+    if (t) endTry();
     S = j;
     fill();
     toast(msg || "Saved");
@@ -839,6 +855,19 @@ function init() {
   $("#gif-none").onclick = function () { save({ weather_gif: "" }, "No GIF on the weather screen").then(function () { loadFiles("/gif"); }, function () {}); };
   $("#img-up").onclick = uploadPicture;
   $("#upd-check").onclick = checkUpdate;
+
+  $("#theme-try").onclick = function () {
+    var sel = $("#theme"), t = tried || { theme: S.theme, auto_switch: S.auto_switch };
+    post("/api/settings?save=0", { theme: sel.value, auto_switch: 0 }).then(function () {
+      tried = t;
+      $("#try-msg").textContent = "Showing " + sel.options[sel.selectedIndex].text + " - not saved.";
+      $("#try-banner").hidden = false;
+    }).catch(function (e) { toast(e.message, false); });
+  };
+  $("#try-back").onclick = function () {
+    post("/api/settings?save=0", tried).then(endTry).catch(function (e) { toast(e.message, false); });
+  };
+  window.addEventListener("pagehide", function () { if (tried) liveSet(tried, true); });
   $("#img-fit").onchange = function () { $("#img-file").accept = this.value === "raw" ? ".jpg,.jpeg,.gif,image/jpeg,image/gif" : "image/*,.jpg,.jpeg,.gif"; };
 
   // Brightness: live while the slider moves (not saved), saved when it is released.
@@ -879,7 +908,7 @@ function init() {
       try { o = JSON.parse(rd.result); } catch (e) { toast("That file is not valid JSON", false); return; }
       if (!o || typeof o !== "object" || Array.isArray(o)) { toast("That file is not a settings file", false); return; }
       if (!confirm("Replace the current settings with the ones in this file?")) return;
-      post("/api/settings/import", o).then(function (j) {
+      (tried ? post("/api/settings?save=0", tried).then(endTry) : Promise.resolve()).then(function () { return post("/api/settings/import", o); }).then(function (j) {
         S = j;
         fill();
         $("#imp-file").value = "";
