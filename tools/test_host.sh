@@ -45,3 +45,39 @@ g++ -std=gnu++17 -O1 -g -Wall -Wextra -Werror -Wno-maybe-uninitialized -Wno-form
     tests/host/test_hourly.cpp src/screen_hourly.cpp src/weather_hourly.cpp \
     -o "$out/test_hourly"
 "$out/test_hourly"
+
+# The weather clock, the forecast and the clock (both layouts): the safe area, overlaps, no redraw of an unchanged
+# screen, and the weather clock's icon. The real icons.cpp is linked.
+g++ -std=gnu++17 -O1 -g -Wall -Wextra -Werror -Wno-maybe-uninitialized -Wno-format-truncation \
+    -fsanitize=address,undefined -fno-sanitize-recover=undefined \
+    -DARDUINOJSON_USE_DOUBLE=0 -DARDUINOJSON_USE_LONG_LONG=0 -DFW_VERSION='"test"' \
+    -Itests/host -Isrc -isystem "$json" \
+    tests/host/test_weather_screens.cpp src/screen_weather.cpp src/screen_forecast.cpp src/screen_clock.cpp src/icons.cpp \
+    -o "$out/test_weather_screens"
+"$out/test_weather_screens"
+
+# The cross-site check on the web API (origin_check.cpp): pure, strings in, verdict out.
+g++ -std=gnu++17 -O1 -g -Wall -Wextra -Werror \
+    -fsanitize=address,undefined -fno-sanitize-recover=undefined \
+    -Itests/host -Isrc \
+    tests/host/test_origin_check.cpp src/origin_check.cpp \
+    -o "$out/test_origin_check"
+"$out/test_origin_check"
+
+# The mDNS responder's DNS side (mdns_dns.cpp): parses questions from any machine on the LAN.
+g++ -std=gnu++17 -O1 -g -Wall -Wextra -Werror \
+    -fsanitize=address,undefined -fno-sanitize-recover=undefined \
+    -Itests/host -Isrc \
+    tests/host/test_mdns_dns.cpp src/mdns_dns.cpp \
+    -o "$out/test_mdns_dns"
+"$out/test_mdns_dns"
+
+# The restore side of backup.cpp (an archive uploaded by a browser), built unchanged against an in-memory LittleFS
+# and the Wi-Fi / ESP stand-ins in tests/host/backup/ (that folder goes first: it has its own Arduino.h).
+g++ -std=gnu++17 -O1 -g -Wall -Wextra -Werror -Wno-maybe-uninitialized \
+    -fsanitize=address,undefined -fno-sanitize-recover=undefined \
+    -DARDUINOJSON_USE_DOUBLE=0 -DARDUINOJSON_USE_LONG_LONG=0 -DARDUINOJSON_ENABLE_ARDUINO_STRING=1 -DFW_VERSION='"test"' \
+    -Itests/host/backup -Isrc -isystem "$json" \
+    tests/host/test_backup.cpp src/backup.cpp \
+    -o "$out/test_backup"
+"$out/test_backup"

@@ -3,10 +3,20 @@
 //
 //   y   4..52   HH:MM in the clock font (colours, 12/24 h, colon blink), seconds and AM/PM
 //   y  56..82   date
-//   y  88..168  left: the GIF, or the weather icon when there is none (or it cannot play)
-//               right: temperature, conditions, "feels like"
-//   y 174..190  sunrise and sunset times (when the weather answer has them)
-//   y 190..232  humidity | wind | pressure, in the user's units
+//   y  84..164  left: the GIF, or the weather icon when there is none (or it cannot play)
+//               right: temperature (84..132), conditions (134..150), "feels like" (150..166)
+//               right, only when a GIF is chosen: a 36 px icon of the conditions, x 196..232, y 90..126
+//   y 166..182  sunrise and sunset times (when the weather answer has them)
+//   y 182..224  humidity | wind | pressure, in the user's units (caption 182..198, value 198..224)
+//
+// Nothing is drawn below y 224: the plastic over the glass hides about the last 16 px (CLAUDE.md,
+// section 12). The tests hold this screen to that (tests/host/test_weather_screens.cpp).
+//
+// The icon on the right: the left box shows the user's GIF, so the conditions would only be words ("Rain").
+// While `weather_gif` is set (playing or not, so the layout never jumps) the icon of the conditions is drawn at
+// the right end of the temperature row, with the temperature's unit shrunk to Font 2 to make room: the widest
+// temperature ("122" in Fahrenheit) then ends at x 194, two px from the icon. It is part of the weather area, drawn
+// when the data changes and never touched by the GIF. With no GIF the big icon fills the left box instead.
 //
 // Update(false) repaints one thing at a time: a changed time field, the colons, the date
 // when the day changes, the whole lower area when weather::data() changed, one GIF frame.
@@ -33,13 +43,14 @@ const int16_t TIME_H = 48;
 const int16_t SEC_H = 26;             // Font 4
 const int16_t SIDE_GAP = 6;           // between the minutes and the seconds / AM-PM column
 const int16_t DATE_Y = 56;
-const int16_t AREA_Y = 86;            // the weather area is everything below this line
+const int16_t AREA_Y = 84;            // the weather area is everything below this line
 const int16_t AREA_H = config::SCREEN_H - AREA_Y;
-const int16_t BOX_X = 6, BOX_Y = 88, BOX_SIZE = 80;
+const int16_t BOX_X = 6, BOX_Y = 84, BOX_SIZE = 80;
 const int16_t COL_X = 94;
-const int16_t TEMP_Y = 88, DESC_Y = 138, FEELS_Y = 156;
-const int16_t SUN_Y = 174;
-const int16_t CAPTION_Y = 190, VALUE_Y = 206;
+const int16_t TEMP_Y = 84, DESC_Y = 134, FEELS_Y = 150;
+const int16_t ICON_SIZE = 36, ICON_CX = 214, ICON_CY = 108;   // the right edge is 8 px from the screen's
+const int16_t SUN_Y = 166;
+const int16_t CAPTION_Y = 182, VALUE_Y = 198;
 const uint32_t GIF_RETRY_MS = 10000;
 
 // --- Time row -----------------------------------------------------------------------
@@ -268,7 +279,12 @@ void drawWeatherArea(const weather::Data &w) {
   tft.fillRect(0, AREA_Y, config::SCREEN_W, AREA_H, TFT_BLACK);
   boxMode = BOX_EMPTY;
 
-  drawTemperature(COL_X, TEMP_Y, w.tempC, 6, 4, 4, 8, TFT_WHITE);
+  if (settings::get().weatherGif[0]) {
+    drawTemperature(COL_X, TEMP_Y, w.tempC, 6, 2, 3, 6, TFT_WHITE);
+    icons::drawWeather(ICON_CX, ICON_CY, ICON_SIZE, w.code, w.isDay);
+  } else {
+    drawTemperature(COL_X, TEMP_Y, w.tempC, 6, 4, 4, 8, TFT_WHITE);
+  }
 
   tft.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
   tft.setTextDatum(TL_DATUM);
@@ -283,13 +299,13 @@ void drawWeatherArea(const weather::Data &w) {
 
   char caption[24], value[16];
   snprintf(value, sizeof(value), "%u%%", (unsigned)w.humidity);
-  drawStat(40, "Humidity", value);
+  drawStat(44, "Humidity", value);
   snprintf(caption, sizeof(caption), "Wind %s", units::windLabel());
   formatWind(value, sizeof(value), w.windKmh);
   drawStat(120, caption, value);
   snprintf(caption, sizeof(caption), "Press %s", units::pressureLabel());
   units::formatPressure(value, sizeof(value), w.pressureHpa);
-  drawStat(200, caption, value);
+  drawStat(196, caption, value);
 }
 
 void closeGif() {

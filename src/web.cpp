@@ -13,15 +13,22 @@
 //   GET  /api/backup           every stored file as one tar (Wi-Fi password included; not in rescue mode)
 //   POST /api/backup/restore   put such a tar back (multipart), then reboot
 //   POST /api/reboot           POST /api/factory-reset   (deletes only /custom.json)
-//   GET  /update POST /update  firmware update (our page + the library's handler)
-//   GET  /v.json  /reboot  /set?brt=&blinv=  /wifi   kept for backward compatibility
+//   GET  /update POST /update  firmware update: our page; POST is our own handler in normal mode (Origin check,
+//                              password) and the library's ESP8266HTTPUpdateServer in the rescue AP (safety net)
+//   GET  /v.json  /wifi  POST /reboot  POST /set?brt=&blinv=   kept for backward compatibility
 //   anything else              404, or a redirect to the home page in rescue-AP mode
+//
+// Every request that is not a GET, HEAD or OPTIONS (every POST, /update's and the two uploads included) is
+// refused with 403 when it carries an Origin header whose host and port are not the Host header's: that is a
+// page on another site making the owner's browser talk to the device (origin_check.h). No Origin (curl, the
+// upload scripts) passes. Not enforced in the rescue access point, like the password (CLAUDE.md rules 1, 11).
 #include "web.h"
 
 #include <ESP8266HTTPUpdateServer.h>
 #include <ESP8266WebServer.h>
 #include <ESP8266WiFi.h>
 #include <LittleFS.h>
+#include <Updater.h>
 
 #include "backup.h"
 #include "config.h"
@@ -31,6 +38,7 @@
 #include "mdns.h"
 #include "media.h"
 #include "net.h"
+#include "origin_check.h"
 #include "portal.h"
 #include "portal_url.h"
 #include "settings.h"
@@ -46,7 +54,7 @@ static ESP8266WebServer server(80);
 // "why does my GIF stop" can be answered from the web interface.
 static uint32_t requestHeap;
 static uint8_t requestGif;
-static ESP8266HTTPUpdateServer updater;
+static ESP8266HTTPUpdateServer updater;   // the library's /update handler: rescue mode only (see begin())
 static bool listening = false;
 
 // --- Password (HTTP Basic, user "admin") ------------------------------------------------
@@ -61,17 +69,24 @@ static bool authEnforced() { return settings::get().password[0] != '\0' && !net:
 
 static bool authorized() { return !authEnforced() || server.authenticate(AUTH_USER, settings::get().password); }
 
-// True when the request may go on; otherwise has already sent the 401 (the browser then asks).
+// True when a state-changing request comes from another site (see origin_check.h). GET, HEAD and OPTIONS
+// carry no Origin worth checking and change nothing.
+static bool crossSite() {
+  HTTPMethod m = server.method();
+  if (m == HTTP_GET || m == HTTP_HEAD || m == HTTP_OPTIONS) return false;
+  return !origin_check::allowed(server.header(F("Origin")).c_str(), server.hostHeader().c_str(), net::isAp());
+}
+
+// True when the request may go on; otherwise has already sent the 403 (another site) or the 401 (the
+// browser then asks).
 static bool guard() {
+  if (crossSite()) {
+    server.send(403, F("application/json"), F("{\"ok\":false,\"error\":\"Cross-site request refused\"}"));
+    return false;
+  }
   if (authorized()) return true;
   server.requestAuthentication(BASIC_AUTH, "Status-ESP", F("Password required"));
   return false;
-}
-
-// POST /update is the library's handler: it has its own credentials, which follow the same rule.
-static void applyUpdaterCredentials() {
-  updater.updateCredentials(authEnforced() ? String(AUTH_USER) : String(),
-                            authEnforced() ? String(settings::get().password) : String());
 }
 
 // Registers a route behind guard().
@@ -156,8 +171,7 @@ static void handleIndex() {
 }
 
 // /update page without the "FileSystem" form (which would erase the whole stock file
-// area). Registered BEFORE updater.setup() so that it replaces the library's GET page;
-// POST handling stays the library's proven one.
+// area). The upload itself is handleUpdateChunk() below.
 static void handleUpdatePage() {
   server.send(200, "text/html", F(
       "<!DOCTYPE html><html lang='en'><head><meta charset='utf-8'>"
@@ -170,6 +184,70 @@ static void handleUpdatePage() {
       "<input type='submit' value='Update'></form>"
       "<p>Do not cut the power during the update.</p>"
       "<p><a href='/' style='color:#8cf'>Back</a></p></body></html>"));
+}
+
+// POST /update: the same steps as the library's ESP8266HTTPUpdateServer (Update.begin / write / end, then a
+// restart), written here so that the Origin check can come first: the library's upload callback cannot be
+// wrapped. The "filesystem" field the library also accepts is not: only firmware goes in (rule 7).
+static bool updAllowed = false;
+static int updDenied = 0;   // 401 or 403 when the upload was refused at its start
+static String updError;
+
+// Our POST /update handler, active in normal Wi-Fi mode only. In rescue mode the library's handler serves
+// the same URL (see begin()): the same registration, but accepted only when we are not the access point.
+class NormalModeOnlyHandler : public esp8266webserver::FunctionRequestHandler<WiFiServer> {
+ public:
+  using esp8266webserver::FunctionRequestHandler<WiFiServer>::FunctionRequestHandler;
+  // canUpload() and handle() both go through canHandle(), so uploads follow the same choice.
+  bool canHandle(HTTPMethod method, const String &uri) override {
+    return !net::isAp() && esp8266webserver::FunctionRequestHandler<WiFiServer>::canHandle(method, uri);
+  }
+};
+
+static void handleUpdateChunk() {
+  HTTPUpload &up = server.upload();
+  if (up.status == UPLOAD_FILE_START) {
+    updError = "";
+    updAllowed = false;
+    updDenied = 0;
+    if (crossSite()) { updDenied = 403; return; }
+    if (!authorized()) { updDenied = 401; return; }
+    updAllowed = true;
+    uint32_t maxSketchSpace = (ESP.getFreeSketchSpace() - 0x1000) & 0xFFFFF000;
+    if (!Update.begin(maxSketchSpace, U_FLASH)) updError = Update.getErrorString();
+  } else if (!updAllowed) {
+    return;
+  } else if (up.status == UPLOAD_FILE_WRITE) {
+    if (updError.isEmpty() && Update.write(up.buf, up.currentSize) != up.currentSize) updError = Update.getErrorString();
+  } else if (up.status == UPLOAD_FILE_END) {
+    if (updError.isEmpty() && !Update.end(true)) updError = Update.getErrorString();
+  } else if (up.status == UPLOAD_FILE_ABORTED) {
+    Update.end();
+    updAllowed = false;   // a later POST without a file must not report success on stale state
+  }
+  yield();
+}
+
+static void handleUpdateDone() {
+  if (updDenied == 403) {
+    server.send(403, F("application/json"), F("{\"ok\":false,\"error\":\"Cross-site request refused\"}"));
+    return;
+  }
+  if (!updAllowed) {   // 401, or no file came at all
+    if (!guard()) return;
+    server.send(400, F("text/html"), F("Update error: no file received"));
+    return;
+  }
+  updAllowed = false;
+  if (!updError.isEmpty() || Update.hasError()) {
+    server.send(200, F("text/html"), String(F("Update error: ")) + updError);
+    return;
+  }
+  server.client().setNoDelay(true);
+  server.send(200, F("text/html"), F("<META http-equiv=\"refresh\" content=\"15;URL=/\">Update Success! Rebooting..."));
+  delay(100);
+  server.client().stop();
+  ESP.restart();
 }
 
 // --- API: status and settings -----------------------------------------------------------------
@@ -267,7 +345,6 @@ static void applySettingsAndReply(JsonDocument &body, bool persist) {
   display::settingsChanged(changed);
   if (changed & settings::CH_NTP) timekeeping::applySettings();
   if (changed & settings::CH_LOCATION) weather::requestRefresh();
-  if (changed & settings::CH_AUTH) applyUpdaterCredentials();
   if (changed & settings::CH_PORTAL) portal::settingsChanged();
 
   JsonDocument doc;
@@ -531,6 +608,7 @@ static void handleUploadChunk() {
     upWritten = 0;
     if (upFile) upFile.close();
 
+    if (crossSite()) return upFail(403, "Cross-site request refused");
     if (!authorized()) return upFail(401, "Password required");
     const char *folder = folderFromArg(server.arg("dir"));
     if (!folder) return upFail(400, "dir must be /image or /gif");
@@ -700,6 +778,7 @@ static void handleRestoreChunk() {
     rsFailed = false;
     rsCode = 200;
     rsMessage = "";
+    if (crossSite()) return rsFail(403, "Cross-site request refused");
     if (!authorized()) return rsFail(401, "Password required");
     if (!settings::fsMounted()) return rsFail(500, "Storage is not available");
     media::gifClose();   // the decoder holds a file open, and its memory is needed
@@ -784,6 +863,11 @@ static void handleFactoryReset() {
 }
 
 // --- Backward compatibility (0.1.0 - 0.2.0 interface) ---------------------------------------------------------
+
+// /set and /reboot used to act on a plain GET, which any page can trigger with an <img> tag.
+static void handleLegacyGetHint() {
+  server.send(405, F("text/plain"), F("Use POST. /set?brt=50 and /reboot no longer act on a GET."));
+}
 
 static void handleLegacySet() {
   settings::Settings &s = settings::get();
@@ -875,9 +959,18 @@ void begin() {
     return ESP8266WebServer::CLIENT_REQUEST_CAN_CONTINUE;
   });
 
-  // Must stay before updater.setup(): see handleUpdatePage().
+  // The Origin header is not collected by default; Authorization (needed for the password) always is.
+  server.collectHeaders("Origin");
+
   route("/update", HTTP_GET, handleUpdatePage);
-  updater.setup(&server, "/update");
+  // Normal mode: our handler (Origin check, password). Rescue access point: the library's own handler, with
+  // no credentials, kept as the safety net because it is the one verified on the device many times and
+  // /update is the only way back (rule 1); neither the Origin check nor the password applies there anyway.
+  // The library's handler also takes a "filesystem" field, which would erase the file area (rule 7): our page
+  // never sends one, which is why it is confined to rescue mode and to our page. GET /update stays OUR page
+  // in both modes because it is registered first.
+  server.addHandler(new NormalModeOnlyHandler(handleUpdateDone, handleUpdateChunk, "/update", HTTP_POST));
+  updater.setup(&server, "/update", "", "");
 
   route("/", HTTP_GET, handleIndex);
 
@@ -899,10 +992,12 @@ void begin() {
   route("/api/reboot", HTTP_POST, handleReboot);
   route("/api/factory-reset", HTTP_POST, handleFactoryReset);
 
-  route("/set", HTTP_ANY, handleLegacySet);
+  route("/set", HTTP_POST, handleLegacySet);
+  route("/set", HTTP_ANY, handleLegacyGetHint);
   route("/wifi", HTTP_GET, handleLegacyWifiPage);
   route("/wifi", HTTP_POST, handleLegacyWifiSave);
-  route("/reboot", HTTP_ANY, handleLegacyReboot);
+  route("/reboot", HTTP_POST, handleLegacyReboot);
+  route("/reboot", HTTP_ANY, handleLegacyGetHint);
   server.on("/v.json", handleVersion);   // always open: the upload tools read it
   server.onNotFound(handleNotFound);
 }
@@ -911,7 +1006,6 @@ void loop() {
   if (!listening) {
     // The same moment the 0.1.0 firmware chose: once the Wi-Fi mode is settled.
     if (!net::isConnected() && !net::isAp()) return;
-    applyUpdaterCredentials();   // the Wi-Fi mode is settled: password on, or rescue mode and off
     server.begin();
     listening = true;
   }

@@ -5,6 +5,66 @@ All notable changes to this project are documented in this file. The format foll
 changes the first, second and third number, and what a `-rc.N` pre-release is) is in
 [docs/releasing.md](docs/releasing.md).
 
+## [1.1.2] - 2026-11-16
+
+Mostly fixes and security hardening, with one small addition the owner asked for (the conditions icon on the weather
+clock, below). Promoted from `1.1.2-rc.1` (the same build with a new version string) after the owner tested it on
+their device and found it good. Install it through the device's `/update` page like any release; the stock firmware
+stays one upload away. Works with the same Status-Portal as 1.1.1 (1.11.1 for everything).
+
+### Security
+- **The device now refuses requests sent by other web sites.** Until now any page you opened in a browser on your
+  home network could, without you seeing anything, make the device reboot, factory-reset, change its settings or
+  its web password, or point the Status-Portal address at another machine (so the portal key would be sent there);
+  the web password did not help, because the browser attaches its saved login to such a request. Every request that
+  changes something (every POST: the API, `/wifi`, `/update`, the picture upload and the backup restore) is now
+  answered with 403 when the browser says it comes from a page whose address is not the device's own. The device's
+  own pages always pass, whether you reach it by its IP address, `status-esp.local` or any other name, and tools
+  that send no such header (`curl`, `tools/upload.sh`, `tools/upload.ps1`) are unaffected. The rescue access point
+  is exempt, like the password, so `/update` stays reachable there. Not covered: DNS rebinding (ROADMAP).
+- **`/set` and `/reboot` (the 0.1.0 routes) now act on POST only.** On a plain GET they changed things, so an image
+  tag on any web page could reboot the device; a GET now answers 405 with a hint.
+
+### Added
+- **The weather clock shows the icon of the current conditions even when a GIF is chosen.** The left box holds your
+  GIF, so until now the conditions were only words ("Rain"). When a GIF is set, a 36 px icon of the conditions (sun,
+  cloud, rain, snow, thunder; the moon at night) now sits at the right end of the temperature row, 8 px from the edge.
+  To make room the temperature's unit is drawn smaller in that case (the widest value, 122 F, ends 2 px before the
+  icon). With no GIF chosen nothing changes: the big icon is still in the left box.
+
+### Changed
+- `POST /update` is now handled by the firmware's own code in normal Wi-Fi mode (the same steps as the library:
+  begin, write, end, restart) so that the check above can run before anything is written; the "filesystem" field is
+  not accepted there. In the rescue access point the library's own update handler, the one proven on the device,
+  still serves `/update` with no password and no Origin check, as a safety net: it is the only way back.
+- The PC tests now also cover the mDNS question parser (`status-esp.local`): valid and other-name questions, every
+  truncation, looping and out-of-range name pointers, lying counts and lengths, and 60,000 mutated packets under the
+  sanitizers. They found no bug; the firmware code is unchanged.
+- The PC tests now also run the backup writer and the restore side of `backup.cpp` (the code that reads an archive
+  uploaded by a browser) unchanged, against an in-memory file system: a round trip of the firmware's own archive, an
+  archive without the marker, unsafe names (`..`, empty parts, over 31 characters, absolute), lying or non-octal
+  sizes, bad checksums, truncation at every length, the archive fed in chunks of 1, 7, 512, 513 and 1460 bytes, a
+  full or failing storage, and 30,000 mutated archives. Every run is checked against rule 2 (nothing formatted,
+  nothing deleted, only clean paths written). They found no bug; `backup.cpp` is unchanged.
+
+### Fixed
+- **The weather clock no longer draws into the part of the glass the plastic hides.** Humidity, wind and pressure were
+  at y 190..232 and are now at y 182..224 (caption 182..198, value 198..224); the rows above moved up by 2 to 4 px to
+  make room (GIF box and temperature y 84, conditions 134, "Feels" 150, sunrise and sunset 166). The three columns
+  moved to x 44, 120 and 196 so that "Press mmHg" and "Press inHg" keep 8 px from the right edge.
+- **The forecast and the clock no longer draw into the part of the glass the plastic hides.** The forecast's legend
+  ("High  Low  C") was at y 214..230 and is now at y 206..222. The clock's hint ("Syncing the time...", "UTC - set a
+  city or an offset") moved from y 214..230 to y 206..222 in both layouts; in the Large layout the date moved up from
+  y 184 to y 178 to make room, and AM/PM now stops 8 px from the right edge. The forecast's city name is also kept 8 px
+  from both sides.
+- **The red or orange alert dot** (Status-Portal alerts set to "indicator") sat 5 px from the right edge and 6 px from
+  the top; it is now 8 px from both.
+- **The forecast's city name no longer runs under the alert dot.** A long name could reach x 224 and sit under the red
+  or orange dot in the top-right corner; it is now at most 200 px wide, centred (x 20 to 220), and shortened with
+  "..." as before. Names that already fit are not affected.
+- The PC tests now hold the forecast, the clock (all three fonts, 12 and 24 hours, every hint) and the weather clock to the same safe area
+  as the other screens, and the test display knows the digit fonts 6, 7 and 8 with their real sizes.
+
 ## [1.1.1] - 2026-11-08
 
 Bug fixes only. Promoted from `1.1.1-rc.1` (the same build with a new version string) after the owner tested it on

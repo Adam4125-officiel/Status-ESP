@@ -54,6 +54,10 @@ get in the way; remove a line when it is no longer true.
   the latency beside the status and Jellyfin's band with real data (the owner's portal was not yet on
   1.11.0), GIF decoding speed, `status-esp.local` on a real network, and the password prompt in a real
   browser. The drawing, the parsing and the album logic were run on a PC against a stand-in (`tests/host/`).
+- **DNS rebinding is not covered.** The device refuses a cross-site POST by comparing the request's `Origin` with its
+  `Host` (1.1.2). A hostile name that an attacker's DNS points at the device's address makes the two agree, so such a
+  page can still talk to it. A fixed allow-list of `Host` names would close that, but it could lock the owner out of
+  `/update` behind an unusual name (a router-given name, a proxy), which is worse than the risk, so it was not done.
 - **Memory while a GIF plays is tight.** The GIF decoder takes about 24.5 KB in one block, which
   leaves only about 6 KB of heap for everything else (a web request that would be short closes the GIF first). The web interface's status block shows
   `heap` and `max_block`; if uploads or settings saves misbehave while a GIF is on screen,

@@ -6,9 +6,8 @@
 
 namespace web {
 
-// setup(): registers every route. /update's custom GET page is registered BEFORE
-// updater.setup() (the server takes the first handler that matches), and the form that
-// would erase the file system never comes back. Does not start listening yet.
+// setup(): registers every route. /update has our own page and our own upload handler (the form that
+// would erase the file system never comes back). Does not start listening yet.
 void begin();
 // Every loop() pass: starts listening once the network state is settled (connected or
 // rescue AP), then serves clients. Never blocks for long.

@@ -27,7 +27,18 @@ Founding constraints:
 - The stock files on the device (images, settings, Wi-Fi) stay untouched.
 
 ## 2. Current state (handover)
-- **1.1.1 is the current stable release (2026-11-08)**, promoted from `1.1.1-rc.1` (same build, new version
+- **1.1.2 is the current stable release (2026-11-16)**, promoted from `1.1.2-rc.1` (same build, new version string)
+  after the owner tested it on the device (PR #5 is the draft for the session branch `ccr-dde9c129-d2ydij`; this
+  version was cut on the branch `1.1.2`). Fixes plus one small addition asked for by the owner: the weather clock,
+  the forecast, the clock and the alert dot moved clear of the plastic; the weather clock draws the current
+  conditions' icon beside the temperature when a GIF is chosen; cross-site POSTs are refused (`origin_check`,
+  rule 11) and `POST /update` is our own handler in normal Wi-Fi mode, the library's in rescue mode; `/set` and
+  `/reboot` act on POST only; new PC tests for the weather screens, the mDNS parser and the backup restore.
+  `firmware.bin` is 508,848 bytes (about 11 KB of flash left), static RAM 42,644. **Verified on the real device:
+  the owner's upload of the next candidate went through this version's new `/update` handler**, so that handler is
+  now proven there (the rescue-mode library handler stays as the safety net). 1.2.0 follows on `ccr-dde9c129-d2ydij`
+  (PR #5).
+- **1.1.1 (2026-11-08)** was the stable release before it:, promoted from `1.1.1-rc.1` (same build, new version
   string) after the owner tested it on the device (PR #4 merged into `main` with a merge commit, branch deleted). It
   is fixes only: the Status-Portal screen's announcement ticker moved clear of the plastic (below).
 - **1.1.0 (2026-10-08)** was promoted from `1.1.0-rc.3` after the owner tested the candidates on the device (PR #3;
@@ -146,10 +157,23 @@ Founding constraints:
     access-point mode** (`web.cpp`: `authEnforced()` is `password set && !net::isAp()`), and it
     must keep covering **every** route except `/v.json`, the 404 / captive-portal answers and
     the library's own CORS preflight: a new route goes through `route()` (or calls `guard()` /
-    `authorized()` itself, as `/api/upload` does), and `POST /update` follows the same rule through
-    `updater.updateCredentials()`. The password is never returned by any GET or by the export
+    `authorized()` itself, as `/api/upload` does), and `POST /update` is our own handler in `web.cpp`
+    (`handleUpdateChunk()`, the library's steps) with the Origin check and `authorized()` in normal mode, and
+    **the library's `ESP8266HTTPUpdateServer` handler, with no credentials, in the rescue access point**
+    (`NormalModeOnlyHandler` refuses when `net::isAp()`, so the library's handler, the one verified on the device,
+    takes over; it is the safety net, keep it. It also accepts a `filesystem` field, hence confined to rescue mode
+    and our page). The password is never returned by any GET or by the export
     (`settings::toJson()` only writes it for the file on the device), and an import never
     touches it. Otherwise a forgotten password would brick the device without opening it.
+    **Cross-site requests (1.1.2).** Every request that is not a GET, HEAD or OPTIONS (every POST:
+    the API, `/wifi`, `/update`, `/api/upload`, `/api/backup/restore`) is refused with 403 when it carries an
+    `Origin` header whose host[:port] is not the `Host` header's (`origin_check.cpp`, called by `guard()` and
+    at the start of the three upload handlers). Origin is compared with Host, never with a list of names, so
+    the device's own pages pass however the owner reached it (IP, `status-esp.local`, a proxy that keeps Host)
+    and `/update` cannot be locked out. No Origin (curl, `tools/upload.*`) passes. **Not enforced in the rescue
+    access point**, like the password. Without this a page on another site could post to the device (the
+    browser even attaches its cached Basic credentials). `/set` and `/reboot` act on POST only (a GET is 405).
+    DNS rebinding is not covered (ROADMAP).
 
 ## 4. Privacy (public repository)
 - **Commit nothing personal**: name, e-mail, user name, user-profile or home-directory paths,
@@ -237,7 +261,8 @@ src/main.cpp                 setup() / loop() and the boot screens; everything e
 src/config.h                 FW_NAME / FW_FULL_NAME, pins, folder names, limits
 src/settings.{h,cpp}         every setting, /custom.json, validation (the same JSON as /api/settings)
 src/net.{h,cpp}              Wi-Fi state machine: boot delay, connection attempts, rescue AP, async scan
-src/web.{h,cpp}              HTTP routes, the JSON API, file upload / delete, /update page
+src/web.{h,cpp}              HTTP routes, the JSON API, file upload / delete, /update page and upload
+src/origin_check.{h,cpp}     the Origin-against-Host check for state-changing requests (pure: runs on the PC)
 src/timekeeping.{h,cpp}      SNTP (UTC) + the UTC offset applied by us, date formatting, night window
 src/weather.{h,cpp}          Open-Meteo fetch (streamed JSON), cache, back-off
 src/geocode.{h,cpp}          city search through Open-Meteo's geocoding API (explicit user action)
@@ -271,7 +296,13 @@ tools/make_release.py        makes dist/v<version>/ : Status-ESP-<version>.bin, 
 tools/release.sh             Linux: build + assets + tag + GitHub release (--dry-run supported)
 tools/upload.ps1 | upload.sh upload a .bin through /update, checking /v.json before and after
 tools/test_host.sh           builds and runs tests/host/ with the PC's g++ (needs one firmware build first)
-tests/host/                  parser and screen tests against a recording stand-in for TFT_eSPI (see section 15)
+tests/host/                  parser and screen tests against a recording stand-in for TFT_eSPI (see section 15);
+                             test_weather_screens.cpp covers the forecast, the clock and the weather clock;
+                             test_origin_check.cpp the cross-site check;
+                             test_mdns_dns.cpp the mDNS question parser and its fuzzer;
+                             test_backup.cpp the backup writer and the restore state machine (backup.cpp
+                             unchanged) against the in-memory LittleFS in tests/host/backup/, with a fuzzer
+                             that asserts rule 2 (nothing formatted, nothing deleted, only clean names written)
 tools/check_firmware.py      checks the Arduino CRC of a .bin (and extracts a firmware from a flash image)
 tools/analyze_firmware.py    analyses a firmware binary (segments, gzip pages, strings)
 docs/hardware.md             hardware, pinout, flash layout, size constraint
@@ -439,9 +470,9 @@ HTTP routes:
 | `GET /api/backup` | every LittleFS file + the Wi-Fi network as one tar; 403 in rescue mode (open hotspot) |
 | `POST /api/backup/restore` | multipart upload of such a tar, then reboot; checks the password itself, like `/api/upload` |
 | `POST /api/reboot`, `POST /api/factory-reset` | restart; delete `/custom.json` only, then restart |
-| `GET /update` | our page (firmware only), **declared before** `updater.setup()` because the server takes the first handler that matches |
-| `POST /update` | `ESP8266HTTPUpdateServer` handling (`firmware` field) |
-| `GET /set?brt=&blinv=`, `/wifi`, `/reboot` | the 0.1.0 routes, kept for compatibility |
+| `GET /update` | our page (firmware only) |
+| `POST /update` | normal mode: our upload handler (`firmware` field; Origin and password checked at the start); rescue AP: the library's `ESP8266HTTPUpdateServer` handler |
+| `POST /set?brt=&blinv=`, `POST /reboot`, `/wifi` | the 0.1.0 routes, kept for compatibility (`/set` and `/reboot` answer a GET with 405) |
 | `GET /v.json` | `{"m":"SmallTV-Ultra","v":"Status-ESP-<version>"}` (same shape as the stock firmware's) |
 | anything else | 404, or a redirect to `http://192.168.4.1/` in rescue mode (captive portal) |
 
@@ -463,8 +494,11 @@ HTTP routes:
   16 px label drawn at y 222..238 was cut off, and a label starting at x 3 is at the mercy of the left edge. Treat the
   last 16 px at the bottom as unusable, and keep text 8 px from the sides where it can be (the tests' "safe area":
   `tft.safeBottom`, `safeSide`, `safeSideBelow`, set by `tests/host/test_hourly.cpp` and by `show()` in
-  `test_portal_screens.cpp`). **Every screen the tests cover is held to it**: hourly, VMs, Resources (since 1.1.0-rc.3)
-  and Status-Portal (its ticker, since 1.1.1-rc.1).
+  `test_portal_screens.cpp`). **Every screen the tests cover is held to it**: hourly, VMs, Resources (since 1.1.0-rc.3),
+  Status-Portal (its ticker, since 1.1.1-rc.1), and the forecast, the clock (both layouts) and the weather clock (since 1.1.2-rc.1,
+  `tests/host/test_weather_screens.cpp`). The owner noticed that the word clock's four minute dots at y 228..234 ARE
+  visible on their device, only small: the 16 px figure is conservative, so keep to it, but a few px inside it is not a
+  disaster (the word clock was left alone). The alert dot's outer ring is 8 px from the top and right edges.
 
 ## 13. Known pitfalls
 - The classic XOR checksum of ESP8266 images does not match on Arduino binaries: `elf2bin.py`
@@ -525,17 +559,18 @@ there, not here; when something ships, remove it from `ROADMAP.md` (the changelo
 exists). Check every idea against the 520,000-byte limit and the memory rule first.
 
 ## 15. Resuming work (read this first if you are a new session)
-1. **State.** `main` holds 1.1.1, stable (section 2). Read section 2, then `git log --oneline -15`,
+1. **State.** `main` holds 1.1.2, stable (section 2). Read section 2, then `git log --oneline -15`,
    `CHANGELOG.md` and `ROADMAP.md`. Nothing is half-done on a branch unless `git branch -a` says so.
 2. **Toolchain** (project-local, created by `bash tools/setup.sh`, git-ignored): build with
    `PLATFORMIO_CORE_DIR=$PWD/.pio-core .venv/bin/pio run`, check the image with
    `.venv/bin/python tools/check_firmware.py .pio/build/smalltv-ultra/firmware.bin`, run the PC
    tests with `bash tools/test_host.sh` (it needs one firmware build first: it borrows ArduinoJson from
    `.pio/libdeps`; it stops at the first test program that fails, so run a later one by hand to see it fail too).
-   Run the tests after every change to `portal_*`, `weather_hourly.*` or any `screen_*.cpp`
-   they cover (`screen_portal`, `screen_resources`, `screen_vms`, `screen_hourly`); they take seconds and
-   catch layout overflows (the stand-in knows font 2 and 4 only: do not use another font in one of those
-   screens without teaching it to `tests/host/TFT_eSPI.h`).
+   Run the tests after every change to `portal_*`, `weather_hourly.*`, `origin_check.*`, `mdns_dns.*`, `backup.cpp` or any `screen_*.cpp`
+   they cover (`screen_portal`, `screen_resources`, `screen_vms`, `screen_hourly`, `screen_forecast`, `screen_clock`, `screen_weather`);
+   they take seconds and catch layout overflows (the stand-in knows fonts 2, 4, 6, 7 and 8, with the real widths and
+   heights from the TFT_eSPI font tables: do not use another font in one of those screens without teaching it to
+   `tests/host/TFT_eSPI.h`).
 3. **Seeing a screen without eyes.** Set `PORTAL_OPS_DIR=<dir>` when running the screen tests: every
    scenario writes its drawing calls as JSON lines (`{"op":"rect"|"text"|"line"|"icon"|...}`), and a throw-away
    script that replays them with Pillow gives a picture (the weather icons are stubbed in the hourly test and

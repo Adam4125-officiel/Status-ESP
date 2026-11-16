@@ -1,11 +1,11 @@
 // Theme "forecast": the three days after today, side by side.
 //
-//   y   6..22   the chosen city (trimmed to fit)
+//   y   6..22   the chosen city (at most 200 px wide, so it stays clear of the alert dot at the top right)
 //   y  32..58   weekday
 //   y  72..128  icon (day version)
 //   y 138..164  highest temperature, warm colour
 //   y 170..196  lowest temperature, cool colour
-//   y 214..230  legend and the temperature unit
+//   y 206..222  legend and the temperature unit (nothing below y 224: the plastic over the glass hides it)
 //
 // Nothing here changes between two weather updates, so Update(false) only checks whether
 // weather::data() is new (or the reason for having none changed) and otherwise does nothing.
@@ -26,7 +26,7 @@ const int16_t CITY_Y = 6;
 const int16_t WEEKDAY_Y = 32;
 const int16_t ICON_CY = 100, ICON_SIZE = 56;
 const int16_t HIGH_Y = 138, LOW_Y = 170;
-const int16_t FOOT_Y = 214;
+const int16_t FOOT_Y = 206;
 const int16_t DIVIDER_TOP = 32, DIVIDER_BOTTOM = 200;
 
 const uint16_t HIGH_COLOR = TFT_ORANGE;
@@ -42,7 +42,9 @@ void clearScreen() { tft.fillRect(0, 0, config::SCREEN_W, config::SCREEN_H, TFT_
 void drawCity() {
   char name[sizeof(settings::get().city)];
   strlcpy(name, settings::get().city, sizeof(name));
-  const int16_t maxW = config::SCREEN_W - 8;
+  // 200 px, centred: x 20..220. That keeps the name clear of the sides (the plastic) and of the alert dot that
+  // display.cpp draws in the top-right corner (its ring spans x 220..232, y 8..20).
+  const int16_t maxW = 200;
   size_t len = strlen(name);
   if (tft.textWidth(name, 2) > maxW) {
     while (len > 3 && tft.textWidth(name, 2) + tft.textWidth("...", 2) > maxW) name[--len] = '\0';
