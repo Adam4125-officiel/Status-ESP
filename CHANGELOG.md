@@ -16,6 +16,13 @@ changes the first, second and third number, and what a `-rc.N` pre-release is) i
   original is sent when it is a JPG, with a message; otherwise the upload is refused. This lifts, for pictures
   uploaded this way, the album's progressive-JPEG, rotation and size limits, and makes big photos load faster. The
   firmware is unchanged by it; only the page grew.
+- **"Check for updates" in Settings, Firmware.** One click asks GitHub whether a newer release exists (stable only,
+  or the newest pre-release too when "include pre-releases" is ticked) and shows either "You have the latest
+  version", or the new version with links to its release page and its `.bin`, and a reminder to upload that file on
+  the Firmware update page. It is your browser that contacts github.com, only when you click: the device still
+  cannot do TLS and sends nothing. GitHub limits anonymous requests; the page says so if you hit that. The version
+  comparison (`-rc.N` older than the same stable) is tested on the PC (`tests/web/test_cmp_ver.js`, run by
+  `tools/test_host.sh` when Node is installed).
 
 ## [1.1.2-rc.1] - 2026-11-16
 

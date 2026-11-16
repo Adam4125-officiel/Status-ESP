@@ -30,7 +30,9 @@ Version numbers follow [docs/releasing.md](docs/releasing.md): new features bump
   in what is left. 0.3.0-rc.3 is 489,488 bytes against the 520,000-byte limit (about 30 KB of
   flash left, and the next feature, the Status-Portal client, also has to fit), and the TLS code plus its buffers would cost more than that in flash and a large
   contiguous block of the little heap that is left (see the GIF memory note below). Settle this
-  first, then: following the GitHub redirect to the download host, MD5 check with the `Updater`
+  first. **What exists instead (1.2.0):** the web interface's "Check for updates" button, where the *browser*
+  asks GitHub's API and links to the `.bin` to upload on `/update` by hand; it never installs anything. If the
+  on-device updater is ever built, then: following the GitHub redirect to the download host, MD5 check with the `Updater`
   class, never installing a pre-release automatically, and `/update` must stay reachable
   whatever the updater does.
 

@@ -358,6 +358,10 @@ a{color:#8cf}
     <h3>Firmware</h3>
     <a class="btn warn" href="/update">Firmware update</a>
     <p class="hint">To go back to the stock firmware, upload the official GeekMagic firmware (.bin) on the same page.</p>
+    <button type="button" class="alt" id="upd-check">Check for updates</button>
+    <label class="inline"><input type="checkbox" id="upd-pre"> include pre-releases</label>
+    <p id="upd-res"></p>
+    <p class="hint">Only when you click: your browser, not the device, contacts github.com.</p>
   </div>
 
   <div class="card">
@@ -704,6 +708,41 @@ function uploadPicture() {
   });
 }
 
+/* >>> cmpVer */
+// > 0 when version a is newer than b ("v1.2.0", "1.2.0-rc.2"); a stable one beats any -rc.N; NaN if unreadable.
+function cmpVer(a, b) {
+  function p(v) {
+    var m = /^v?(\d+)\.(\d+)\.(\d+)(-rc\.(\d+))?$/.exec(v);
+    return m && [+m[1], +m[2], +m[3], m[5] === undefined ? 1e9 : +m[5]];
+  }
+  var x = p(a), y = p(b), i;
+  if (!x || !y) return NaN;
+  for (i = 0; i < 4; i++) if (x[i] !== y[i]) return x[i] - y[i];
+  return 0;
+}
+/* <<< cmpVer */
+
+function checkUpdate() {
+  var res = $("#upd-res"), pre = $("#upd-pre").checked;
+  function link(u, t) { return /^https:\/\//.test(u) ? [el("a", { href: u, target: "_blank", rel: "noopener", text: t }), document.createTextNode(" ")] : []; }
+  res.textContent = "Checking...";
+  fetch("https://api.github.com/repos/Adam4125-officiel/Status-ESP/releases" + (pre ? "?per_page=10" : "/latest"), { headers: { Accept: "application/vnd.github+json" } }).then(function (r) {
+    if (!r.ok) throw new Error(r.status === 403 || r.status === 429 ? "GitHub's rate limit is reached, try again later (HTTP " + r.status + ")" : "HTTP " + r.status);
+    return r.json();
+  }).then(function (j) {
+    var rel = pre ? (j || []).filter(function (x) { return !x.draft; })[0] : j, cur = ST.version, d = rel && cmpVer(rel.tag_name, cur);
+    if (!rel || d !== d) throw new Error("no readable release (running " + cur + ")");
+    var v = rel.tag_name.replace(/^v/, "");
+    res.textContent = "";
+    if (d <= 0) { res.textContent = "You have the latest version (" + cur + ")."; return; }
+    var bin = (rel.assets || []).filter(function (x) { return /\.bin$/.test(x.name); })[0];
+    res.appendChild(el("b", { text: "Version " + v + (rel.prerelease ? " (pre-release)" : "") + " is available. " }));
+    link(rel.html_url, "Release page").concat(bin ? link(bin.browser_download_url, bin.name) : []).forEach(function (n) { res.appendChild(n); });
+    res.appendChild(el("br"));
+    res.appendChild(document.createTextNode("Download the .bin, then upload it on the Firmware update page."));
+  }).catch(function (e) { res.textContent = "Could not reach GitHub: " + e.message; });
+}
+
 /* ---- City search --------------------------------------------------------------------------- */
 
 function searchCity(ev) {
@@ -799,6 +838,7 @@ function init() {
   $("#gif-up").onclick = function () { upload("/gif", $("#gif-file"), $("#gif-prog"), ["gif"]); };
   $("#gif-none").onclick = function () { save({ weather_gif: "" }, "No GIF on the weather screen").then(function () { loadFiles("/gif"); }, function () {}); };
   $("#img-up").onclick = uploadPicture;
+  $("#upd-check").onclick = checkUpdate;
   $("#img-fit").onchange = function () { $("#img-file").accept = this.value === "raw" ? ".jpg,.jpeg,.gif,image/jpeg,image/gif" : "image/*,.jpg,.jpeg,.gif"; };
 
   // Brightness: live while the slider moves (not saved), saved when it is released.

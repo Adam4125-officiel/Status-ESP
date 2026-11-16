@@ -56,7 +56,8 @@ Founding constraints:
   free heap about 31 KB at rest (largest block about 30 KB), measured on the device with 1.1.0.**
   Flash and RAM are both nearly spent: a feature has to find savings first (ROADMAP, "Memory").
   Read `heap`, `max_block` and `req_heap` in `/api/status` after any change that allocates.
-- **What the firmware has**: a six-tab web interface and JSON API; Open-Meteo weather with
+- **What the firmware has**: a six-tab web interface and JSON API (it prepares album pictures in the browser, and its "Check for
+  updates" button asks GitHub from the browser, never from the device); Open-Meteo weather with
   diagnostics; NTP time with automatic or manual time zone; JPG and animated GIF playback from
   `/image` and `/gif`; night mode; a Wi-Fi boot delay; factory reset; the `status-esp.local`
   mDNS name; settings export and import; an optional web password; a full backup and restore of

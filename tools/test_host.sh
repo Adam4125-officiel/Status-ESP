@@ -81,3 +81,10 @@ g++ -std=gnu++17 -O1 -g -Wall -Wextra -Werror -Wno-maybe-uninitialized \
     tests/host/test_backup.cpp src/backup.cpp \
     -o "$out/test_backup"
 "$out/test_backup"
+
+# The web page's version comparison (web/index.html, between its marker comments); needs Node, skipped without it.
+if command -v node >/dev/null 2>&1; then
+  node tests/web/test_cmp_ver.js
+else
+  echo "node not found: skipping tests/web/test_cmp_ver.js"
+fi
