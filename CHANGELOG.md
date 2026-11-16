@@ -5,7 +5,11 @@ All notable changes to this project are documented in this file. The format foll
 changes the first, second and third number, and what a `-rc.N` pre-release is) is in
 [docs/releasing.md](docs/releasing.md).
 
-## [1.2.0-rc.1] - 2026-11-16
+## [1.2.0] - 2026-11-16
+
+Promoted from `1.2.0-rc.1` (the same build with a new version string) after the owner installed it on their device and
+found it good. Install it through the device's `/update` page like any release; the stock firmware stays one upload
+away. It contains everything in 1.1.2. Works with the same Status-Portal as 1.1.x (1.11.1 for everything).
 
 ### Added
 - **Night mode: a night theme.** In Settings, Night mode, "Theme at night" shows the chosen theme (for example the
