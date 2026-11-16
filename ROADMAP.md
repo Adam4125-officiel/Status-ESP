@@ -16,9 +16,13 @@ Version numbers follow [docs/releasing.md](docs/releasing.md): new features bump
 - **GIFs and the heap.** A GIF now needs 26 KB free to open (it was 31 KB, with 0.5 KB of slack
   at idle), and yields to web requests (see CLAUDE.md, rule 10). Still open: the decoder is one
   24.3 KB block, so a GIF plays with about 6 KB of heap left, and a fetch (weather, portal)
-  closes it and restarts it. Lowering static RAM (42.6 KB, of which the Status-Portal cache is
-  2.4 KB and about 10 KB is string literals the toolchain keeps in RAM, 3.5 KB of them in
-  `web.cpp`) would give every GIF more room. Not seen on the device with the album's own pictures:
+  closes it and restarts it. Lowering static RAM (42.7 KB, of which the Status-Portal cache is
+  2.4 KB and `.rodata`, the string literals the toolchain keeps in RAM, is 9.4 KB) would give every GIF more room. Looked at
+  in 1.2.0 and left alone: `web.cpp` already passes its text through `F()` wherever the call takes a flash string,
+  and what is left is the JSON keys (ArduinoJson reads a key through a plain pointer, and copies an `F()` key into
+  the heap), strings handed out as `const char *` (the weather descriptions, the media, backup and weather error
+  messages) and the file-system library's own trace names (about 0.4 KB). Moving those means changing APIs or trading
+  static RAM for heap, which is the scarcer of the two while a GIF plays; no safe 1 KB was found. Not seen on the device with the album's own pictures:
   progressive JPEGs are skipped with a message, and the baseline ones all decode with the
   decoder's 3.5 KB workspace (checked on a PC against every picture on the device).
 
