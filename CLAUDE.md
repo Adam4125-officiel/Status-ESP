@@ -448,6 +448,13 @@ Status-Portal client (0.4.0, `portal*.{h,cpp}`, `screen_portal.cpp`, `screen_res
 - **Alerts** (`portal_alert`): `switch` makes the Status-Portal screen take over while the portal
   reports a problem and give the screen back afterwards; `indicator` draws a red or orange dot in the
   corner of every other theme; `off` does neither (`display.cpp`, `updateAlertSwitch()` / `updateAlertDot()`).
+- **Night mode extras** (1.2.0, `display.cpp` `updateNightSwitch()`, `night.h`, `timekeeping::inNightWindow()`): `night_theme`
+  shows a theme while the night window lasts and pauses the rotation, built like the alert take-over. Priority: an
+  alert in `switch` mode, then the night theme, then the manual theme or the rotation. A theme change in the settings
+  during the night (the web interface's "Try" included) ends the take-over until the window ends (`nightPaused`).
+  `night_sun` makes the window sunset -> sunrise of the weather city, compared with the CITY's minutes (not the
+  screen's clock), falling back to the fixed times without weather or with a missing time. `night.h` is pure and
+  tested on the PC (`tests/host/test_night.cpp`); `display.cpp` is not.
 - **Diagnostics** are shown in the web interface's Status-Portal tab and in `/api/status`
   (`portal_on`, `portal_ok`, `portal_age`, `portal_overall`, `portal_err`, `portal_try_age`,
   `portal_fails`, `portal_http`): when the screens say "unreachable", read those first.

@@ -56,6 +56,11 @@ g++ -std=gnu++17 -O1 -g -Wall -Wextra -Werror -Wno-maybe-uninitialized -Wno-form
     -o "$out/test_weather_screens"
 "$out/test_weather_screens"
 
+# The night window (night.h): fixed times, sunset -> sunrise, the fallback and the two clocks. Pure.
+g++ -std=gnu++17 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -fno-sanitize-recover=undefined \
+    -Isrc tests/host/test_night.cpp -o "$out/test_night"
+"$out/test_night"
+
 # The cross-site check on the web API (origin_check.cpp): pure, strings in, verdict out.
 g++ -std=gnu++17 -O1 -g -Wall -Wextra -Werror \
     -fsanitize=address,undefined -fno-sanitize-recover=undefined \

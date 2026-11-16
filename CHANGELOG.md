@@ -8,6 +8,16 @@ changes the first, second and third number, and what a `-rc.N` pre-release is) i
 ## [1.2.0-rc.1] - 2026-11-16
 
 ### Added
+- **Night mode: a night theme.** In Settings, Night mode, "Theme at night" shows the chosen theme (for example the
+  clock) for as long as the night window lasts and pauses the auto-switch; when the window ends the screen goes
+  back to the theme or the rotation of the settings. "No change" (the default) keeps today's behaviour: night
+  mode only dims. A Status-Portal alert in "switch" mode still takes the screen first. A theme you choose during the
+  night (the "Try" button included) stays until the window ends, so the two never fight. New setting `night_theme`
+  (a theme name, or ""), in the settings file, the API and the export.
+- **Night mode: from sunset to sunrise.** The new "From sunset to sunrise" box makes the night window the one of the
+  weather city (the times above are used until the weather is known, and when the sun does not rise or set). The
+  comparison is made in the city's own time, so a manual time zone does not shift it. New setting `night_sun` (0 or
+  1, off by default). The window logic (`night.h`) is tested on the PC (`tests/host/test_night.cpp`).
 - **The weather screens say when their data is old.** When the weather cannot be refreshed (the network or
   Open-Meteo is down), the last answer used to stay on screen as if it were fresh. Now, once it is older than twice
   the refresh interval and at least 90 minutes, a yellow hint appears: "Weather 3 h old" in the sun row of the

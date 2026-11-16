@@ -63,6 +63,8 @@ static void defaults(Settings &s) {
   s.nightStart = 22 * 60;
   s.nightEnd = 7 * 60;
   s.nightBrightness = 10;
+  s.nightTheme = NIGHT_THEME_NONE;
+  s.nightSun = false;
   s.portalInterval = 60;
   s.portalPage = 6;
   s.portalSections = portal::SEC_ALL;
@@ -186,7 +188,8 @@ static uint32_t diff(const Settings &a, const Settings &b) {
   if (a.theme != b.theme || a.autoSwitch != b.autoSwitch || a.autoInterval != b.autoInterval ||
       a.autoMask != b.autoMask) ch |= CH_THEME;
   if (a.nightEnabled != b.nightEnabled || a.nightStart != b.nightStart || a.nightEnd != b.nightEnd ||
-      a.nightBrightness != b.nightBrightness) ch |= CH_NIGHT;
+      a.nightBrightness != b.nightBrightness || a.nightTheme != b.nightTheme || a.nightSun != b.nightSun)
+    ch |= CH_NIGHT;
   if (a.hourRgb != b.hourRgb || a.minRgb != b.minRgb || a.secRgb != b.secRgb || a.hour12 != b.hour12 ||
       a.dateFormat != b.dateFormat || a.colonBlink != b.colonBlink || a.clockFont != b.clockFont) ch |= CH_CLOCK;
   if (a.tzAuto != b.tzAuto || a.tzOffsetMin != b.tzOffsetMin) ch |= CH_TIMEZONE;
@@ -288,6 +291,12 @@ uint32_t apply(JsonObjectConst obj) {
   if (obj["night_start"].is<const char *>() && parseClock(obj["night_start"].as<const char *>(), minutes)) S.nightStart = minutes;
   if (obj["night_end"].is<const char *>() && parseClock(obj["night_end"].as<const char *>(), minutes)) S.nightEnd = minutes;
   if (readInt(obj["night_brt"], 0, 100, n)) S.nightBrightness = (uint8_t)n;
+  if (obj["night_theme"].is<const char *>()) {   // "" = none; a name that is not a theme is ignored
+    const char *name = obj["night_theme"].as<const char *>();
+    if (name[0] == '\0') S.nightTheme = NIGHT_THEME_NONE;
+    else if (themeFromName(name, t)) S.nightTheme = t;
+  }
+  if (readBool(obj["night_sun"], b)) S.nightSun = b;
 
   if (obj["pw"].is<const char *>()) {
     str = obj["pw"].as<const char *>();
@@ -368,6 +377,8 @@ void toJson(JsonDocument &doc, bool secrets) {
   snprintf(buf, sizeof(buf), "%02u:%02u", S.nightEnd / 60, S.nightEnd % 60);
   doc["night_end"] = String(buf);
   doc["night_brt"] = S.nightBrightness;
+  doc["night_theme"] = S.nightTheme < THEME_COUNT ? themeName(S.nightTheme) : "";
+  doc["night_sun"] = S.nightSun ? 1 : 0;
 
   doc["portal_url"] = String(S.portalUrl);
   doc["portal_interval"] = S.portalInterval;

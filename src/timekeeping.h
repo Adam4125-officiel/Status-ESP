@@ -33,8 +33,9 @@ void formatDate(char *buf, size_t size, const struct tm &t);
 const char *weekdayName(int wday, bool full);   // 0 = Sunday; "Mon" / "Monday"
 const char *monthName(int month, bool full);    // 0 = January; "Oct" / "October"
 
-// Night mode: enabled in the settings AND the local time is inside [start, end), the
-// window may cross midnight. False while the clock is unset.
+// Night mode: enabled in the settings AND the time is inside the window (night.h): [start, end) on the
+// screen's clock, or sunset -> sunrise of the weather city when night_sun is on and the weather is known.
+// The window may cross midnight. False while the clock is unset.
 bool inNightWindow();
 
 }  // namespace timekeeping
