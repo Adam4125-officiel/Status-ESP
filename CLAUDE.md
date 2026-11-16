@@ -27,6 +27,14 @@ Founding constraints:
 - The stock files on the device (images, settings, Wi-Fi) stay untouched.
 
 ## 2. Current state (handover)
+- **1.1.2-rc.1 is a release candidate (2026-11-16), not yet tested on the device.** Fixes plus one small addition asked
+  for by the owner: the weather clock, the forecast, the clock and the alert dot moved clear of the plastic; the weather
+  clock draws the current conditions' icon beside the temperature when a GIF is chosen; cross-site POSTs are refused
+  (`origin_check`, rule 11) and `POST /update` is our own handler in normal Wi-Fi mode, the library's in rescue mode;
+  `/set` and `/reboot` act on POST only; new PC tests for the weather screens, the mDNS parser and the backup restore.
+  `firmware.bin` is 508,848 bytes (about 11 KB of flash left), static RAM 42,644. **First thing to check on the
+  device: an upload through the new `/update` handler** (if it fails, the rescue hotspot still has the old one). The
+  work sits on the session branch `ccr-dde9c129-d2ydij` (PR #5), where 1.2.0 follows it.
 - **1.1.1 is the current stable release (2026-11-08)**, promoted from `1.1.1-rc.1` (same build, new version
   string) after the owner tested it on the device (PR #4 merged into `main` with a merge commit, branch deleted). It
   is fixes only: the Status-Portal screen's announcement ticker moved clear of the plastic (below).
