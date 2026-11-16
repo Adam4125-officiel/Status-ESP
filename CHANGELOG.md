@@ -31,6 +31,9 @@ changes the first, second and third number, and what a `-rc.N` pre-release is) i
 - `POST /update` is now handled by the firmware's own code (the same steps as the library it replaced: begin, write,
   end, restart) so that the check above can run before anything is written. The "filesystem" field the library also
   took is no longer accepted. This saves about 1 KB of flash.
+- The PC tests now also cover the mDNS question parser (`status-esp.local`): valid and other-name questions, every
+  truncation, looping and out-of-range name pointers, lying counts and lengths, and 60,000 mutated packets under the
+  sanitizers. They found no bug; the firmware code is unchanged.
 
 ### Fixed
 - **The weather clock no longer draws into the part of the glass the plastic hides.** Humidity, wind and pressure were

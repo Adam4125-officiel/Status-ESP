@@ -63,3 +63,11 @@ g++ -std=gnu++17 -O1 -g -Wall -Wextra -Werror \
     tests/host/test_origin_check.cpp src/origin_check.cpp \
     -o "$out/test_origin_check"
 "$out/test_origin_check"
+
+# The mDNS responder's DNS side (mdns_dns.cpp): parses questions from any machine on the LAN.
+g++ -std=gnu++17 -O1 -g -Wall -Wextra -Werror \
+    -fsanitize=address,undefined -fno-sanitize-recover=undefined \
+    -Itests/host -Isrc \
+    tests/host/test_mdns_dns.cpp src/mdns_dns.cpp \
+    -o "$out/test_mdns_dns"
+"$out/test_mdns_dns"
