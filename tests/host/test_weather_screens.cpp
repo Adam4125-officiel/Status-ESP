@@ -586,11 +586,156 @@ static void clockTests() {
   clockCase("clock_large_12h", settings::FONT_LARGE, true);
 }
 
+// ---- Stale weather ---------------------------------------------------------------------------------
+
+// Makes the data `minutes` old (the answer arrived then) with the given refresh interval.
+static void makeOld(uint32_t minutes, uint16_t interval = 20) {
+  g_settings.weatherInterval = interval;
+  g_ms = 100000000UL;
+  g_weather.updatedAtMs = g_ms - minutes * 60000UL;
+}
+
+static void staleTests() {
+  // The rule: older than twice the interval and at least 90 minutes.
+  CHECK(weather::staleMinutes(0, 20) == 0);
+  CHECK(weather::staleMinutes(89UL * 60000, 20) == 0);
+  CHECK(weather::staleMinutes(90UL * 60000, 20) == 0);        // not yet: strictly older
+  CHECK(weather::staleMinutes(91UL * 60000, 20) == 91);
+  CHECK(weather::staleMinutes(150UL * 60000, 60) == 150);     // twice 60 min = 120 min
+  CHECK(weather::staleMinutes(119UL * 60000, 60) == 0);
+  CHECK(weather::staleMinutes(361UL * 60000, 180) == 361);    // 3 h interval: stale after 6 h
+  CHECK(weather::staleMinutes(359UL * 60000, 180) == 0);
+  char buf[16];
+  weather::formatAge(buf, sizeof(buf), 91);
+  CHECK(!strcmp(buf, "1 h old"));
+  weather::formatAge(buf, sizeof(buf), 3 * 60 + 59);
+  CHECK(!strcmp(buf, "3 h old"));
+  weather::formatAge(buf, sizeof(buf), 24 * 60);
+  CHECK(!strcmp(buf, "1 d old"));
+  weather::formatAge(buf, sizeof(buf), 49 * 24 * 60);
+  CHECK(!strcmp(buf, "49 d old"));
+  CHECK(weather::ageBucket(0) == 0 && weather::ageBucket(91) == 1 && weather::ageBucket(179) == 2 &&
+        weather::ageBucket(180) == 3 && weather::ageBucket(24 * 60) != weather::ageBucket(23 * 60 + 59));
+
+  // millis() wrapping: a fetch just before the wrap, now just after it, is 10 minutes old, not 49 days.
+  defaults();
+  install();
+  g_ms = 600000;
+  g_weather.updatedAtMs = (uint32_t)(g_ms - 10UL * 60000);
+  CHECK(weather::staleMinutes() == 0);
+  g_weather.valid = false;
+  g_ms = 100000000UL;
+  g_weather.updatedAtMs = 1;
+  CHECK(weather::staleMinutes() == 0);   // no data, nothing to call old
+
+  // Fresh data: no hint on any of the three screens' weather clock / forecast.
+  defaults();
+  install();
+  showWeather("none");
+  CHECK(drew("17:05"));
+  for (const std::string &d : tft.drawn) CHECK(d.find(" old") == std::string::npos);
+  show("none", screenForecastEnter, screenForecastUpdate);
+  for (const std::string &d : tft.drawn) CHECK(d.find(" old") == std::string::npos);
+
+  // Weather clock, stale: the hint takes the sun row, and nothing else moves.
+  defaults();
+  install();
+  g_settings.weatherInterval = 20;
+  makeOld(0);
+  g_weather.updatedAtMs = g_ms;
+  showWeather("none");
+  CHECK(drew("07:42") && drew("17:05"));
+  g_ms += 3UL * 3600000 + 600000;    // 3 h 10 min later: the fetches keep failing
+  tft.resetStats();
+  screenWeatherUpdate(false);
+  CHECK(drew("Weather 3 h old") && !drew("07:42"));
+  CHECK(tft.ops > 0 && tft.ops <= 3);   // a row cleared and one string, not the whole area
+  expectClean("weather clock, stale");
+  tft.resetStats();
+  screenWeatherUpdate(false);
+  CHECK(tft.ops == 0);
+  g_ms += 40UL * 60000;               // still the same hour: nothing
+  tft.resetStats();
+  screenWeatherUpdate(false);
+  CHECK(tft.ops == 0);
+  g_ms += 30UL * 60000;               // 4 h: the text changes, once
+  tft.resetStats();
+  screenWeatherUpdate(false);
+  CHECK(drew("Weather 4 h old") && tft.ops > 0 && tft.ops <= 3);
+  tft.resetStats();
+  screenWeatherUpdate(false);
+  CHECK(tft.ops == 0);
+  // A fetch works again: the whole area is drawn from the new answer and the sun times are back.
+  g_weather.updatedAtMs = g_ms;
+  tft.resetStats();
+  screenWeatherUpdate(false);
+  CHECK(drew("07:42") && drew("17:05") && !drew("Weather 4 h old"));
+  expectClean("weather clock, fresh again");
+
+  // The worst cases: a GIF playing (it must not restart for the hint), 12-hour format, days old.
+  defaults();
+  install();
+  strlcpy(g_settings.weatherGif, "cat.gif", sizeof(g_settings.weatherGif));
+  g_settings.hour12 = true;
+  showWeather("none");
+  CHECK(g_gifOpens == 1);
+  g_ms += 49UL * 24 * 3600000;   // 49 days without an answer (millis() is about to wrap)
+  beginFrame("weather_stale_gif_12h_days");
+  tft.resetStats();
+  screenWeatherUpdate(false);
+  CHECK(drew("Weather 49 d old") && g_gifOpens == 1 && g_gifOpen);
+  expectClean("weather clock, stale, GIF, days");
+  showWeather("weather_stale_gif_12h");   // a full repaint with stale data: rendered from scratch
+  expectClean("weather clock, stale, full repaint");
+  CHECK(drew("Weather 49 d old"));
+
+  // The same, painted from scratch (what a picture shows), with and without a GIF.
+  defaults();
+  install();
+  g_weather.updatedAtMs = g_ms - 3UL * 3600000 - 600000;
+  showWeather("weather_stale_3h");
+  CHECK(drew("Weather 3 h old"));
+  expectClean("weather clock, stale, painted from scratch");
+
+  // Forecast, stale: "<city> - 3 h old", the city centred with it, repainted once per hour.
+  defaults();
+  install();
+  g_settings.weatherInterval = 20;
+  g_ms = 100000000UL;
+  g_weather.updatedAtMs = g_ms - 3UL * 3600000 - 600000;
+  show("forecast_stale", screenForecastEnter, screenForecastUpdate);
+  CHECK(drew("Paris") && drew(" - 3 h old"));
+  expectClean("forecast, stale");
+  tft.resetStats();
+  screenForecastUpdate(false);
+  CHECK(tft.ops == 0);
+  g_ms += 20UL * 60000;
+  tft.resetStats();
+  screenForecastUpdate(false);
+  CHECK(tft.ops == 0);
+  g_ms += 40UL * 60000;      // 4 h 10 min
+  tft.resetStats();
+  screenForecastUpdate(false);
+  CHECK(tft.ops > 0 && drew(" - 4 h old"));
+  expectClean("forecast, stale, next hour");
+  // Longest city name and two-digit days.
+  strlcpy(g_settings.city, "Llanfairpwllgwyngyllgogerychwyrndrobwllllantysiliogogogoch", sizeof(g_settings.city));
+  g_weather.updatedAtMs = g_ms - 12UL * 24 * 3600000;
+  show("forecast_stale_long", screenForecastEnter, screenForecastUpdate);
+  CHECK(drew(" - 12 d old"));
+  expectClean("forecast, stale, longest city");
+  g_settings.hour12 = true;
+  g_settings.tempUnit = settings::TEMP_F;
+  show("none", screenForecastEnter, screenForecastUpdate);
+  expectClean("forecast, stale, 12 h, F");
+}
+
 int main() {
   g_opsDir = getenv("PORTAL_OPS_DIR");
   weatherTests();
   weatherPictures();
   forecastTests();
+  staleTests();
   clockTests();
   if (tft.log) fclose(tft.log);
   printf("%d checks, %d failed\n", checks, failures);

@@ -16,9 +16,13 @@ Version numbers follow [docs/releasing.md](docs/releasing.md): new features bump
 - **GIFs and the heap.** A GIF now needs 26 KB free to open (it was 31 KB, with 0.5 KB of slack
   at idle), and yields to web requests (see CLAUDE.md, rule 10). Still open: the decoder is one
   24.3 KB block, so a GIF plays with about 6 KB of heap left, and a fetch (weather, portal)
-  closes it and restarts it. Lowering static RAM (42.6 KB, of which the Status-Portal cache is
-  2.4 KB and about 10 KB is string literals the toolchain keeps in RAM, 3.5 KB of them in
-  `web.cpp`) would give every GIF more room. Not seen on the device with the album's own pictures:
+  closes it and restarts it. Lowering static RAM (42.7 KB, of which the Status-Portal cache is
+  2.4 KB and `.rodata`, the string literals the toolchain keeps in RAM, is 9.4 KB) would give every GIF more room. Looked at
+  in 1.2.0 and left alone: `web.cpp` already passes its text through `F()` wherever the call takes a flash string,
+  and what is left is the JSON keys (ArduinoJson reads a key through a plain pointer, and copies an `F()` key into
+  the heap), strings handed out as `const char *` (the weather descriptions, the media, backup and weather error
+  messages) and the file-system library's own trace names (about 0.4 KB). Moving those means changing APIs or trading
+  static RAM for heap, which is the scarcer of the two while a GIF plays; no safe 1 KB was found. Not seen on the device with the album's own pictures:
   progressive JPEGs are skipped with a message, and the baseline ones all decode with the
   decoder's 3.5 KB workspace (checked on a PC against every picture on the device).
 
@@ -30,7 +34,9 @@ Version numbers follow [docs/releasing.md](docs/releasing.md): new features bump
   in what is left. 0.3.0-rc.3 is 489,488 bytes against the 520,000-byte limit (about 30 KB of
   flash left, and the next feature, the Status-Portal client, also has to fit), and the TLS code plus its buffers would cost more than that in flash and a large
   contiguous block of the little heap that is left (see the GIF memory note below). Settle this
-  first, then: following the GitHub redirect to the download host, MD5 check with the `Updater`
+  first. **What exists instead (1.2.0):** the web interface's "Check for updates" button, where the *browser*
+  asks GitHub's API and links to the `.bin` to upload on `/update` by hand; it never installs anything. If the
+  on-device updater is ever built, then: following the GitHub redirect to the download host, MD5 check with the `Updater`
   class, never installing a pre-release automatically, and `/update` must stay reachable
   whatever the updater does.
 
@@ -64,15 +70,15 @@ get in the way; remove a line when it is no longer true.
   look there first. Not measured on the device.
 - **Weather screen GIF is not clipped to its 80x80 box.** A larger GIF (say 240x240) draws over
   the rest of the screen. The web interface says "80x80"; the firmware does not enforce it.
-- **Album pictures:** baseline JPEGs only (progressive ones are skipped with a message), EXIF
-  rotation is ignored, a picture over about 1,900 pixels on a side is refused, GIFs are not
-  scaled (a canvas wider than 480 pixels is refused, one larger than the screen is cropped),
-  sub-folders are not read, and a GIF is cut off at the end of its slot rather than at the end
-  of a loop. `/image` also holds the stock firmware's own pictures (for example `boot.jpg`):
+- **Album pictures:** the web interface now prepares them (240 x 240 baseline JPEG, EXIF rotation applied), so
+  the next limits only apply to a file uploaded with "Do not resize" or by another tool: baseline JPEGs only
+  (progressive ones are skipped with a message), EXIF rotation is ignored, a picture over about 1,900 pixels on a
+  side is refused. GIFs are never prepared and are not scaled (a canvas wider than 480 pixels is refused, one
+  larger than the screen is cropped), sub-folders are not read, and a GIF is cut off at the end of its slot rather
+  than at the end of a loop. `/image` also holds the stock firmware's own pictures (for example `boot.jpg`):
   they show in the album and the web interface can delete them.
-- **Stale weather looks like fresh weather.** If the weather cannot be refreshed, the last data
-  stays on screen with no "last updated" hint; only a device that never got any data says so.
-  Across midnight the forecast keeps its old days until the next successful fetch.
+- **Across midnight the forecast keeps its old days** until the next successful fetch (the three weather
+  screens do say how old the data is once it is stale, but the days are not shifted).
 - **With the time zone on Auto, the clock shows UTC until the first weather answer** (it needs a
   city and a network): the offset comes from Open-Meteo, not from the NTP servers.
 - **`status-esp.local` is a minimal mDNS responder.** It answers address questions only: the

@@ -3,6 +3,7 @@
 #include <ESP8266WiFi.h>
 
 #include "net.h"
+#include "night.h"
 #include "settings.h"
 #include "weather.h"
 
@@ -98,14 +99,18 @@ const char *monthName(int month, bool full) {
   return full ? MONTHS_FULL[month] : MONTHS_SHORT[month];
 }
 
+static int minuteOfDay(time_t t) {
+  int m = (int)((t / 60) % 1440);
+  return m < 0 ? m + 1440 : m;
+}
+
 bool inNightWindow() {
   const settings::Settings &s = settings::get();
-  if (!s.nightEnabled || s.nightStart == s.nightEnd) return false;
-  struct tm t;
-  if (!localTime(t)) return false;
-  uint16_t now = (uint16_t)(t.tm_hour * 60 + t.tm_min);
-  if (s.nightStart < s.nightEnd) return now >= s.nightStart && now < s.nightEnd;
-  return now >= s.nightStart || now < s.nightEnd;  // crosses midnight
+  if (!s.nightEnabled || !synced()) return false;
+  const weather::Data &w = weather::data();
+  time_t utc = utcNow();
+  return night::inWindow(s.nightSun, w.valid && w.offsetValid, w.sunriseMin, w.sunsetMin, s.nightStart, s.nightEnd,
+                         minuteOfDay(utc + offsetSeconds()), minuteOfDay(utc + w.utcOffsetSeconds));
 }
 
 }  // namespace timekeeping

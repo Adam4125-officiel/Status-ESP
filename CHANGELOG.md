@@ -5,6 +5,53 @@ All notable changes to this project are documented in this file. The format foll
 changes the first, second and third number, and what a `-rc.N` pre-release is) is in
 [docs/releasing.md](docs/releasing.md).
 
+## [1.2.0] - 2026-11-16
+
+Promoted from `1.2.0-rc.1` (the same build with a new version string) after the owner installed it on their device and
+found it good. Install it through the device's `/update` page like any release; the stock firmware stays one upload
+away. It contains everything in 1.1.2. Works with the same Status-Portal as 1.1.x (1.11.1 for everything).
+
+### Added
+- **Night mode: a night theme.** In Settings, Night mode, "Theme at night" shows the chosen theme (for example the
+  clock) for as long as the night window lasts and pauses the auto-switch; when the window ends the screen goes
+  back to the theme or the rotation of the settings. "No change" (the default) keeps today's behaviour: night
+  mode only dims. A Status-Portal alert in "switch" mode still takes the screen first. A theme you choose during the
+  night (the "Try" button included) stays until the window ends, so the two never fight. New setting `night_theme`
+  (a theme name, or ""), in the settings file, the API and the export.
+- **Night mode: from sunset to sunrise.** The new "From sunset to sunrise" box makes the night window the one of the
+  weather city (the times above are used until the weather is known, and when the sun does not rise or set). The
+  comparison is made in the city's own time, so a manual time zone does not shift it. New setting `night_sun` (0 or
+  1, off by default). The window logic (`night.h`) is tested on the PC (`tests/host/test_night.cpp`).
+- **The weather screens say when their data is old.** When the weather cannot be refreshed (the network or
+  Open-Meteo is down), the last answer used to stay on screen as if it were fresh. Now, once it is older than twice
+  the refresh interval and at least 90 minutes, a yellow hint appears: "Weather 3 h old" in the sun row of the
+  weather clock (it replaces the sunrise and sunset times meanwhile; the GIF is not touched), and " - 3 h old"
+  after the city on the forecast and the hourly forecast. The age is in whole hours, then whole days ("2 d old"),
+  and the screen repaints only when that text changes (once an hour), never on every pass. The rule is one
+  function, `weather::staleMinutes()`, tested on the PC with the three screens (safe area, overlaps, longest city,
+  12-hour format, a GIF playing, `millis()` wrapping).
+- **Pictures are prepared in your browser before they go to the album.** Choose any picture (JPG, PNG, WebP...) in
+  the Pictures tab: the page decodes it, applies its rotation (EXIF), draws it on a 240 x 240 canvas and uploads
+  that as a baseline JPEG under the same name with a `.jpg` ending. A selector next to the file field picks "Fill
+  the screen (crop)" (the default), "Fit (black bars)" or "Do not resize", which sends the file untouched exactly as
+  before. GIFs are always sent untouched so they keep their animation. If the browser cannot read the picture the
+  original is sent when it is a JPG, with a message; otherwise the upload is refused. This lifts, for pictures
+  uploaded this way, the album's progressive-JPEG, rotation and size limits, and makes big photos load faster. The
+  firmware is unchanged by it; only the page grew.
+- **"Check for updates" in Settings, Firmware.** One click asks GitHub whether a newer release exists (stable only,
+  or the newest pre-release too when "include pre-releases" is ticked) and shows either "You have the latest
+  version", or the new version with links to its release page and its `.bin`, and a reminder to upload that file on
+  the Firmware update page. It is your browser that contacts github.com, only when you click: the device still
+  cannot do TLS and sends nothing. GitHub limits anonymous requests; the page says so if you hit that. The version
+  comparison (`-rc.N` older than the same stable) is tested on the PC (`tests/web/test_cmp_ver.js`, run by
+  `tools/test_host.sh` when Node is installed).
+- **"Try" a theme without saving it.** Next to the theme selector in Settings, "Try" puts the chosen theme on the
+  screen right now (with auto-switch off) and the page shows "Showing <theme> - not saved" with a "Go back" button.
+  Nothing is written to the device's flash: a reboot always brings back the saved theme. While a try is active,
+  every other save on the page (night mode, brightness, a password, a settings import...) first carries the saved
+  theme and auto-switch back, so the tried theme can never be saved by accident; the Theme card's own Save keeps
+  what the form shows; and leaving or reloading the page puts the saved theme back too.
+
 ## [1.1.2] - 2026-11-16
 
 Mostly fixes and security hardening, with one small addition the owner asked for (the conditions icon on the weather

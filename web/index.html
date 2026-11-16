@@ -67,6 +67,7 @@ a{color:#8cf}
 </nav>
 <main>
 <div id="banner" class="banner" hidden></div>
+<div id="try-banner" class="banner" hidden><span id="try-msg"></span> <button type="button" class="small alt" id="try-back">Go back</button></div>
 
 <!-- 1. Status-Portal ------------------------------------------------------------------>
 <section class="tab" id="t-portal">
@@ -242,8 +243,9 @@ a{color:#8cf}
   </div>
   <div class="card">
     <h2>Pictures</h2>
-    <p class="hint">JPG or GIF, 240 x 240 px. Baseline JPEG only (not progressive). Stored in /image.</p>
-    <input type="file" id="img-file" accept=".jpg,.jpeg,.gif,image/jpeg,image/gif">
+    <p class="hint">Any picture (JPG, PNG, WebP...): your browser turns it into a 240 x 240 baseline JPEG before sending it, rotation included. GIFs are sent as they are, to keep their animation. "Do not resize" sends the file untouched: JPG (baseline, not progressive, under about 1,900 px) or GIF only. Stored in /image.</p>
+    <input type="file" id="img-file" accept="image/*,.jpg,.jpeg,.gif">
+    <select id="img-fit"><option value="fill">Fill the screen (crop)</option><option value="fit">Fit (black bars)</option><option value="raw">Do not resize</option></select>
     <button type="button" id="img-up">Upload</button>
     <progress id="img-prog" max="100" value="0" hidden></progress>
     <ul class="list" id="img-list"></ul>
@@ -257,7 +259,7 @@ a{color:#8cf}
     <h2>Theme</h2>
     <form data-settings id="f-theme">
       <label for="theme">Theme shown on the screen</label>
-      <select id="theme" name="theme">
+      <div class="row"><select id="theme" name="theme">
         <option value="weather_clock">Weather clock</option>
         <option value="forecast">Forecast (3 days)</option>
         <option value="hourly">Hourly forecast (24 hours)</option>
@@ -268,8 +270,8 @@ a{color:#8cf}
         <option value="portal">Status-Portal</option>
         <option value="resources">Resources (Status-Portal)</option>
         <option value="vms">Virtual machines (Status-Portal)</option>
-      </select>
-      <p class="hint">To choose a theme manually, turn auto-switch off.</p>
+      </select><button type="button" class="alt" id="theme-try" style="flex:0 0 auto;margin-top:0">Try</button></div>
+      <p class="hint">To choose a theme manually, turn auto-switch off. "Try" shows the chosen theme now without saving it (a reboot brings back the saved one).</p>
       <label class="inline"><input type="checkbox" name="auto_switch" data-t="b"> Auto-switch between themes</label>
       <label for="auto_interval">Seconds per theme (5 - 3600)</label>
       <input type="number" id="auto_interval" name="auto_interval" data-t="n" min="5" max="3600" step="1">
@@ -308,7 +310,10 @@ a{color:#8cf}
       </div>
       <label for="night_brt">Night brightness: <b id="night-val"></b> %</label>
       <input type="range" id="night_brt" name="night_brt" data-t="n" min="0" max="100" step="1">
-      <p class="hint">Uses the time of the clock (see Time). The window may cross midnight.</p>
+      <label class="inline"><input type="checkbox" name="night_sun" data-t="b"> From sunset to sunrise (needs a city; uses the times above until the weather is known)</label>
+      <label for="night_theme">Theme at night</label>
+      <select id="night_theme" name="night_theme"><option value="">No change</option><option value="weather_clock">Weather clock</option><option value="forecast">Forecast (3 days)</option><option value="hourly">Hourly forecast (24 hours)</option><option value="album">Photo album</option><option value="clock">Clock</option><option value="words">Word clock</option><option value="binary">Binary clock</option><option value="portal">Status-Portal</option><option value="resources">Resources (Status-Portal)</option><option value="vms">Virtual machines (Status-Portal)</option></select>
+      <p class="hint">Uses the time of the clock (see Time). The window may cross midnight. The night theme replaces the others, and the auto-switch pauses, until the window ends; a theme you choose meanwhile stays until then. A Status-Portal alert still takes the screen.</p>
       <button>Save</button>
     </form>
   </div>
@@ -357,6 +362,10 @@ a{color:#8cf}
     <h3>Firmware</h3>
     <a class="btn warn" href="/update">Firmware update</a>
     <p class="hint">To go back to the stock firmware, upload the official GeekMagic firmware (.bin) on the same page.</p>
+    <button type="button" class="alt" id="upd-check">Check for updates</button>
+    <label class="inline"><input type="checkbox" id="upd-pre"> include pre-releases</label>
+    <p id="upd-res"></p>
+    <p class="hint">Only when you click: your browser, not the device, contacts github.com.</p>
   </div>
 
   <div class="card">
@@ -495,8 +504,23 @@ function collect(form) {
   return o;
 }
 
+/* "Try" a theme: applied live (save=0) while the device's RAM copy differs from the saved file, so any
+   save has to carry the saved theme back (it would persist the tried one otherwise). */
+var tried = null;
+function liveSet(o, keep) {
+  return fetch("/api/settings?save=0", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(o), keepalive: !!keep });
+}
+function endTry() {
+  tried = null;
+  $("#try-banner").hidden = true;
+  $("#theme").value = S.theme;
+}
+
 function save(obj, msg) {
+  var t = tried;
+  if (t && obj.theme === undefined) { obj.theme = t.theme; obj.auto_switch = t.auto_switch; }
   return post("/api/settings", obj).then(function (j) {
+    if (t) endTry();
     S = j;
     fill();
     toast(msg || "Saved");
@@ -635,13 +659,14 @@ function loadFiles(dir) {
   }).catch(function (e) { toast(e.message, false); });
 }
 
-function upload(dir, input, prog, allowed) {
-  var f = input.files[0];
+function upload(dir, input, prog, allowed, blob, name) {
+  var f = blob || input.files[0];
   if (!f) { toast("Choose a file first", false); return; }
-  var ext = (f.name.split(".").pop() || "").toLowerCase();
+  name = name || f.name;
+  var ext = (name.split(".").pop() || "").toLowerCase();
   if (allowed.indexOf(ext) < 0) { toast("Only ." + allowed.join(", .") + " files are accepted here", false); return; }
   var fd = new FormData();
-  fd.append("file", f, f.name);
+  fd.append("file", f, name);
   var x = new XMLHttpRequest();
   x.open("POST", "/api/upload?dir=" + dir);
   prog.hidden = false;
@@ -661,6 +686,80 @@ function upload(dir, input, prog, allowed) {
   };
   x.onerror = function () { prog.hidden = true; toast("Upload failed: the connection was lost", false); };
   x.send(fd);
+}
+
+/* Album pictures: decode (EXIF rotation honoured), draw on 240x240, re-encode as baseline JPEG. */
+function decodeImg(f) {
+  return new Promise(function (ok, no) {
+    var u = URL.createObjectURL(f), i = new Image();
+    i.onload = function () { URL.revokeObjectURL(u); ok(i); };
+    i.onerror = function () { URL.revokeObjectURL(u); no(new Error("decode")); };
+    i.src = u;
+  });
+}
+function prepImage(f, fit) {
+  var d = window.createImageBitmap ? createImageBitmap(f, { imageOrientation: "from-image" }).catch(function () { return decodeImg(f); }) : decodeImg(f);
+  return d.then(function (im) {
+    var w = im.width, h = im.height, c = document.createElement("canvas"), x = c.getContext("2d");
+    c.width = c.height = 240;
+    x.fillStyle = "#000";
+    x.fillRect(0, 0, 240, 240);
+    x.imageSmoothingQuality = "high";
+    var k = Math[fit === "fill" ? "max" : "min"](240 / w, 240 / h);
+    x.drawImage(im, (240 - w * k) / 2, (240 - h * k) / 2, w * k, h * k);
+    if (im.close) im.close();
+    return new Promise(function (ok, no) {
+      c.toBlob(function (b) { if (b && b.type === "image/jpeg") ok(b); else no(new Error("encode")); }, "image/jpeg", 0.9);
+    });
+  });
+}
+function uploadPicture() {
+  var inp = $("#img-file"), f = inp.files[0], fit = $("#img-fit").value, prog = $("#img-prog"), ok = ["jpg", "jpeg", "gif"];
+  if (!f || fit === "raw" || /\.gif$/i.test(f.name) || f.type === "image/gif") return upload("/image", inp, prog, ok);
+  var base = f.name.replace(/\.[^.]*$/, "").replace(/[^\w.-]+/g, "_").replace(/^\.+/, "").slice(0, 27) || "image";
+  prog.hidden = false;
+  prog.removeAttribute("value");
+  prepImage(f, fit).then(function (b) { upload("/image", inp, prog, ok, b, base + ".jpg"); }, function () {
+    prog.hidden = true;
+    prog.value = 0;
+    if (/\.jpe?g$/i.test(f.name)) { toast("Could not resize here: uploading the original", false); upload("/image", inp, prog, ok); }
+    else toast("This browser cannot read that picture", false);
+  });
+}
+
+/* >>> cmpVer */
+// > 0 when version a is newer than b ("v1.2.0", "1.2.0-rc.2"); a stable one beats any -rc.N; NaN if unreadable.
+function cmpVer(a, b) {
+  function p(v) {
+    var m = /^v?(\d+)\.(\d+)\.(\d+)(-rc\.(\d+))?$/.exec(v);
+    return m && [+m[1], +m[2], +m[3], m[5] === undefined ? 1e9 : +m[5]];
+  }
+  var x = p(a), y = p(b), i;
+  if (!x || !y) return NaN;
+  for (i = 0; i < 4; i++) if (x[i] !== y[i]) return x[i] - y[i];
+  return 0;
+}
+/* <<< cmpVer */
+
+function checkUpdate() {
+  var res = $("#upd-res"), pre = $("#upd-pre").checked;
+  function link(u, t) { return /^https:\/\//.test(u) ? [el("a", { href: u, target: "_blank", rel: "noopener", text: t }), document.createTextNode(" ")] : []; }
+  res.textContent = "Checking...";
+  fetch("https://api.github.com/repos/Adam4125-officiel/Status-ESP/releases" + (pre ? "?per_page=10" : "/latest"), { headers: { Accept: "application/vnd.github+json" } }).then(function (r) {
+    if (!r.ok) throw new Error(r.status === 403 || r.status === 429 ? "GitHub's rate limit is reached, try again later (HTTP " + r.status + ")" : "HTTP " + r.status);
+    return r.json();
+  }).then(function (j) {
+    var rel = pre ? (j || []).filter(function (x) { return !x.draft; })[0] : j, cur = ST.version, d = rel && cmpVer(rel.tag_name, cur);
+    if (!rel || d !== d) throw new Error("no readable release (running " + cur + ")");
+    var v = rel.tag_name.replace(/^v/, "");
+    res.textContent = "";
+    if (d <= 0) { res.textContent = "You have the latest version (" + cur + ")."; return; }
+    var bin = (rel.assets || []).filter(function (x) { return /\.bin$/.test(x.name); })[0];
+    res.appendChild(el("b", { text: "Version " + v + (rel.prerelease ? " (pre-release)" : "") + " is available. " }));
+    link(rel.html_url, "Release page").concat(bin ? link(bin.browser_download_url, bin.name) : []).forEach(function (n) { res.appendChild(n); });
+    res.appendChild(el("br"));
+    res.appendChild(document.createTextNode("Download the .bin, then upload it on the Firmware update page."));
+  }).catch(function (e) { res.textContent = "Could not reach GitHub: " + e.message; });
 }
 
 /* ---- City search --------------------------------------------------------------------------- */
@@ -757,7 +856,22 @@ function init() {
 
   $("#gif-up").onclick = function () { upload("/gif", $("#gif-file"), $("#gif-prog"), ["gif"]); };
   $("#gif-none").onclick = function () { save({ weather_gif: "" }, "No GIF on the weather screen").then(function () { loadFiles("/gif"); }, function () {}); };
-  $("#img-up").onclick = function () { upload("/image", $("#img-file"), $("#img-prog"), ["jpg", "jpeg", "gif"]); };
+  $("#img-up").onclick = uploadPicture;
+  $("#upd-check").onclick = checkUpdate;
+
+  $("#theme-try").onclick = function () {
+    var sel = $("#theme"), t = tried || { theme: S.theme, auto_switch: S.auto_switch };
+    post("/api/settings?save=0", { theme: sel.value, auto_switch: 0 }).then(function () {
+      tried = t;
+      $("#try-msg").textContent = "Showing " + sel.options[sel.selectedIndex].text + " - not saved.";
+      $("#try-banner").hidden = false;
+    }).catch(function (e) { toast(e.message, false); });
+  };
+  $("#try-back").onclick = function () {
+    post("/api/settings?save=0", tried).then(endTry).catch(function (e) { toast(e.message, false); });
+  };
+  window.addEventListener("pagehide", function () { if (tried) liveSet(tried, true); });
+  $("#img-fit").onchange = function () { $("#img-file").accept = this.value === "raw" ? ".jpg,.jpeg,.gif,image/jpeg,image/gif" : "image/*,.jpg,.jpeg,.gif"; };
 
   // Brightness: live while the slider moves (not saved), saved when it is released.
   var brt = $("#brt"), liveTimer;
@@ -797,7 +911,7 @@ function init() {
       try { o = JSON.parse(rd.result); } catch (e) { toast("That file is not valid JSON", false); return; }
       if (!o || typeof o !== "object" || Array.isArray(o)) { toast("That file is not a settings file", false); return; }
       if (!confirm("Replace the current settings with the ones in this file?")) return;
-      post("/api/settings/import", o).then(function (j) {
+      (tried ? post("/api/settings?save=0", tried).then(endTry) : Promise.resolve()).then(function () { return post("/api/settings/import", o); }).then(function (j) {
         S = j;
         fill();
         $("#imp-file").value = "";

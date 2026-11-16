@@ -56,6 +56,11 @@ g++ -std=gnu++17 -O1 -g -Wall -Wextra -Werror -Wno-maybe-uninitialized -Wno-form
     -o "$out/test_weather_screens"
 "$out/test_weather_screens"
 
+# The night window (night.h): fixed times, sunset -> sunrise, the fallback and the two clocks. Pure.
+g++ -std=gnu++17 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -fno-sanitize-recover=undefined \
+    -Isrc tests/host/test_night.cpp -o "$out/test_night"
+"$out/test_night"
+
 # The cross-site check on the web API (origin_check.cpp): pure, strings in, verdict out.
 g++ -std=gnu++17 -O1 -g -Wall -Wextra -Werror \
     -fsanitize=address,undefined -fno-sanitize-recover=undefined \
@@ -81,3 +86,10 @@ g++ -std=gnu++17 -O1 -g -Wall -Wextra -Werror -Wno-maybe-uninitialized \
     tests/host/test_backup.cpp src/backup.cpp \
     -o "$out/test_backup"
 "$out/test_backup"
+
+# The web page's version comparison (web/index.html, between its marker comments); needs Node, skipped without it.
+if command -v node >/dev/null 2>&1; then
+  node tests/web/test_cmp_ver.js
+else
+  echo "node not found: skipping tests/web/test_cmp_ver.js"
+fi

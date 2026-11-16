@@ -373,10 +373,65 @@ static void screenTests() {
   CHECK(tft.ops > 0 && drew("Paris"));   // data is back: the screen is drawn again
 }
 
+// Stale weather: the city line says how old the answer is, in the yellow hint after the name.
+static void staleTests() {
+  defaults();
+  install();
+  show("none");
+  for (const std::string &d : tft.drawn) CHECK(d.find(" old") == std::string::npos);   // fresh: no hint
+
+  g_settings.weatherInterval = 20;
+  g_ms = 100000000UL;
+  g_weather.updatedAtMs = g_ms - 3UL * 3600000 - 600000;
+  show("hourly_stale");
+  CHECK(drew("Paris") && drew(" - 3 h old"));
+  expectClean("stale");
+  tft.resetStats();
+  screenHourlyUpdate(false);
+  CHECK(tft.ops == 0);
+  g_ms += 20UL * 60000;   // the same hour
+  tft.resetStats();
+  screenHourlyUpdate(false);
+  CHECK(tft.ops == 0);
+  g_ms += 40UL * 60000;   // the next one
+  tft.resetStats();
+  screenHourlyUpdate(false);
+  CHECK(tft.ops > 0 && drew(" - 4 h old"));
+  expectClean("stale, next hour");
+
+  // A fresh answer takes the hint away.
+  g_weather.updatedAtMs = g_ms;
+  tft.resetStats();
+  screenHourlyUpdate(false);
+  CHECK(tft.ops > 0 && !drew(" - 4 h old"));
+
+  // The widest: longest city name, Fahrenheit, 12-hour format, three-digit temperature now, days old.
+  defaults();
+  install();
+  g_settings.tempUnit = settings::TEMP_F;
+  g_settings.hour12 = true;
+  strlcpy(g_settings.city, "Llanfairpwllgwyngyllgogerychwyrndrobwllllantysiliogogogoch", sizeof(g_settings.city));
+  g_weather.tempC = 45.0f;
+  g_weather.hours[0].tempDc = 450;
+  g_ms = 100000000UL;
+  g_weather.updatedAtMs = g_ms - 12UL * 24 * 3600000;
+  g_utc = T0 + 23 * 3600;   // the hours have gone by too (a clock that is set): one is left
+  g_weather.hourN = 24;
+  show("hourly_stale_widest");
+  expectClean("stale, widest");
+  CHECK(drew(" - 12 d old"));
+  g_utc = T0;
+  g_weather.updatedAtMs = g_ms - 100UL * 60000;
+  show("none");
+  expectClean("stale, widest, 1 h");
+  CHECK(drew(" - 1 h old"));
+}
+
 int main() {
   g_opsDir = getenv("PORTAL_OPS_DIR");
   parserTests();
   screenTests();
+  staleTests();
   if (tft.log) fclose(tft.log);
   printf("%d checks, %d failed\n", checks, failures);
   return failures ? 1 : 0;

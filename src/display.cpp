@@ -228,6 +228,40 @@ static bool updateAlertSwitch() {
   return false;
 }
 
+// --- Night theme -------------------------------------------------------------------------------------
+// night_theme: while the night window lasts (timekeeping::inNightWindow(): fixed times or sunset -> sunrise) that
+// theme is shown and the rotation is paused; when the window ends the theme the settings ask for comes back.
+// Priority: an alert in "switch" mode first (a server that is down matters at night too), then the night theme,
+// then the manual theme or the rotation. A change of theme in the settings during the night (the web interface's
+// "Try" included) is the owner's choice for the rest of that night: nightPaused keeps the night theme from taking
+// the screen back until the window has ended (or night mode is edited again), so the two never fight.
+
+static bool nightActive = false;    // the night theme has the screen
+static bool nightPaused = false;    // a theme was chosen during this night: leave it
+static bool nightNow = false;       // the window is on (checked once a second)
+static uint32_t nightCheckAt = 0;
+
+// Called on every pass while a theme is active, after updateAlertSwitch().
+static void updateNightSwitch(uint32_t now) {
+  const settings::Settings &s = settings::get();
+  if (nightCheckAt == 0 || now - nightCheckAt >= 1000) {
+    nightCheckAt = now ? now : 1;
+    nightNow = s.nightTheme < settings::THEME_COUNT && timekeeping::inNightWindow();
+    if (!nightNow) nightPaused = false;
+  }
+  if (nightNow && !nightPaused) {
+    if (alertActive) return;   // the alert has the screen; the night theme follows when it clears
+    nightActive = true;
+    if (current != s.nightTheme) switchTo(s.nightTheme);
+    return;
+  }
+  if (!nightActive) return;
+  nightActive = false;           // the night is over (or its theme was removed): back to the normal choice
+  uint8_t back = startTheme();
+  if (alertActive) alertPrev = back;
+  else if (current != back) switchTo(back);
+}
+
 // The corner dot. A theme that repaints the corner (a GIF frame, a full repaint) takes it away, so it is
 // painted again after every full repaint, after every GIF frame, and every DOT_REFRESH_MS otherwise. It
 // is drawn without any clearing (a ring around a disc), so putting it back over itself changes nothing.
@@ -259,10 +293,18 @@ void settingsChanged(uint32_t changed) {
   applyBacklight();
   if (mode != MODE_THEMES) return;
   const settings::Settings &s = settings::get();
+  if (changed & settings::CH_NIGHT) {
+    nightPaused = false;   // night mode was edited: the night theme applies again
+    nightCheckAt = 0;
+  }
   if (changed & settings::CH_THEME) {
     themeSince = millis();
     uint8_t wanted = startTheme();
-    if (!s.autoSwitch) {
+    if (nightActive) {   // a theme chosen during the night wins until the night is over
+      nightActive = false;
+      nightPaused = true;
+      if (!alertActive) switchTo(wanted);
+    } else if (!s.autoSwitch) {
       if (wanted != current) switchTo(wanted);
     } else if (current == NO_THEME || !(s.autoMask & (1u << current))) {
       switchTo(wanted);
@@ -287,7 +329,8 @@ void loop() {
 
   const settings::Settings &s = settings::get();
   updateAlertSwitch();
-  if (s.autoSwitch && !alertActive && now - themeSince >= (uint32_t)s.autoInterval * 1000UL) {
+  updateNightSwitch(now);
+  if (s.autoSwitch && !alertActive && !nightActive && now - themeSince >= (uint32_t)s.autoInterval * 1000UL) {
     uint8_t next = nextInRotation(current);
     themeSince = now;
     if (next != current) switchTo(next);

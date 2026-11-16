@@ -1,6 +1,7 @@
 // Theme "hourly": the next 24 hours of the weather on one screen.
 //
-//   y   3..28   the chosen city, and the temperature now
+//   y   3..28   the chosen city, and the temperature now; when the weather is stale (weather::staleMinutes())
+//               the city is followed by " - 3 h old" in yellow
 //   y  32..116  the next six hours side by side: hour, icon, temperature, chance of rain
 //   y 120       divider
 //   y 124..140  the label of the highest temperature of the 24 hours
@@ -16,7 +17,8 @@
 // Only Fonts 2 and 4, like the Status-Portal screens: the PC tests (tests/host) know exactly those two,
 // and a layout that fits there fits on the device. Nothing here changes between two weather updates
 // except the hour the day has reached, so Update(false) compares what the screen was drawn from and
-// otherwise does nothing (no drawing call at all).
+// otherwise does nothing (no drawing call at all). The age of stale data is part of what the screen was drawn from,
+// in whole hours (days after a day): a stale screen repaints once an hour.
 #include "config.h"
 #include "display.h"
 #include "icons.h"
@@ -44,6 +46,7 @@ const uint16_t DIVIDER_COLOR = 0x2124;                 // very dark grey
 
 int8_t shownKind;        // weather_notice::Kind on the screen, -1 = nothing yet
 uint32_t shownUpdated;   // weather::Data::updatedAtMs the screen was drawn from
+uint16_t shownAge;       // weather::ageBucket() of the stale hint on screen (0 = none)
 int16_t shownSkip;       // how many of the hours had already gone by
 uint8_t shownKey;        // the unit and the hour format it was drawn in
 bool shownNoHours;       // the "no hourly data" message is what is on screen
@@ -88,20 +91,31 @@ void hourLabel(char *buf, size_t size, int hour) {
   }
 }
 
-// The city name at the left in Font 2, shortened with "..." until it fits beside the temperature now.
-void drawCity() {
+// The city name at the left in Font 2, shortened with "..." until it fits beside the temperature now. The stale
+// hint " - 3 h old" (yellow) follows it and gets a little more room: the temperature starts at about x 175.
+void drawCity(uint32_t staleMin) {
   char name[sizeof(settings::get().city)];
   strlcpy(name, settings::get().city, sizeof(name));
-  const int16_t maxW = 128;
+  char age[16] = "";
+  if (staleMin) {
+    strcpy(age, " - ");
+    weather::formatAge(age + 3, sizeof(age) - 3, staleMin);
+  }
+  const int16_t maxW = staleMin ? 156 : 128;
+  const int16_t ageW = tft.textWidth(age, 2);
   size_t len = strlen(name);
-  if (tft.textWidth(name, 2) > maxW) {
-    while (len > 3 && tft.textWidth(name, 2) + tft.textWidth("...", 2) > maxW) name[--len] = '\0';
+  if (tft.textWidth(name, 2) + ageW > maxW) {
+    while (len > 3 && tft.textWidth(name, 2) + tft.textWidth("...", 2) + ageW > maxW) name[--len] = '\0';
     strlcat(name, "...", sizeof(name));
   }
   tft.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
   tft.setTextDatum(TL_DATUM);
   tft.setTextPadding(0);
   tft.drawString(name, 6, CITY_Y, 2);
+  if (staleMin) {
+    tft.setTextColor(TFT_YELLOW, TFT_BLACK);
+    tft.drawString(age, 6 + tft.textWidth(name, 2), CITY_Y, 2);
+  }
 }
 
 // How many of the answer's hours have already gone by. The first one is the hour the answer was made in; the
@@ -185,9 +199,9 @@ void drawChart(const weather::Data &w, int16_t skip, int16_t avail) {
   }
 }
 
-void drawHourly(const weather::Data &w, int16_t skip, int16_t avail) {
+void drawHourly(const weather::Data &w, int16_t skip, int16_t avail, uint32_t staleMin) {
   clearScreen();
-  drawCity();
+  drawCity(staleMin);
   drawTemperature(config::SCREEN_W - 40, NOW_Y, w.tempC, 4, TFT_WHITE);
   drawStrip(w, skip, avail);
   tft.drawFastHLine(6, DIVIDER_Y, config::SCREEN_W - 12, DIVIDER_COLOR);
@@ -204,6 +218,7 @@ void screenHourlyEnter() {
   shownSkip = -1;
   shownKey = 255;
   shownNoHours = false;
+  shownAge = 0;
 }
 
 void screenHourlyUpdate(bool full) {
@@ -217,6 +232,7 @@ void screenHourlyUpdate(bool full) {
       shownKind = (int8_t)kind;
       shownUpdated = 0;
       shownNoHours = false;
+      shownAge = 0;
     }
     return;
   }
@@ -226,21 +242,24 @@ void screenHourlyUpdate(bool full) {
   int16_t avail = (int16_t)w.hourN - skip;
   bool noHours = avail < 1;
   uint8_t key = currentKey();
+  uint32_t staleMin = weather::staleMinutes();
+  uint16_t age = weather::ageBucket(staleMin);
   if (shownKind == (int8_t)weather_notice::NONE && w.updatedAtMs == shownUpdated && skip == shownSkip &&
-      key == shownKey && noHours == shownNoHours)
+      key == shownKey && noHours == shownNoHours && age == shownAge)
     return;
 
   if (noHours) {
     clearScreen();
     display::drawMessage("No hourly forecast", "Waiting for fresh weather data", TFT_YELLOW);
   } else {
-    drawHourly(w, skip, avail);
+    drawHourly(w, skip, avail, staleMin);
   }
   shownKind = (int8_t)weather_notice::NONE;
   shownUpdated = w.updatedAtMs;
   shownSkip = skip;
   shownKey = key;
   shownNoHours = noHours;
+  shownAge = age;
 }
 
 void screenHourlyLeave() {}

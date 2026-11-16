@@ -1,6 +1,7 @@
 // Theme "forecast": the three days after today, side by side.
 //
-//   y   6..22   the chosen city (at most 200 px wide, so it stays clear of the alert dot at the top right)
+//   y   6..22   the chosen city (at most 200 px wide, so it stays clear of the alert dot at the top right);
+//               when the weather is stale (weather::staleMinutes()) the city is followed by " - 3 h old" in yellow
 //   y  32..58   weekday
 //   y  72..128  icon (day version)
 //   y 138..164  highest temperature, warm colour
@@ -8,7 +9,9 @@
 //   y 206..222  legend and the temperature unit (nothing below y 224: the plastic over the glass hides it)
 //
 // Nothing here changes between two weather updates, so Update(false) only checks whether
-// weather::data() is new (or the reason for having none changed) and otherwise does nothing.
+// weather::data() is new (or the reason for having none changed) and otherwise does nothing. The age of stale
+// data is the one thing that moves on its own: it is part of what the screen was drawn from, in whole hours
+// (days after a day), so a stale screen repaints once an hour, not on every pass.
 // A settings change (units, city) arrives as Update(true) through CH_VISUAL.
 #include "config.h"
 #include "display.h"
@@ -35,25 +38,39 @@ const uint16_t DIVIDER_COLOR = 0x2124; // very dark grey
 
 int8_t shownKind;        // weather_notice::Kind on the screen, -1 = nothing yet
 uint32_t shownUpdated;   // weather::Data::updatedAtMs the screen was drawn from
+uint16_t shownAge;       // weather::ageBucket() of the stale hint on screen (0 = none)
 
 void clearScreen() { tft.fillRect(0, 0, config::SCREEN_W, config::SCREEN_H, TFT_BLACK); }
 
-// The city name centred in Font 2, shortened with "..." until it fits.
-void drawCity() {
+// The city name centred in Font 2, shortened with "..." until it fits. When the data is stale, " - 3 h old" follows
+// it in yellow and the whole line is centred.
+void drawCity(uint32_t staleMin) {
   char name[sizeof(settings::get().city)];
   strlcpy(name, settings::get().city, sizeof(name));
+  char age[16] = "";
+  if (staleMin) {
+    strcpy(age, " - ");
+    weather::formatAge(age + 3, sizeof(age) - 3, staleMin);
+  }
   // 200 px, centred: x 20..220. That keeps the name clear of the sides (the plastic) and of the alert dot that
   // display.cpp draws in the top-right corner (its ring spans x 220..232, y 8..20).
   const int16_t maxW = 200;
+  const int16_t ageW = tft.textWidth(age, 2);
   size_t len = strlen(name);
-  if (tft.textWidth(name, 2) > maxW) {
-    while (len > 3 && tft.textWidth(name, 2) + tft.textWidth("...", 2) > maxW) name[--len] = '\0';
+  if (tft.textWidth(name, 2) + ageW > maxW) {
+    while (len > 3 && tft.textWidth(name, 2) + tft.textWidth("...", 2) + ageW > maxW) name[--len] = '\0';
     strlcat(name, "...", sizeof(name));
   }
+  int16_t nameW = tft.textWidth(name, 2);
+  int16_t x = (config::SCREEN_W - nameW - ageW) / 2;
   tft.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
-  tft.setTextDatum(TC_DATUM);
+  tft.setTextDatum(TL_DATUM);
   tft.setTextPadding(0);
-  tft.drawString(name, config::SCREEN_W / 2, CITY_Y, 2);
+  tft.drawString(name, x, CITY_Y, 2);
+  if (staleMin) {
+    tft.setTextColor(TFT_YELLOW, TFT_BLACK);
+    tft.drawString(age, x + nameW, CITY_Y, 2);
+  }
 }
 
 // "<number><ring>" centred on cx, top-aligned at y, in Font 4.
@@ -93,9 +110,9 @@ void drawFooter() {
   footPiece(x + 2 * ringR + 1 + 3, unit, TFT_DARKGREY);
 }
 
-void drawForecast(const weather::Data &w) {
+void drawForecast(const weather::Data &w, uint32_t staleMin) {
   clearScreen();
-  drawCity();
+  drawCity(staleMin);
   for (int i = 0; i < 3; i++) {
     const weather::Day &d = w.forecast[i];
     int16_t cx = i * COL_W + COL_W / 2;
@@ -116,6 +133,7 @@ void drawForecast(const weather::Data &w) {
 void screenForecastEnter() {
   shownKind = -1;
   shownUpdated = 0;
+  shownAge = 0;
 }
 
 void screenForecastUpdate(bool full) {
@@ -128,15 +146,19 @@ void screenForecastUpdate(bool full) {
       weather_notice::draw(kind);
       shownKind = (int8_t)kind;
       shownUpdated = 0;
+      shownAge = 0;
     }
     return;
   }
 
   const weather::Data &w = weather::data();
-  if (shownKind != (int8_t)weather_notice::NONE || w.updatedAtMs != shownUpdated) {
-    drawForecast(w);
+  uint32_t staleMin = weather::staleMinutes();
+  uint16_t age = weather::ageBucket(staleMin);
+  if (shownKind != (int8_t)weather_notice::NONE || w.updatedAtMs != shownUpdated || age != shownAge) {
+    drawForecast(w, staleMin);
     shownKind = (int8_t)weather_notice::NONE;
     shownUpdated = w.updatedAtMs;
+    shownAge = age;
   }
 }
 

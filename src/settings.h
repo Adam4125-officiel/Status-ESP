@@ -20,9 +20,11 @@
 //   colon 0|1             font 0 digital (Font 7)|1 plain (Font 6)|2 large (Font 8, clock theme only)     ntp "" or host name
 //   album_auto 0|1        album_interval 2..3600 (s)    album_file "" or file in /image
 //   theme "weather_clock"|"forecast"|"hourly"|"album"|"clock"|
-//         "words"|"binary"|"portal"|"resources"
+//         "words"|"binary"|"portal"|"resources"|"vms"
 //   auto_switch 0|1       auto_interval 5..3600 (s)     auto_themes ["clock", ...]
 //   night_en 0|1          night_start "HH:MM"           night_end "HH:MM"     night_brt 0..100
+//   night_theme "" (none: night only dims) or a theme name: shown while the night window lasts, rotation paused
+//   night_sun 0|1         the night window is sunset -> sunrise of the weather city (night_start/end until known)
 //   pw "" or 4..32 printable ASCII characters: the web password (user "admin"), "" = none.
 //       Write-only: it is stored in /custom.json but never returned by toJson() unless the
 //       caller asks for secrets (only save() does), so no API response and no export has it.
@@ -52,6 +54,7 @@ enum Theme : uint8_t {
   THEME_VMS = 9,        // Status-Portal: the Hyper-V virtual machines of the machine the portal runs on
   THEME_COUNT = 10       // autoMask is a uint16_t: at most 16 themes, this is the limit
 };
+const uint8_t NIGHT_THEME_NONE = 255;
 // What Status-Portal's alert does to the display (portal_alert).
 enum PortalAlert : uint8_t { PORTAL_ALERT_OFF = 0, PORTAL_ALERT_INDICATOR = 1, PORTAL_ALERT_SWITCH = 2 };
 enum WindUnit : uint8_t { WIND_KMH = 0, WIND_MS = 1, WIND_MPH = 2 };
@@ -95,6 +98,8 @@ struct Settings {
   bool nightEnabled;
   uint16_t nightStart, nightEnd;      // minutes since local midnight
   uint8_t nightBrightness;
+  uint8_t nightTheme;                 // night_theme: a Theme shown during the night window, NIGHT_THEME_NONE = none
+  bool nightSun;                      // night_sun: sunset -> sunrise instead of nightStart -> nightEnd
   // Security
   char password[33];         // pw, "" = the web interface and the API are open
   // Status-Portal (a portal 1.10.0 or newer, over plain http on the LAN)

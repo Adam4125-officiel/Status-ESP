@@ -27,7 +27,20 @@ Founding constraints:
 - The stock files on the device (images, settings, Wi-Fi) stay untouched.
 
 ## 2. Current state (handover)
-- **1.1.2 is the current stable release (2026-11-16)**, promoted from `1.1.2-rc.1` (same build, new version string)
+- **1.2.0 is the current stable release (2026-11-16)**, promoted from `1.2.0-rc.1` (same build, new version string)
+  after the owner installed it on the device (through 1.1.2-rc.1's new `/update` handler) and said both updates seem
+  good. It contains everything in 1.1.2. Web interface: album pictures are resized to 240x240 baseline JPEGs in the
+  browser before upload, a "Check for updates" button (the browser asks GitHub, the device has no TLS), a "Try"
+  button for themes (`save=0`). Firmware: the weather themes say how old stale data is (`weather::staleMinutes()`),
+  and night mode gained a night theme (`night_theme`) and a sunset-to-sunrise window (`night_sun`, `night.h`).
+  `firmware.bin` is 513,104 bytes (about 6.9 KB of flash left), static RAM about 42,750. **Installed on the owner's
+  device: 1.2.0-rc.1 (2026-11-16), the same build as the stable apart from the version string.** Not covered by any
+  test: the night take-over in `display.cpp`, GitHub's real API, browsers other than Chromium. The owner did not
+  detail what they checked on the device, so treat those as not yet confirmed. Both stable versions (1.1.2 and
+  1.2.0) were prepared in one session on `ccr-dde9c129-d2ydij` (PR #5), with 1.1.2 cut on its own branch `1.1.2`;
+  the GitHub releases themselves are published by the owner (the environment that prepared them cannot create tags
+  or releases).
+- **1.1.2 (2026-11-16)** was the stable release before it, merged into `main` with PR #6:, promoted from `1.1.2-rc.1` (same build, new version string)
   after the owner tested it on the device (PR #5 is the draft for the session branch `ccr-dde9c129-d2ydij`; this
   version was cut on the branch `1.1.2`). Fixes plus one small addition asked for by the owner: the weather clock,
   the forecast, the clock and the alert dot moved clear of the plastic; the weather clock draws the current
@@ -36,9 +49,8 @@ Founding constraints:
   `/reboot` act on POST only; new PC tests for the weather screens, the mDNS parser and the backup restore.
   `firmware.bin` is 508,848 bytes (about 11 KB of flash left), static RAM 42,644. **Verified on the real device:
   the owner's upload of the next candidate went through this version's new `/update` handler**, so that handler is
-  now proven there (the rescue-mode library handler stays as the safety net). 1.2.0 follows on `ccr-dde9c129-d2ydij`
-  (PR #5).
-- **1.1.1 (2026-11-08)** was the stable release before it:, promoted from `1.1.1-rc.1` (same build, new version
+  now proven there (the rescue-mode library handler stays as the safety net).
+- **1.1.1 (2026-11-08)** was the stable release before it, promoted from `1.1.1-rc.1` (same build, new version
   string) after the owner tested it on the device (PR #4 merged into `main` with a merge commit, branch deleted). It
   is fixes only: the Status-Portal screen's announcement ticker moved clear of the plastic (below).
 - **1.1.0 (2026-10-08)** was promoted from `1.1.0-rc.3` after the owner tested the candidates on the device (PR #3;
@@ -47,19 +59,21 @@ Founding constraints:
   rain bars) and the **virtual machines** theme (`vms`: Hyper-V VM names, states and uptimes), and needs
   **Status-Portal 1.11.1** for the VMs (released first, 2026-10-08). The policy table in section 5 is unchanged;
   `main` is the only long-lived branch and the next version gets a branch of its own (section 6). Read
-  `CHANGELOG.md` for the detail. **Installed on the owner's device**: the stable 1.1.1 (uploaded 2026-11-08; rc.1
-  before it).
+  `CHANGELOG.md` for the detail. Installed on the owner's device at the time: the stable 1.1.1
+  (uploaded 2026-11-08; rc.1 before it).
 - **What the owner's SmallTV-Ultra taught**: the plastic over the glass hides roughly the last 16 px at the bottom
   (half of a label at y 222..238) and is unkind to anything within a few px of a side. Section 12 has the rule;
   rc.2 and rc.3 applied it to the hourly chart, the VM footer and the Resources footer; 1.1.1-rc.1 moved the
   Status-Portal screen's announcement ticker from y 220..236 to y 206..222 (8 px from the sides), released as 1.1.1.
-- **Size: `firmware.bin` is 506,512 bytes against the 520,000 limit (about 13.5 KB of flash left; it was
+- **Size: `firmware.bin` is 513,104 bytes in 1.2.0 against the 520,000 limit (about 6.9 KB of flash left). The
+  figures below were measured with 1.1.0 (506,512 bytes, static RAM 42,596 of 81,920; it was
   509,456 in 1.0.0: removing countdown (2.8 KB) and analog (7 KB, it was the only user of the trigonometry
-  functions) paid for the hourly forecast (4 KB) and the VMs (2.7 KB)), static RAM 42,596 of 81,920, idle
+  functions) paid for the hourly forecast (4 KB) and the VMs (2.7 KB)), idle
   free heap about 31 KB at rest (largest block about 30 KB), measured on the device with 1.1.0.**
   Flash and RAM are both nearly spent: a feature has to find savings first (ROADMAP, "Memory").
   Read `heap`, `max_block` and `req_heap` in `/api/status` after any change that allocates.
-- **What the firmware has**: a six-tab web interface and JSON API; Open-Meteo weather with
+- **What the firmware has**: a six-tab web interface and JSON API (it prepares album pictures in the browser, and its "Check for
+  updates" button asks GitHub from the browser, never from the device); Open-Meteo weather with
   diagnostics; NTP time with automatic or manual time zone; JPG and animated GIF playback from
   `/image` and `/gif`; night mode; a Wi-Fi boot delay; factory reset; the `status-esp.local`
   mDNS name; settings export and import; an optional web password; a full backup and restore of
@@ -450,6 +464,13 @@ Status-Portal client (0.4.0, `portal*.{h,cpp}`, `screen_portal.cpp`, `screen_res
 - **Alerts** (`portal_alert`): `switch` makes the Status-Portal screen take over while the portal
   reports a problem and give the screen back afterwards; `indicator` draws a red or orange dot in the
   corner of every other theme; `off` does neither (`display.cpp`, `updateAlertSwitch()` / `updateAlertDot()`).
+- **Night mode extras** (1.2.0, `display.cpp` `updateNightSwitch()`, `night.h`, `timekeeping::inNightWindow()`): `night_theme`
+  shows a theme while the night window lasts and pauses the rotation, built like the alert take-over. Priority: an
+  alert in `switch` mode, then the night theme, then the manual theme or the rotation. A theme change in the settings
+  during the night (the web interface's "Try" included) ends the take-over until the window ends (`nightPaused`).
+  `night_sun` makes the window sunset -> sunrise of the weather city, compared with the CITY's minutes (not the
+  screen's clock), falling back to the fixed times without weather or with a missing time. `night.h` is pure and
+  tested on the PC (`tests/host/test_night.cpp`); `display.cpp` is not.
 - **Diagnostics** are shown in the web interface's Status-Portal tab and in `/api/status`
   (`portal_on`, `portal_ok`, `portal_age`, `portal_overall`, `portal_err`, `portal_try_age`,
   `portal_fails`, `portal_http`): when the screens say "unreachable", read those first.
@@ -559,7 +580,7 @@ there, not here; when something ships, remove it from `ROADMAP.md` (the changelo
 exists). Check every idea against the 520,000-byte limit and the memory rule first.
 
 ## 15. Resuming work (read this first if you are a new session)
-1. **State.** `main` holds 1.1.2, stable (section 2). Read section 2, then `git log --oneline -15`,
+1. **State.** `main` holds 1.2.0, stable (section 2). Read section 2, then `git log --oneline -15`,
    `CHANGELOG.md` and `ROADMAP.md`. Nothing is half-done on a branch unless `git branch -a` says so.
 2. **Toolchain** (project-local, created by `bash tools/setup.sh`, git-ignored): build with
    `PLATFORMIO_CORE_DIR=$PWD/.pio-core .venv/bin/pio run`, check the image with
@@ -589,6 +610,6 @@ exists). Check every idea against the 520,000-byte limit and the memory rule fir
    was not (how it looks, anything needing a real portal answer). The owner tests on the device and finds
    what the tests missed; several rules in this file come from that.
 7. **Sensible next steps**, in the order the owner would probably ask: whatever they report after looking at
-   1.0.0 on the screen; more room for the GIFs (static RAM: 3.5 KB of string literals sit in RAM in `web.cpp`
+   1.2.0 on the screen; more room for the GIFs (static RAM: 3.5 KB of string literals sit in RAM in `web.cpp`
    and about 10 KB in all, see ROADMAP "Memory"); Jellyfin task progress (portal first); the auto-updater
    only if flash is found first.
