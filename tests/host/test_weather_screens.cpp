@@ -1,11 +1,12 @@
-// Host test of two themes: the forecast (screen_forecast.cpp) and the clock (screen_clock.cpp, both layouts), against
-// the recording stand-in for the display (TFT_eSPI.h next to this file). Built and run by tools/test_host.sh with the
-// sanitizers on.
+// Host test of three themes: the weather clock (screen_weather.cpp), the forecast (screen_forecast.cpp) and the clock
+// (screen_clock.cpp, both layouts), against the recording stand-in for the display (TFT_eSPI.h next to this file).
+// Built and run by tools/test_host.sh with the sanitizers on.
 //
 // What it holds them to: the safe area (the plastic over the glass hides the last 16 px and is unkind to the sides:
 // CLAUDE.md, section 12), no string or shape that leaves the screen, no text wider than its padding, no two texts
-// that overlap, and an unchanged screen that makes no drawing call. The REAL icons.cpp is linked; the weather, the
-// time and the settings are stubbed.
+// that overlap, an unchanged screen that makes no drawing call, and, for the weather clock, the icon of the current
+// conditions on the right when a GIF holds the left box. The REAL icons.cpp is linked (the weather clock's icon is
+// what its test looks at); the GIF decoder and the weather are stubbed.
 //
 // It cannot say how anything looks: set PORTAL_OPS_DIR=<dir> and every scenario also leaves a <name>.ops file (one
 // JSON line per drawing call) that a script can turn into a picture.
@@ -224,6 +225,224 @@ static void show(const char *name, EnterFn enter, UpdateFn update) {
   update(true);
 }
 
+// ---- The weather clock -----------------------------------------------------------------------------
+
+static void showWeather(const char *name) { show(name, screenWeatherEnter, screenWeatherUpdate); }
+
+// The bounding box of the icon(s) painted in the weather area above the sun row, right of the left box (x >= 90).
+static bool rightIcon(TFT_Box &out) {
+  bool any = false;
+  out = {240, 240, 0, 0, ""};
+  for (const TFT_Box &s : tft.shapes) {
+    if (s.x0 < 90 || s.y1 > 160) continue;
+    any = true;
+    out.x0 = s.x0 < out.x0 ? s.x0 : out.x0;
+    out.y0 = s.y0 < out.y0 ? s.y0 : out.y0;
+    out.x1 = s.x1 > out.x1 ? s.x1 : out.x1;
+    out.y1 = s.y1 > out.y1 ? s.y1 : out.y1;
+  }
+  return any;
+}
+// The same for the left box (x < 90, above the sun row).
+static bool leftIcon(TFT_Box &out) {
+  bool any = false;
+  out = {240, 240, 0, 0, ""};
+  for (const TFT_Box &s : tft.shapes) {
+    if (s.x1 > 90 || s.y1 > 166) continue;
+    any = true;
+    out.x0 = s.x0 < out.x0 ? s.x0 : out.x0;
+    out.y0 = s.y0 < out.y0 ? s.y0 : out.y0;
+    out.x1 = s.x1 > out.x1 ? s.x1 : out.x1;
+    out.y1 = s.y1 > out.y1 ? s.y1 : out.y1;
+  }
+  return any;
+}
+
+// The icon on the right is clear of every text, and 8 px from the right edge.
+static void expectIconClear(const char *scenario) {
+  TFT_Box icon;
+  checks++;
+  if (!rightIcon(icon)) {
+    failures++;
+    printf("FAIL %s: no icon on the right\n", scenario);
+    return;
+  }
+  bool bad = icon.x1 > 232 || icon.y0 < 84 || icon.y1 > 134;
+  const TFT_Box *hit = nullptr;
+  for (const TFT_Box &b : tft.boxes)
+    if (b.y0 >= 84 && overlap(icon, b)) hit = &b;
+  if (bad || hit) {
+    failures++;
+    printf("FAIL %s: icon at x %d..%d y %d..%d%s%s\n", scenario, icon.x0, icon.x1, icon.y0, icon.y1,
+           hit ? " overlaps " : "", hit ? hit->text.c_str() : "");
+  }
+}
+
+static void weatherTests() {
+  // No GIF chosen: the big icon is in the left box and there is no second one.
+  defaults();
+  install();
+  showWeather("weather_no_gif");
+  expectClean("weather, no GIF");
+  TFT_Box icon;
+  CHECK(!rightIcon(icon));
+  CHECK(leftIcon(icon) && icon.x0 >= 6 && icon.x1 <= 86 && icon.y0 >= 84 && icon.y1 <= 164);
+  CHECK(drew("Partly cloudy") && drew("Feels ") && drew("18") && drew("62%") && drew("07:42") && drew("17:05"));
+  CHECK(!g_gifOpen);
+
+  // An unchanged screen makes no drawing call, and a new answer repaints.
+  tft.resetStats();
+  screenWeatherUpdate(false);
+  CHECK(tft.ops == 0);
+  g_ms += 600000;
+  g_weather.updatedAtMs = g_ms;
+  tft.resetStats();
+  screenWeatherUpdate(false);
+  CHECK(tft.ops > 0);
+  expectClean("weather, new answer");
+  CHECK(!rightIcon(icon));
+
+  // A GIF chosen: it plays in the left box and the icon of the conditions is on the right.
+  defaults();
+  install();
+  strlcpy(g_settings.weatherGif, "cat.gif", sizeof(g_settings.weatherGif));
+  showWeather("weather_gif");
+  expectClean("weather, GIF");
+  CHECK(g_gifOpen && g_gifOpens == 1);
+  expectIconClear("weather, GIF");
+  CHECK(rightIcon(icon) && icon.x1 - icon.x0 >= 28 && icon.x1 - icon.x0 <= 44);
+  CHECK(!leftIcon(icon));   // the left box belongs to the GIF
+  tft.resetStats();
+  screenWeatherUpdate(false);   // the GIF plays a frame, nothing else is painted
+  CHECK(tft.ops == 0);
+  g_ms += 600000;
+  g_weather.updatedAtMs = g_ms;
+  g_weather.code = 63;
+  tft.resetStats();
+  screenWeatherUpdate(false);
+  CHECK(tft.ops > 0 && drew("Rain"));
+  expectClean("weather, GIF, new answer");
+  expectIconClear("weather, GIF, new answer");
+  CHECK(g_gifOpen);
+
+  // The GIF cannot open (no memory, bad file): the left box falls back to the big icon, and the small one stays
+  // where it was, so the layout does not jump.
+  defaults();
+  install();
+  strlcpy(g_settings.weatherGif, "cat.gif", sizeof(g_settings.weatherGif));
+  g_gifOk = false;
+  showWeather("weather_gif_fails");
+  expectClean("weather, GIF that cannot open");
+  expectIconClear("weather, GIF that cannot open");
+  CHECK(leftIcon(icon) && icon.x1 <= 86);
+
+  // Night: the moon and not the sun on the small icon too.
+  defaults();
+  install(5.0f, 0);
+  g_weather.isDay = false;
+  strlcpy(g_settings.weatherGif, "cat.gif", sizeof(g_settings.weatherGif));
+  showWeather("weather_gif_night");
+  expectClean("weather, night");
+  expectIconClear("weather, night");
+
+  // The notice screens replace the lower area; the data coming back repaints it with the icon.
+  defaults();
+  install();
+  strlcpy(g_settings.weatherGif, "cat.gif", sizeof(g_settings.weatherGif));
+  g_kind = weather_notice::LOADING;
+  showWeather("weather_notice");
+  expectClean("weather, notice");
+  CHECK(drew("A notice") && !rightIcon(icon));
+  g_kind = weather_notice::NONE;
+  tft.resetStats();
+  screenWeatherUpdate(false);
+  expectClean("weather, data back");
+  expectIconClear("weather, data back");
+
+  // No time yet: the clock row says so, the weather is unaffected.
+  defaults();
+  install();
+  g_synced = false;
+  strlcpy(g_settings.weatherGif, "cat.gif", sizeof(g_settings.weatherGif));
+  showWeather("weather_unsynced");
+  expectClean("weather, unsynced");
+  expectIconClear("weather, unsynced");
+
+  // The worst cases, one combination after another: every temperature from -40 to 50 C in both units, every WMO code
+  // (so every description icons::describe() has), 12 and 24 hours, every wind and pressure unit, the widest
+  // humidity, wind and pressure. The icon must clear every text and the safe area must hold.
+  size_t longest = 0;
+  std::string longestText;
+  std::set<std::string> seen;
+  int frames = 0;
+  static const float TEMPS[] = {-40.0f, -39.6f, -12.0f, -9.0f, -1.0f, 0.0f, 9.0f, 18.0f, 37.7f, 38.0f, 45.0f, 50.0f};
+  for (int unit = 0; unit < 2; unit++) {
+    for (float tempC : TEMPS) {
+      for (int code = 0; code < 100; code++) {
+        defaults();
+        install(tempC, (uint8_t)code);
+        g_settings.tempUnit = unit ? settings::TEMP_F : settings::TEMP_C;
+        g_settings.hour12 = (code % 2) == 1;
+        g_settings.windUnit = (uint8_t)(code % 3);
+        g_settings.pressUnit = (uint8_t)(code % 4);
+        g_settings.clockFont = (code / 3) % 2 ? settings::FONT_PLAIN : settings::FONT_DIGITAL;
+        g_weather.feelsC = tempC - 9.0f;
+        g_weather.humidity = 100;
+        g_weather.windKmh = 149.0f;
+        g_weather.pressureHpa = 1086.0f;
+        g_weather.sunriseMin = 12 * 60 + 58;   // 12:58 PM: the widest time
+        g_weather.sunsetMin = 23 * 60 + 59;
+        g_localSeconds = T0 + (code % 2 ? 3600 * 22 : 0);   // 12-hour: a two-digit hour
+        strlcpy(g_settings.weatherGif, "cat.gif", sizeof(g_settings.weatherGif));
+        showWeather("none");
+        char label[80];
+        snprintf(label, sizeof(label), "weather, %s %.1f C, code %d", unit ? "F" : "C", tempC, code);
+        expectClean(label);
+        expectIconClear(label);
+        frames++;
+        const char *d = icons::describe((uint8_t)code);
+        if (seen.insert(d).second && tft.textWidth(d, 2) > (int)longest) {
+          longest = (size_t)tft.textWidth(d, 2);
+          longestText = d;
+        }
+      }
+    }
+  }
+  printf("weather clock: %d worst-case frames, %zu descriptions, longest \"%s\" (%zu px)\n", frames, seen.size(),
+         longestText.c_str(), longest);
+  CHECK(seen.size() >= 25);
+}
+
+// The pictures (PORTAL_OPS_DIR): the mild case and the widest ones, with and without a GIF.
+static void weatherPictures() {
+  struct Pic {
+    const char *name;
+    float tempC;
+    uint8_t code;
+    bool gif, fahrenheit, hour12;
+  };
+  static const Pic PICS[] = {
+      {"weather_gif_mild", 18.0f, 2, true, false, false},
+      {"weather_gif_cold_longest", -12.0f, 86, true, false, true},
+      {"weather_gif_hot_f_longest", 40.0f, 86, true, true, true},
+      {"weather_gif_coldest_f", -40.0f, 99, true, true, false},
+      {"weather_gif_night", 3.0f, 0, true, false, false},
+      {"weather_nogif_mild", 18.0f, 2, false, false, false},
+      {"weather_nogif_cold_longest", -12.0f, 86, false, false, true},
+  };
+  for (const Pic &p : PICS) {
+    defaults();
+    install(p.tempC, p.code);
+    g_weather.isDay = strcmp(p.name, "weather_gif_night") != 0;
+    g_settings.tempUnit = p.fahrenheit ? settings::TEMP_F : settings::TEMP_C;
+    g_settings.hour12 = p.hour12;
+    if (p.gif) strlcpy(g_settings.weatherGif, "cat.gif", sizeof(g_settings.weatherGif));
+    showWeather(p.name);
+    expectClean(p.name);
+    if (p.gif) expectIconClear(p.name);
+  }
+}
+
 // ---- The forecast ----------------------------------------------------------------------------------
 
 static void showForecast(const char *name) { show(name, screenForecastEnter, screenForecastUpdate); }
@@ -358,6 +577,8 @@ static void clockTests() {
 
 int main() {
   g_opsDir = getenv("PORTAL_OPS_DIR");
+  weatherTests();
+  weatherPictures();
   forecastTests();
   clockTests();
   if (tft.log) fclose(tft.log);

@@ -7,7 +7,18 @@ changes the first, second and third number, and what a `-rc.N` pre-release is) i
 
 ## [1.1.2-rc.1] - 2026-11-16
 
+### Added
+- **The weather clock shows the icon of the current conditions even when a GIF is chosen.** The left box holds your
+  GIF, so until now the conditions were only words ("Rain"). When a GIF is set, a 36 px icon of the conditions (sun,
+  cloud, rain, snow, thunder; the moon at night) now sits at the right end of the temperature row, 8 px from the edge.
+  To make room the temperature's unit is drawn smaller in that case (the widest value, 122 F, ends 2 px before the
+  icon). With no GIF chosen nothing changes: the big icon is still in the left box.
+
 ### Fixed
+- **The weather clock no longer draws into the part of the glass the plastic hides.** Humidity, wind and pressure were
+  at y 190..232 and are now at y 182..224 (caption 182..198, value 198..224); the rows above moved up by 2 to 4 px to
+  make room (GIF box and temperature y 84, conditions 134, "Feels" 150, sunrise and sunset 166). The three columns
+  moved to x 44, 120 and 196 so that "Press mmHg" and "Press inHg" keep 8 px from the right edge.
 - **The forecast and the clock no longer draw into the part of the glass the plastic hides.** The forecast's legend
   ("High  Low  C") was at y 214..230 and is now at y 206..222. The clock's hint ("Syncing the time...", "UTC - set a
   city or an offset") moved from y 214..230 to y 206..222 in both layouts; in the Large layout the date moved up from
@@ -15,7 +26,7 @@ changes the first, second and third number, and what a `-rc.N` pre-release is) i
   from both sides.
 - **The red or orange alert dot** (Status-Portal alerts set to "indicator") sat 5 px from the right edge and 6 px from
   the top; it is now 8 px from both.
-- The PC tests now hold the forecast and the clock (all three fonts, 12 and 24 hours, every hint) to the same safe area
+- The PC tests now hold the forecast, the clock (all three fonts, 12 and 24 hours, every hint) and the weather clock to the same safe area
   as the other screens, and the test display knows the digit fonts 6, 7 and 8 with their real sizes.
 
 ## [1.1.1] - 2026-11-08

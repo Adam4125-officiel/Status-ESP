@@ -46,12 +46,12 @@ g++ -std=gnu++17 -O1 -g -Wall -Wextra -Werror -Wno-maybe-uninitialized -Wno-form
     -o "$out/test_hourly"
 "$out/test_hourly"
 
-# The forecast and the clock (both layouts): the safe area, overlaps, and no redraw of an unchanged screen.
-# The real icons.cpp is linked.
+# The weather clock, the forecast and the clock (both layouts): the safe area, overlaps, no redraw of an unchanged
+# screen, and the weather clock's icon. The real icons.cpp is linked.
 g++ -std=gnu++17 -O1 -g -Wall -Wextra -Werror -Wno-maybe-uninitialized -Wno-format-truncation \
     -fsanitize=address,undefined -fno-sanitize-recover=undefined \
     -DARDUINOJSON_USE_DOUBLE=0 -DARDUINOJSON_USE_LONG_LONG=0 -DFW_VERSION='"test"' \
     -Itests/host -Isrc -isystem "$json" \
-    tests/host/test_weather_screens.cpp src/screen_forecast.cpp src/screen_clock.cpp src/icons.cpp \
+    tests/host/test_weather_screens.cpp src/screen_weather.cpp src/screen_forecast.cpp src/screen_clock.cpp src/icons.cpp \
     -o "$out/test_weather_screens"
 "$out/test_weather_screens"
