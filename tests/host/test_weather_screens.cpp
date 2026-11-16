@@ -479,6 +479,17 @@ static void forecastTests() {
   showForecast("forecast_widest");
   expectClean("forecast, widest strings");
   CHECK(drew("122") && drew("-40"));
+  // The city stays clear of the alert dot (ring at x 220..232, y 8..20) and shortened names keep their "...".
+  {
+    int cityBoxes = 0;
+    for (const TFT_Box &b : tft.boxes) {
+      if (b.y0 >= 22 || b.y1 <= 6) continue;   // the city row
+      cityBoxes++;
+      CHECK(b.x1 <= 220 && b.x0 >= 20);
+      CHECK(b.text.size() > 3 && b.text.compare(b.text.size() - 3, 3, "...") == 0);
+    }
+    CHECK(cityBoxes == 1);
+  }
 
   // Every weekday and every code (the real icons are drawn).
   for (int code = 0; code < 100; code += 3) {

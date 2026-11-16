@@ -1,6 +1,6 @@
 // Theme "forecast": the three days after today, side by side.
 //
-//   y   6..22   the chosen city (trimmed to fit within 8 px of each side)
+//   y   6..22   the chosen city (at most 200 px wide, so it stays clear of the alert dot at the top right)
 //   y  32..58   weekday
 //   y  72..128  icon (day version)
 //   y 138..164  highest temperature, warm colour
@@ -42,7 +42,9 @@ void clearScreen() { tft.fillRect(0, 0, config::SCREEN_W, config::SCREEN_H, TFT_
 void drawCity() {
   char name[sizeof(settings::get().city)];
   strlcpy(name, settings::get().city, sizeof(name));
-  const int16_t maxW = config::SCREEN_W - 16;   // 8 px from each side: the plastic
+  // 200 px, centred: x 20..220. That keeps the name clear of the sides (the plastic) and of the alert dot that
+  // display.cpp draws in the top-right corner (its ring spans x 220..232, y 8..20).
+  const int16_t maxW = 200;
   size_t len = strlen(name);
   if (tft.textWidth(name, 2) > maxW) {
     while (len > 3 && tft.textWidth(name, 2) + tft.textWidth("...", 2) > maxW) name[--len] = '\0';

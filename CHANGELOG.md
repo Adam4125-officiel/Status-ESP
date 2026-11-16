@@ -53,6 +53,9 @@ changes the first, second and third number, and what a `-rc.N` pre-release is) i
   from both sides.
 - **The red or orange alert dot** (Status-Portal alerts set to "indicator") sat 5 px from the right edge and 6 px from
   the top; it is now 8 px from both.
+- **The forecast's city name no longer runs under the alert dot.** A long name could reach x 224 and sit under the red
+  or orange dot in the top-right corner; it is now at most 200 px wide, centred (x 20 to 220), and shortened with
+  "..." as before. Names that already fit are not affected.
 - The PC tests now hold the forecast, the clock (all three fonts, 12 and 24 hours, every hint) and the weather clock to the same safe area
   as the other screens, and the test display knows the digit fonts 6, 7 and 8 with their real sizes.
 
