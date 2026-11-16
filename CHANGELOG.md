@@ -34,6 +34,12 @@ changes the first, second and third number, and what a `-rc.N` pre-release is) i
 - The PC tests now also cover the mDNS question parser (`status-esp.local`): valid and other-name questions, every
   truncation, looping and out-of-range name pointers, lying counts and lengths, and 60,000 mutated packets under the
   sanitizers. They found no bug; the firmware code is unchanged.
+- The PC tests now also run the backup writer and the restore side of `backup.cpp` (the code that reads an archive
+  uploaded by a browser) unchanged, against an in-memory file system: a round trip of the firmware's own archive, an
+  archive without the marker, unsafe names (`..`, empty parts, over 31 characters, absolute), lying or non-octal
+  sizes, bad checksums, truncation at every length, the archive fed in chunks of 1, 7, 512, 513 and 1460 bytes, a
+  full or failing storage, and 30,000 mutated archives. Every run is checked against rule 2 (nothing formatted,
+  nothing deleted, only clean paths written). They found no bug; `backup.cpp` is unchanged.
 
 ### Fixed
 - **The weather clock no longer draws into the part of the glass the plastic hides.** Humidity, wind and pressure were

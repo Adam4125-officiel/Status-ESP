@@ -284,7 +284,10 @@ tools/test_host.sh           builds and runs tests/host/ with the PC's g++ (need
 tests/host/                  parser and screen tests against a recording stand-in for TFT_eSPI (see section 15);
                              test_weather_screens.cpp covers the forecast, the clock and the weather clock;
                              test_origin_check.cpp the cross-site check;
-                             test_mdns_dns.cpp the mDNS question parser and its fuzzer
+                             test_mdns_dns.cpp the mDNS question parser and its fuzzer;
+                             test_backup.cpp the backup writer and the restore state machine (backup.cpp
+                             unchanged) against the in-memory LittleFS in tests/host/backup/, with a fuzzer
+                             that asserts rule 2 (nothing formatted, nothing deleted, only clean names written)
 tools/check_firmware.py      checks the Arduino CRC of a .bin (and extracts a firmware from a flash image)
 tools/analyze_firmware.py    analyses a firmware binary (segments, gzip pages, strings)
 docs/hardware.md             hardware, pinout, flash layout, size constraint
@@ -548,7 +551,7 @@ exists). Check every idea against the 520,000-byte limit and the memory rule fir
    `.venv/bin/python tools/check_firmware.py .pio/build/smalltv-ultra/firmware.bin`, run the PC
    tests with `bash tools/test_host.sh` (it needs one firmware build first: it borrows ArduinoJson from
    `.pio/libdeps`; it stops at the first test program that fails, so run a later one by hand to see it fail too).
-   Run the tests after every change to `portal_*`, `weather_hourly.*`, `origin_check.*`, `mdns_dns.*` or any `screen_*.cpp`
+   Run the tests after every change to `portal_*`, `weather_hourly.*`, `origin_check.*`, `mdns_dns.*`, `backup.cpp` or any `screen_*.cpp`
    they cover (`screen_portal`, `screen_resources`, `screen_vms`, `screen_hourly`, `screen_forecast`, `screen_clock`, `screen_weather`);
    they take seconds and catch layout overflows (the stand-in knows fonts 2, 4, 6, 7 and 8, with the real widths and
    heights from the TFT_eSPI font tables: do not use another font in one of those screens without teaching it to
